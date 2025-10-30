@@ -1,0 +1,706 @@
+// MIT License
+//
+// Copyright (c) 2025 User-3090
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+
+//@version=6
+indicator("VWAP Trader AIO", overlay=true, max_lines_count=500)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CONSTANTS & CONFIGURATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+const int MAX_BARS            = 5000
+const int SCAN_WINDOW         = 10    // Rolling window: keep last N days
+const int MIN_DAYS_FOR_SCAN   = 2     // Minimum days needed before using scanned data
+const int MIN_BARS_TOTAL      = 6     // Minimum bars to start scanning (works on 4-hour+ timeframes)
+const int MIN_BARS_PER_DAY    = 1     // Minimum bars per day (filters holidays, allows multi-hour timeframes)
+const int MAX_BARS_PER_DAY    = 3000  // Maximum bars per day (supports 30-second charts on 24h markets)
+const int SECONDS_STOCK_DAY   = 23400 // 6.5 hours (stock market RTH)
+const int SECONDS_FOREX_DAY   = 86400 // 24 hours (forex trading, 5 days/week)
+const int SECONDS_FUTURES_DAY = 82800 // 23 hours (typical futures trading)
+const int SECONDS_CRYPTO_DAY  = 86400 // 24 hours (crypto trading)
+
+max_bars_back(close, MAX_BARS)
+max_bars_back(time, 5000)
+max_bars_back(high, 5000)
+
+// SMA Colors - Daily
+const color COL_SMA5   = #fbbe30  // Yellow - 5-day
+const color COL_SMA20  = #f47b00  // Orange - 20-day
+const color COL_SMA50  = #d62060  // Pink - 50-day
+const color COL_SMA200 = #e43b38  // Red - 200-day
+
+// SMA Colors - Weekly (default to match 20-day, 50-day, 200-day)
+const color COL_SMA20W = #f47b00  // Orange - 20-week
+const color COL_SMA31W = #d62060  // Pink - 31-week
+const color COL_SMA42W = #e43b38  // Red - 42-week
+
+// Shading Colors
+const color COL_SHADE_BULLISH    = color.new(#81ce6f, 90) // Green
+const color COL_SHADE_BEARISH    = color.new(#e43b38, 90) // Red
+const color COL_SHADE_TRANSITION = color.new(#fbbe30, 90) // Yellow
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INPUTS - ORGANIZED BY FEATURE
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// SMA Start Lines
+show5StartLineInput = input.bool(true, "Show 5-Day", inline="5", group="SMA Start Lines")
+startLineStyle5Input = input.string("Dashed", "Style", options=["Solid", "Dashed", "Dotted"], inline="5", group="SMA Start Lines")
+show50StartLineInput = input.bool(false, "Show 50-Day", inline="50", group="SMA Start Lines")
+startLineStyle50Input = input.string("Dashed", "Style", options=["Solid", "Dashed", "Dotted"], inline="50", group="SMA Start Lines")
+show200StartLineInput = input.bool(false, "Show 200-Day", inline="200", group="SMA Start Lines")
+startLineStyle200Input = input.string("Dashed", "Style", options=["Solid", "Dashed", "Dotted"], inline="200", group="SMA Start Lines")
+
+// Info Bar (Compact Display)
+showInfoBar = input.bool(false, "Show Info Bar", group="Info Bar", tooltip="Display compact info panel with ATR and volume data")
+infoBarPosition = input.string("Top Right", "Position", options=["Top Left", "Top Right", "Bottom Left", "Bottom Right"], group="Info Bar")
+infoBarBgColor = input.color(color.gray, "Background Color", group="Info Bar")
+infoBarTextColor = input.color(color.white, "Text Color", group="Info Bar")
+infoBarTextSize = input.string("Normal", "Text Size", options=["Auto", "Tiny", "Small", "Normal", "Large", "Huge"], group="Info Bar")
+showATR = input.bool(true, "Show ATR in Info Bar", group="Info Bar")
+atrPeriod = input.int(20, "ATR Period (Days)", minval=1, maxval=500, group="Info Bar", tooltip="Number of days for Average True Range calculation")
+riskAmount = input.float(2000, "ATR Position Size", minval=0, step=100, group="Info Bar", tooltip="Dollar risk per 1 ATR move - calculates shares/lots based on volatility")
+showVolume = input.bool(true, "Show Volume in Info Bar", group="Info Bar")
+volumePeriod = input.int(20, "Volume Period (Days)", minval=1, maxval=500, group="Info Bar", tooltip="Number of days for average volume calculation")
+
+// Pivot Points (Traditional Daily Levels)
+showPivots = input.bool(true, "Show Pivot Points", group="Pivot Points", tooltip="Display traditional pivot points: P, R1-R3, S1-S3")
+pivotIntradayOnly = input.bool(true, "Intraday Only", group="Pivot Points", tooltip="Only display on intraday timeframes, hide on daily/weekly charts")
+pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Pivot Points")
+pivotLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Pivot Points")
+pivotLabelSize = input.string("Normal", "Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Pivot Points")
+showPivotP = input.bool(false, "P", inline="P", group="Pivot Points")
+pivotColorP = input.color(#000000, "", inline="P", group="Pivot Points")
+showPivotR1 = input.bool(false, "R1", inline="R", group="Pivot Points")
+pivotColorR1 = input.color(#449955, "", inline="R", group="Pivot Points")
+showPivotR2 = input.bool(true, "R2", inline="R", group="Pivot Points")
+pivotColorR2 = input.color(#449955, "", inline="R", group="Pivot Points")
+showPivotR3 = input.bool(true, "R3", inline="R", group="Pivot Points")
+pivotColorR3 = input.color(#81ce6f, "", inline="R", group="Pivot Points")
+showPivotS1 = input.bool(false, "S1", inline="S", group="Pivot Points")
+pivotColorS1 = input.color(#b51b00, "", inline="S", group="Pivot Points")
+showPivotS2 = input.bool(true, "S2", inline="S", group="Pivot Points")
+pivotColorS2 = input.color(#b51b00, "", inline="S", group="Pivot Points")
+showPivotS3 = input.bool(true, "S3", inline="S", group="Pivot Points")
+pivotColorS3 = input.color(#d37666, "", inline="S", group="Pivot Points")
+
+// Settlement Prices (Futures Only)
+showSettlements = input.bool(true, "Show Settlement Prices", group="Settlement Prices", tooltip="Display last X settlement prices - FUTURES ONLY")
+settlementIntradayOnly = input.bool(true, "Intraday Only", group="Settlement Prices", tooltip="Only display on intraday timeframes, hide on daily/weekly charts")
+settlementCount = input.int(10, "Number of Settlements", minval=1, maxval=50, group="Settlement Prices", tooltip="How many settlement prices to display")
+settlementLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Settlement Prices")
+settlementLineStyle = input.string("Dotted", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Settlement Prices")
+settlementLabelSize = input.string("Normal", "Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Settlement Prices")
+settlementColor = input.color(#000000, "Weekday Color", group="Settlement Prices")
+settlementFridayColor = input.color(#ff0014, "Friday/Weekend Color", group="Settlement Prices", tooltip="Separate color for Friday and weekend settlements")
+settlementDistanceFilter = input.bool(true, "Filter by Distance", group="Settlement Prices", tooltip="Only show settlements within X ticks of current price (dynamic)")
+settlementMaxDistance = input.int(1000, "Max Distance (Ticks)", minval=1, group="Settlement Prices", tooltip="Maximum distance from current price to display settlement line")
+settlementHideCrossed = input.bool(true, "Hide Crossed Settlements", group="Settlement Prices", tooltip="Hide settlements that price has touched/crossed (like naked POC)")
+
+// Session Detection
+showSessionsMode = input.string("Only Futures", "Show Session Labels", options=["Always", "Only Futures", "Off"], group="Session Detection", tooltip="Display D/W/M/Y session markers on chart")
+numDailySessions = input.int(5, "Daily Sessions", minval=0, maxval=31, group="Session Detection", tooltip="Number of daily sessions to show (0 to disable)")
+numWeeklySessions = input.int(2, "Weekly Sessions", minval=0, maxval=53, group="Session Detection", tooltip="Number of weekly sessions to show (0 to disable)")
+numMonthlySessions = input.int(2, "Monthly Sessions", minval=0, maxval=12, group="Session Detection", tooltip="Number of monthly sessions to show (0 to disable)")
+numYearlySessions = input.int(2, "Yearly Sessions", minval=0, maxval=5, group="Session Detection", tooltip="Number of yearly sessions to show (0 to disable)")
+colorSessionDaily = input.color(color.new(#00b8bd, 0), "Daily Color", group="Session Detection")
+colorSessionWeekly = input.color(color.new(#b51b00, 0), "Weekly Color", group="Session Detection")
+colorSessionMonthly = input.color(color.new(#00fcff, 0), "Monthly Color", group="Session Detection")
+colorSessionYearly = input.color(color.new(color.black, 0), "Yearly Color", group="Session Detection")
+
+// Thick Bars (Hi-DPI Readability Enhancement - Lowest Priority)
+showThickBars = input.bool(true, "Show Thick Bars", group="Thick Bars", tooltip="Draw thick bars for better visibility on hi-DPI displays in thin bar mode. Automatically reserves lines for other features.")
+thickBarsBaseOnPrevClose = input.bool(false, "Base Color on Previous Close", group="Thick Bars", tooltip="When disabled, color is based on Open vs Close. When enabled, based on Previous Close vs Close")
+thickBarsWidth = input.int(2, "Bar Width", minval=1, maxval=10, group="Thick Bars")
+thickBarsColorUp = input.color(color.black, "Up Color", group="Thick Bars")
+thickBarsColorDown = input.color(color.black, "Down Color", group="Thick Bars")
+
+// Dynamic Period Separators
+showPeriodSeparators = input.bool(true, "Show Period Separators", group="Period Separators", tooltip="Automatically draw period boundary lines based on chart timeframe")
+minBarsPerSegment = input.int(7, "Min Bars Per Segment", minval=1, maxval=50, group="Period Separators", tooltip="Minimum number of bars between separators - automatically selects appropriate timeframe")
+separatorColor = input.color(color.gray, "Separator Color", group="Period Separators")
+separatorStyle = input.string("Dotted", "Separator Style", options=["Solid", "Dashed", "Dotted"], group="Period Separators")
+separatorWidth = input.int(1, "Separator Width", minval=1, maxval=5, group="Period Separators")
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADAPTIVE BARS PER DAY CALCULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Cache timeframe checks and instrument type for performance (calculated once per bar)
+int tfSeconds = timeframe.in_seconds()
+bool isIntraday = timeframe.isintraday
+bool isWeekly = timeframe.isweekly
+bool isDaily = timeframe.isdaily
+bool isMonthly = timeframe.ismonthly
+bool isFutures = syminfo.type == "futures"
+
+// Initial fallback: detect instrument type and use appropriate hours
+int theoreticalSeconds = syminfo.type == "futures" ? SECONDS_FUTURES_DAY :
+     syminfo.type == "crypto" ? SECONDS_CRYPTO_DAY :
+     syminfo.type == "forex" ? SECONDS_FOREX_DAY :
+     SECONDS_STOCK_DAY
+float theoreticalBarsPerDay = isIntraday ? math.round(theoreticalSeconds / tfSeconds) : 1.0
+var float barsPerDay = theoreticalBarsPerDay
+var array<int> barCountsPerDay = array.new<int>()
+var int dayStartBar = na
+bool hasEnoughData = bar_index >= MIN_BARS_TOTAL
+
+// Session detection arrays
+var array<int> sessionBars = array.new<int>()
+var array<float> sessionHighs = array.new<float>()
+var array<string> sessionTypes = array.new<string>()
+
+// Year detection using explicit tracking (more reliable across all timeframes)
+var int lastYear = na
+int currentYear = year(time)
+bool newYear = not na(lastYear) and currentYear != lastYear
+if barstate.isconfirmed and not na(currentYear)
+    lastYear := currentYear
+
+// Detect session changes
+bool newDay = timeframe.change("D") and barstate.isconfirmed
+bool newWeek = timeframe.change("W") and barstate.isconfirmed
+bool newMonth = timeframe.change("M") and barstate.isconfirmed
+
+// Store sessions with highest priority: Y > M > W > D
+string sessionType = newYear ? "Y" : newMonth ? "M" : newWeek ? "W" : newDay ? "D" : ""
+if sessionType != ""
+    array.unshift(sessionBars, bar_index)
+    array.unshift(sessionHighs, high)
+    array.unshift(sessionTypes, sessionType)
+    // Maintain buffer of 1000 sessions (max: 20D + 10W + 10M + 5Y)
+    if array.size(sessionBars) > 1000
+        array.pop(sessionBars)
+        array.pop(sessionHighs)
+        array.pop(sessionTypes)
+
+// Scan trading days and adapt to session changes
+if newDay and not isWeekly and hasEnoughData
+    if not na(dayStartBar)
+        int barsInDay = bar_index - dayStartBar
+
+        // Filter holidays, data gaps, corrupt data
+        if barsInDay >= MIN_BARS_PER_DAY and barsInDay <= MAX_BARS_PER_DAY
+            array.push(barCountsPerDay, barsInDay)
+
+            // Maintain rolling window
+            if array.size(barCountsPerDay) > SCAN_WINDOW
+                array.shift(barCountsPerDay)
+
+    dayStartBar := bar_index
+
+    // Use mode of last N days
+    if array.size(barCountsPerDay) >= MIN_DAYS_FOR_SCAN
+        barsPerDay := array.mode(barCountsPerDay)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SMA CALCULATIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Calculate SMA periods based on actual bars per day
+len5   = int(5 * barsPerDay)
+len20  = int(20 * barsPerDay)
+len50  = int(50 * barsPerDay)
+len200 = int(200 * barsPerDay)
+
+canShow5   = len5 > 0 and len5 <= MAX_BARS
+canShow20  = len20 > 0 and len20 <= MAX_BARS
+canShow50  = len50 > 0 and len50 <= MAX_BARS
+canShow200 = len200 > 0 and len200 <= MAX_BARS
+
+// Calculate SMAs unconditionally (Pine Script requirement), use guards for display
+sma5   = ta.sma(close, canShow5 ? math.min(len5, MAX_BARS) : 1)
+sma20  = ta.sma(close, canShow20 ? math.min(len20, MAX_BARS) : 1)
+sma50  = ta.sma(close, canShow50 ? math.min(len50, MAX_BARS) : 1)
+sma200 = ta.sma(close, canShow200 ? math.min(len200, MAX_BARS) : 1)
+
+sma20w = ta.sma(close, 20)
+sma31w = ta.sma(close, 31)
+sma42w = ta.sma(close, 42)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ATR & POSITION SIZE CALCULATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Currency symbol formatter
+getCurrencySymbol(string curr) =>
+    string _result = curr == "USD" ? "$" :
+         curr == "EUR" ? "€" :
+         curr == "GBP" ? "£" :
+         curr == "JPY" ? "¥" :
+         curr == "CNY" ? "¥" :
+         curr == "CHF" ? "CHF " :
+         curr == "AUD" ? "A$" :
+         curr == "CAD" ? "C$" :
+         curr == "NZD" ? "NZ$" :
+         curr == "HKD" ? "HK$" :
+         curr == "SGD" ? "S$" :
+         curr == "KRW" ? "₩" :
+         curr == "INR" ? "₹" :
+         curr == "RUB" ? "₽" :
+         curr == "BRL" ? "R$" :
+         curr == "ZAR" ? "R" :
+         curr == "TRY" ? "₺" :
+         curr + " "
+    _result
+
+// Combine all daily timeframe requests into single call for efficiency
+// For futures, use settlement_as_close to get settlement prices
+settlementTicker = ticker.new(syminfo.prefix, syminfo.ticker, settlement_as_close=settlement_as_close.on)
+[atrValue, avgVolume, dailyHigh, dailyLow, dailyClose] = request.security(syminfo.tickerid, "D", [ta.atr(atrPeriod), ta.sma(volume, volumePeriod), high[1], low[1], close[1]], lookahead=barmerge.lookahead_off)
+
+atrPercent = atrValue > 0 and close > 0 ? (atrValue / close) * 100 : 0
+avgVolumeFormatted = showVolume and avgVolume > 0 ? avgVolume : 0
+
+float dailyRange = dailyHigh - dailyLow
+pivotP = (dailyHigh + dailyLow + dailyClose) / 3
+pivotR1 = 2 * pivotP - dailyLow
+pivotS1 = 2 * pivotP - dailyHigh
+pivotR2 = pivotP + dailyRange
+pivotS2 = pivotP - dailyRange
+pivotR3 = dailyHigh + 2 * (pivotP - dailyLow)
+pivotS3 = dailyLow - 2 * (dailyHigh - pivotP)
+
+float calculatedShares = 0.0
+float calculatedLots = 0.0
+float capitalAmount = 0.0
+
+if riskAmount > 0 and atrValue > 0
+    if isFutures and syminfo.pointvalue > 0
+        calculatedLots := riskAmount / (atrValue * syminfo.pointvalue)
+        capitalAmount := calculatedLots * close * syminfo.pointvalue
+    else
+        calculatedShares := riskAmount / atrValue
+        capitalAmount := calculatedShares * close
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DISPLAY CONDITIONS & SHADING
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Daily SMA display conditions
+show5   = not isWeekly and isIntraday and canShow5 and bar_index >= len5 - 1
+show20  = not isWeekly and canShow20 and bar_index >= len20 - 1
+show50  = not isWeekly and canShow50 and bar_index >= len50 - 1
+show200 = not isWeekly and canShow200 and bar_index >= len200 - 1
+
+// Shading logic (only for 5-day SMA)
+canShade = show5 and not na(sma5[1])
+smaColor = canShade and close > sma5 and sma5 > sma5[1] ? COL_SHADE_BULLISH :
+           canShade and close <= sma5 and sma5 <= sma5[1] ? COL_SHADE_BEARISH :
+           canShade ? COL_SHADE_TRANSITION : na
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PLOTS - DAILY SMAs
+// ═══════════════════════════════════════════════════════════════════════════════
+
+p5   = plot(show5 ? sma5 : na, "5-Day SMA", COL_SMA5, 2)
+p20  = plot(show20 ? sma20 : na, "20-Day SMA", COL_SMA20, 2)
+p50  = plot(show50 ? sma50 : na, "50-Day SMA", COL_SMA50, 2)
+p200 = plot(show200 ? sma200 : na, "200-Day SMA", COL_SMA200, 2)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PLOTS - WEEKLY SMAs
+// ═══════════════════════════════════════════════════════════════════════════════
+
+plot(isWeekly and bar_index >= 19 ? sma20w : na, "20W SMA", COL_SMA20W, 2)
+plot(isWeekly and bar_index >= 30 ? sma31w : na, "31W SMA", COL_SMA31W, 2)
+plot(isWeekly and bar_index >= 41 ? sma42w : na, "42W SMA", COL_SMA42W, 2)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SHADING & START LINES
+// ═══════════════════════════════════════════════════════════════════════════════
+
+pClose = plot(close, display=display.none, editable=false)
+fill(pClose, p5, smaColor, title="5-Day SMA Shading")
+
+getLineStyle(s) => s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
+
+var line startLine5 = na
+if barstate.islast and show5 and show5StartLineInput and na(startLine5)
+    startBar = bar_index - len5 + 1
+    if startBar >= 0
+        startLine5 := line.new(startBar, low[len5 - 1], startBar, high[len5 - 1],
+             extend=extend.both, color=COL_SMA5, style=getLineStyle(startLineStyle5Input), width=2)
+
+var line startLine50 = na
+if barstate.islast and show50 and show50StartLineInput and na(startLine50)
+    startBar = bar_index - len50 + 1
+    if startBar >= 0
+        startLine50 := line.new(startBar, low[len50 - 1], startBar, high[len50 - 1],
+             extend=extend.both, color=COL_SMA50, style=getLineStyle(startLineStyle50Input), width=2)
+
+var line startLine200 = na
+if barstate.islast and show200 and show200StartLineInput and na(startLine200)
+    startBar = bar_index - len200 + 1
+    if startBar >= 0
+        startLine200 := line.new(startBar, low[len200 - 1], startBar, high[len200 - 1],
+             extend=extend.both, color=COL_SMA200, style=getLineStyle(startLineStyle200Input), width=2)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INFO BAR DISPLAY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showInfoBar and barstate.islast
+    pos = infoBarPosition == "Top Left" ? position.top_left :
+          infoBarPosition == "Top Right" ? position.top_right :
+          infoBarPosition == "Bottom Left" ? position.bottom_left :
+          position.bottom_right
+
+    txtSize = infoBarTextSize == "Auto" ? size.auto :
+              infoBarTextSize == "Tiny" ? size.tiny :
+              infoBarTextSize == "Small" ? size.small :
+              infoBarTextSize == "Normal" ? size.normal :
+              infoBarTextSize == "Large" ? size.large :
+              size.huge
+
+    var table infoTable = table.new(pos, 1, 1, frame_width = 1, frame_color = color.gray)
+    table.clear(infoTable, 0, 0, 0, 0)
+
+    string infoText = ""
+
+    if showATR
+        string atrText = atrValue > 0 ?
+             "ATR(" + str.tostring(atrPeriod) + "): " + str.tostring(atrPercent, "0.0") + "%" :
+             "ATR(" + str.tostring(atrPeriod) + "): N/A"
+
+        if riskAmount > 0 and atrValue > 0
+            currSymbol = getCurrencySymbol(syminfo.currency)
+            positionText = isFutures and calculatedLots > 0 ?
+                 str.tostring(calculatedLots, "0.0") + " lots (" + currSymbol + str.tostring(capitalAmount, "#,###") + ")" :
+                 not isFutures and calculatedShares > 0 ?
+                 str.tostring(math.round(calculatedShares), "#,###") + " shares (" + currSymbol + str.tostring(capitalAmount, "#,###") + ")" :
+                 "N/A"
+            atrText := atrText + " | 1 ATR = " + currSymbol + str.tostring(riskAmount, "#,###") + " → " + positionText
+
+        infoText := atrText
+
+    if showVolume and avgVolumeFormatted > 0
+        string volumeText = "Avg Vol(" + str.tostring(volumePeriod) + "): " + str.tostring(avgVolumeFormatted / 1000000, "#.##") + "M"
+        infoText := infoText == "" ? volumeText : infoText + " | " + volumeText
+
+    if infoText != ""
+        table.cell(infoTable, 0, 0, infoText, text_color = infoBarTextColor, bgcolor = infoBarBgColor, text_size = txtSize)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PIVOT POINTS DISPLAY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Convert style inputs once
+string lineStyleActual = pivotLineStyle == "Solid" ? line.style_solid : pivotLineStyle == "Dashed" ? line.style_dashed : line.style_dotted
+string labelSizeActual = pivotLabelSize == "Tiny" ? size.tiny : pivotLabelSize == "Small" ? size.small : pivotLabelSize == "Large" ? size.large : pivotLabelSize == "Huge" ? size.huge : size.normal
+
+// Store pivot lines and labels
+var line lineP = na, var line lineR1 = na, var line lineR2 = na, var line lineR3 = na
+var line lineS1 = na, var line lineS2 = na, var line lineS3 = na
+var label labelP = na, var label labelR1 = na, var label labelR2 = na, var label labelR3 = na
+var label labelS1 = na, var label labelS2 = na, var label labelS3 = na
+
+// Draw/update pivot levels
+if showPivots and (not pivotIntradayOnly or timeframe.isintraday) and not na(dayStartBar)
+    int startBar = dayStartBar
+
+    // P Level
+    if showPivotP and not na(pivotP)
+        string labelTextP = "P (" + str.tostring(pivotP, format.mintick) + ")"
+        if na(lineP)
+            lineP := line.new(startBar, pivotP, bar_index, pivotP, color=pivotColorP, width=pivotLineWidth, style=lineStyleActual)
+            labelP := label.new(bar_index, pivotP, labelTextP, color=color.new(pivotColorP, 100), textcolor=pivotColorP, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(lineP, startBar, pivotP), line.set_xy2(lineP, bar_index, pivotP)
+            label.set_xy(labelP, bar_index, pivotP), label.set_text(labelP, labelTextP)
+
+    // R1 Level
+    if showPivotR1 and not na(pivotR1)
+        string labelTextR1 = "R1 (" + str.tostring(pivotR1, format.mintick) + ")"
+        if na(lineR1)
+            lineR1 := line.new(startBar, pivotR1, bar_index, pivotR1, color=pivotColorR1, width=pivotLineWidth, style=lineStyleActual)
+            labelR1 := label.new(bar_index, pivotR1, labelTextR1, color=color.new(pivotColorR1, 100), textcolor=pivotColorR1, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(lineR1, startBar, pivotR1), line.set_xy2(lineR1, bar_index, pivotR1)
+            label.set_xy(labelR1, bar_index, pivotR1), label.set_text(labelR1, labelTextR1)
+
+    // R2 Level
+    if showPivotR2 and not na(pivotR2)
+        string labelTextR2 = "R2 (" + str.tostring(pivotR2, format.mintick) + ")"
+        if na(lineR2)
+            lineR2 := line.new(startBar, pivotR2, bar_index, pivotR2, color=pivotColorR2, width=pivotLineWidth, style=lineStyleActual)
+            labelR2 := label.new(bar_index, pivotR2, labelTextR2, color=color.new(pivotColorR2, 100), textcolor=pivotColorR2, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(lineR2, startBar, pivotR2), line.set_xy2(lineR2, bar_index, pivotR2)
+            label.set_xy(labelR2, bar_index, pivotR2), label.set_text(labelR2, labelTextR2)
+
+    // R3 Level
+    if showPivotR3 and not na(pivotR3)
+        string labelTextR3 = "R3 (" + str.tostring(pivotR3, format.mintick) + ")"
+        if na(lineR3)
+            lineR3 := line.new(startBar, pivotR3, bar_index, pivotR3, color=pivotColorR3, width=pivotLineWidth, style=lineStyleActual)
+            labelR3 := label.new(bar_index, pivotR3, labelTextR3, color=color.new(pivotColorR3, 100), textcolor=pivotColorR3, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(lineR3, startBar, pivotR3), line.set_xy2(lineR3, bar_index, pivotR3)
+            label.set_xy(labelR3, bar_index, pivotR3), label.set_text(labelR3, labelTextR3)
+
+    // S1 Level
+    if showPivotS1 and not na(pivotS1)
+        string labelTextS1 = "S1 (" + str.tostring(pivotS1, format.mintick) + ")"
+        if na(lineS1)
+            lineS1 := line.new(startBar, pivotS1, bar_index, pivotS1, color=pivotColorS1, width=pivotLineWidth, style=lineStyleActual)
+            labelS1 := label.new(bar_index, pivotS1, labelTextS1, color=color.new(pivotColorS1, 100), textcolor=pivotColorS1, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(lineS1, startBar, pivotS1), line.set_xy2(lineS1, bar_index, pivotS1)
+            label.set_xy(labelS1, bar_index, pivotS1), label.set_text(labelS1, labelTextS1)
+
+    // S2 Level
+    if showPivotS2 and not na(pivotS2)
+        string labelTextS2 = "S2 (" + str.tostring(pivotS2, format.mintick) + ")"
+        if na(lineS2)
+            lineS2 := line.new(startBar, pivotS2, bar_index, pivotS2, color=pivotColorS2, width=pivotLineWidth, style=lineStyleActual)
+            labelS2 := label.new(bar_index, pivotS2, labelTextS2, color=color.new(pivotColorS2, 100), textcolor=pivotColorS2, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(lineS2, startBar, pivotS2), line.set_xy2(lineS2, bar_index, pivotS2)
+            label.set_xy(labelS2, bar_index, pivotS2), label.set_text(labelS2, labelTextS2)
+
+    // S3 Level
+    if showPivotS3 and not na(pivotS3)
+        string labelTextS3 = "S3 (" + str.tostring(pivotS3, format.mintick) + ")"
+        if na(lineS3)
+            lineS3 := line.new(startBar, pivotS3, bar_index, pivotS3, color=pivotColorS3, width=pivotLineWidth, style=lineStyleActual)
+            labelS3 := label.new(bar_index, pivotS3, labelTextS3, color=color.new(pivotColorS3, 100), textcolor=pivotColorS3, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(lineS3, startBar, pivotS3), line.set_xy2(lineS3, bar_index, pivotS3)
+            label.set_xy(labelS3, bar_index, pivotS3), label.set_text(labelS3, labelTextS3)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SETTLEMENT PRICES DISPLAY (FUTURES ONLY)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Convert style inputs once
+string settlementLineStyleActual = settlementLineStyle == "Solid" ? line.style_solid : settlementLineStyle == "Dashed" ? line.style_dashed : line.style_dotted
+string settlementLabelSizeActual = settlementLabelSize == "Tiny" ? size.tiny : settlementLabelSize == "Small" ? size.small : settlementLabelSize == "Large" ? size.large : settlementLabelSize == "Huge" ? size.huge : size.normal
+
+// Only show for futures and optionally only on intraday timeframes
+bool showSettlementsCondition = showSettlements and isFutures and (not settlementIntradayOnly or isIntraday)
+
+// Arrays to store settlement data: lines, labels, prices, start bars, colors, and crossed status
+var array<line> settlementLines = array.new<line>()
+var array<label> settlementLabels = array.new<label>()
+var array<float> settlementPrices = array.new<float>()
+var array<int> settlementStartBars = array.new<int>()
+var array<color> settlementColors = array.new<color>()
+var array<bool> settlementCrossed = array.new<bool>()
+
+// Get settlement prices from daily timeframe (last settlementCount days)
+if showSettlementsCondition and timeframe.change("D") and barstate.isconfirmed
+    // Clear old lines/labels beyond settlementCount
+    if array.size(settlementLines) >= settlementCount
+        line.delete(array.shift(settlementLines))
+        label.delete(array.shift(settlementLabels))
+        array.shift(settlementPrices)
+        array.shift(settlementStartBars)
+        array.shift(settlementColors)
+        array.shift(settlementCrossed)
+
+    // Get settlement price and timestamp from daily timeframe
+    [settlementPrice, settlementTime] = request.security(settlementTicker, "D", [close, time], lookahead=barmerge.lookahead_off)
+
+    if not na(settlementPrice)
+        // Offset time by 1 day forward for correct label date (settlement from previous day, shown next day)
+        int labelTimestamp = settlementTime + 86400000  // Add 1 day in milliseconds
+
+        // Determine if this is Friday or weekend settlement using the adjusted date
+        int settlementDayOfWeek = dayofweek(labelTimestamp, syminfo.timezone)
+        bool isFridayOrWeekend = settlementDayOfWeek == dayofweek.friday or settlementDayOfWeek == dayofweek.saturday or settlementDayOfWeek == dayofweek.sunday
+        color lineColor = isFridayOrWeekend ? settlementFridayColor : settlementColor
+
+        // Create new line from current bar (no extend)
+        newLine = line.new(bar_index, settlementPrice, bar_index, settlementPrice, color=lineColor, width=settlementLineWidth, style=settlementLineStyleActual)
+
+        // Format date with weekday using the adjusted timestamp (1 day back)
+        string dateLabel = str.format_time(labelTimestamp, "EEE MMM dd", syminfo.timezone)
+        newLabel = label.new(bar_index, settlementPrice, dateLabel, color=color.new(lineColor, 100), textcolor=lineColor, style=label.style_label_left, size=settlementLabelSizeActual)
+
+        array.push(settlementLines, newLine)
+        array.push(settlementLabels, newLabel)
+        array.push(settlementPrices, settlementPrice)
+        array.push(settlementStartBars, bar_index)
+        array.push(settlementColors, lineColor)
+        array.push(settlementCrossed, false)
+
+var int visibleSettlementCount = 0
+visibleSettlementCount := 0
+
+if showSettlementsCondition and array.size(settlementLines) > 0
+    for i = 0 to array.size(settlementLines) - 1
+        currentPrice = array.get(settlementPrices, i)
+        bool wasCrossed = array.get(settlementCrossed, i)
+
+        if settlementHideCrossed and not wasCrossed and low <= currentPrice and high >= currentPrice
+            array.set(settlementCrossed, i, true)
+            wasCrossed := true
+
+        float distanceInTicks = math.abs(currentPrice - close) / syminfo.mintick
+        bool isWithinDistance = not settlementDistanceFilter or distanceInTicks <= settlementMaxDistance
+        bool shouldBeVisible = not (settlementHideCrossed and wasCrossed) and isWithinDistance
+
+        if shouldBeVisible
+            visibleSettlementCount += 1
+
+        // Get line/label objects
+        currentLine = array.get(settlementLines, i)
+        currentLabel = array.get(settlementLabels, i)
+        currentStartBar = array.get(settlementStartBars, i)
+        currentColor = array.get(settlementColors, i)
+
+        if not na(currentLine) and not na(currentLabel)
+            // Always update positions to keep extending
+            line.set_xy1(currentLine, currentStartBar, currentPrice)
+            line.set_xy2(currentLine, bar_index, currentPrice)
+            label.set_xy(currentLabel, bar_index, currentPrice)
+
+            // Show or hide based on visibility conditions
+            if shouldBeVisible
+                line.set_color(currentLine, currentColor)
+                label.set_textcolor(currentLabel, currentColor)
+            else
+                // Hide by making transparent, but keep extending
+                line.set_color(currentLine, color.new(currentColor, 100))
+                label.set_textcolor(currentLabel, color.new(currentColor, 100))
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SESSION DETECTION LABELS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Determine if session labels should be shown based on mode
+bool showSessionsCondition = showSessionsMode == "Always" or (showSessionsMode == "Only Futures" and syminfo.type == "futures")
+
+if showSessionsCondition and barstate.islast
+    // Determine current timeframe constraints (use cached values)
+    bool isDailyOrHigher = isDaily or isWeekly or isMonthly
+    bool isWeeklyOrHigher = isWeekly or isMonthly
+    bool isMonthlyOrHigher = isMonthly
+
+    // Counters: all counters are hierarchical (track actual timeframe progression)
+    int dailyCounter = 0, weeklyCounter = 0, monthlyCounter = 0, yearlyCounter = 0
+
+    // Validate arrays and cache sizes
+    int arraySize = array.size(sessionBars)
+    if arraySize > 0 and arraySize == array.size(sessionTypes) and arraySize == array.size(sessionHighs)
+        for i = 0 to arraySize - 1
+            // Early exit when all counters exceed limits
+            if (numDailySessions == 0 or isDailyOrHigher or dailyCounter > numDailySessions) and
+               (numWeeklySessions == 0 or isWeeklyOrHigher or weeklyCounter > numWeeklySessions) and
+               (numMonthlySessions == 0 or isMonthlyOrHigher or monthlyCounter > numMonthlySessions) and
+               (numYearlySessions == 0 or yearlyCounter > numYearlySessions)
+                break
+
+            string sType = array.get(sessionTypes, i)
+            int barIdx = array.get(sessionBars, i)
+
+            // Skip bars beyond buffer
+            if bar_index - barIdx > 4999
+                continue
+
+            // Increment counters hierarchically (Y increments all, M increments M/W/D, W increments W/D, D increments D)
+            dailyCounter += 1
+            if sType == "W" or sType == "M" or sType == "Y"
+                weeklyCounter += 1
+            if sType == "M" or sType == "Y"
+                monthlyCounter += 1
+            if sType == "Y"
+                yearlyCounter += 1
+
+            // Determine display properties (highest priority wins)
+            int displayCounter = sType == "Y" ? yearlyCounter : sType == "M" ? monthlyCounter : sType == "W" ? weeklyCounter : dailyCounter
+            color labelColor = sType == "Y" ? colorSessionYearly : sType == "M" ? colorSessionMonthly : sType == "W" ? colorSessionWeekly : colorSessionDaily
+
+            // Check display conditions (all use counter-based limits)
+            bool shouldShow = false
+            if sType == "Y" and numYearlySessions > 0 and yearlyCounter <= numYearlySessions
+                shouldShow := true
+            else if sType == "M" and numMonthlySessions > 0 and monthlyCounter <= numMonthlySessions and not isMonthlyOrHigher
+                shouldShow := true
+            else if sType == "W" and numWeeklySessions > 0 and weeklyCounter <= numWeeklySessions and not isWeeklyOrHigher
+                shouldShow := true
+            else if sType == "D" and numDailySessions > 0 and dailyCounter <= numDailySessions and not isDailyOrHigher
+                shouldShow := true
+
+            // Create label
+            if shouldShow
+                label.new(barIdx, array.get(sessionHighs, i), sType + str.tostring(displayCounter),
+                         style=label.style_label_down, color=labelColor, textcolor=color.white, size=size.small)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// DYNAMIC PERIOD SEPARATORS (LOWEST PRIORITY - AFTER THICK BARS)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showPeriodSeparators
+    // Calculate bars per timeframe unit based on current chart timeframe
+    float barsPerMinute = tfSeconds < 60 ? 60.0 / tfSeconds : na
+    float barsPerHour = tfSeconds < 3600 ? 3600.0 / tfSeconds : na
+
+    // For daily/weekly/monthly charts, use direct bar calculations
+    float barsPerWeek = na
+    float barsPerMonth = na
+    float barsPerYear = na
+
+    if isMonthly
+        barsPerYear := 12.0
+        barsPerMonth := 1.0
+    else if isWeekly
+        barsPerMonth := 4.3
+        barsPerYear := 52.0
+    else if isDaily
+        barsPerMonth := 21.0
+        barsPerYear := 252.0
+    else if barsPerDay > 0
+        // On intraday charts: use barsPerDay calculation
+        barsPerWeek := barsPerDay * 5
+        barsPerMonth := barsPerDay * 21
+        barsPerYear := barsPerDay * 252
+
+    // Determine which timeframe to use (smallest to largest)
+    string separatorTimeframe =
+         barsPerMinute >= minBarsPerSegment ? "1" :
+         barsPerHour >= minBarsPerSegment ? "60" :
+         barsPerDay >= minBarsPerSegment ? "D" :
+         barsPerWeek >= minBarsPerSegment ? "W" :
+         barsPerMonth >= minBarsPerSegment ? "M" : "12M"
+
+    // Draw separator on timeframe boundary
+    if timeframe.change(separatorTimeframe)
+        string separatorLineStyle = separatorStyle == "Solid" ? line.style_solid :
+             separatorStyle == "Dashed" ? line.style_dashed : line.style_dotted
+        line.new(bar_index, high, bar_index, low,
+             extend=extend.both, color=separatorColor, style=separatorLineStyle, width=separatorWidth)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// THICK BARS DISPLAY (HI-DPI READABILITY - LOWEST PRIORITY)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+if showThickBars
+    int reservedLines = ((show5StartLineInput or show50StartLineInput or show200StartLineInput) ? 3 : 0) + (showPivots ? 7 : 0) + (showSettlements and isFutures ? array.size(settlementLines) : 0)
+    int barsFromEnd = last_bar_index - bar_index
+
+    if barsFromEnd < (500 - reservedLines)
+        color barColor = thickBarsBaseOnPrevClose ?
+             (close >= close[1] ? thickBarsColorUp : thickBarsColorDown) :
+             (close >= open ? thickBarsColorUp : thickBarsColorDown)
+        line.new(bar_index, high, bar_index, low, width=thickBarsWidth, color=barColor, xloc=xloc.bar_index)
