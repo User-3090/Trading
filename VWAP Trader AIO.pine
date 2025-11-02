@@ -53,14 +53,19 @@ const color COL_SMA20W = #f47b00  // Orange - 20-week
 const color COL_SMA31W = #d62060  // Pink - 31-week
 const color COL_SMA42W = #e43b38  // Red - 42-week
 
-// Shading Colors
-const color COL_SHADE_BULLISH    = color.new(#81ce6f, 90) // Green
-const color COL_SHADE_BEARISH    = color.new(#e43b38, 90) // Red
-const color COL_SHADE_TRANSITION = color.new(#fbbe30, 90) // Yellow
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INPUTS - ORGANIZED BY FEATURE
 // ═══════════════════════════════════════════════════════════════════════════════
+
+// 5-Day SMA Shading
+shadingMode = input.string("Flat", "Shading Mode", options=["None", "Flat", "Gradient"], group="5-Day SMA Shading", tooltip="None = disabled, Flat = uniform color, Gradient = fades from bar")
+shadeBullishColor = input.color(color.new(#81ce6f, 90), "Bullish Color", group="5-Day SMA Shading", tooltip="Shading when price above rising 5-Day SMA")
+shadeBearishColor = input.color(color.new(#e43b38, 90), "Bearish Color", group="5-Day SMA Shading", tooltip="Shading when price below falling 5-Day SMA")
+shadeTransitionColor = input.color(color.new(#fbbe30, 90), "Transition Color", group="5-Day SMA Shading", tooltip="Shading during mixed conditions")
+shadowLengthPercent = input.float(0.2, "Shadow Length (%)", minval=0.01, step=0.01, group="5-Day SMA Shading", tooltip="Shadow distance from bar (gradient mode only)")
+gradientMaxAlpha = input.int(100, "Fade To Alpha", group="5-Day SMA Shading", tooltip="Transparency at shadow end (gradient mode only)")
 
 // SMA Start Lines
 show5StartLineInput = input.bool(true, "Show 5-Day", inline="5", group="SMA Start Lines")
@@ -70,24 +75,9 @@ startLineStyle50Input = input.string("Dashed", "Style", options=["Solid", "Dashe
 show200StartLineInput = input.bool(false, "Show 200-Day", inline="200", group="SMA Start Lines")
 startLineStyle200Input = input.string("Dashed", "Style", options=["Solid", "Dashed", "Dotted"], inline="200", group="SMA Start Lines")
 
-// Info Bar (Compact Display)
-showInfoBar = input.bool(false, "Show Info Bar", group="Info Bar", tooltip="Display compact info panel with ATR and volume data")
-infoBarPosition = input.string("Top Right", "Position", options=["Top Left", "Top Right", "Bottom Left", "Bottom Right"], group="Info Bar")
-infoBarBgColor = input.color(color.gray, "Background Color", group="Info Bar")
-infoBarTextColor = input.color(color.white, "Text Color", group="Info Bar")
-infoBarTextSize = input.string("Normal", "Text Size", options=["Auto", "Tiny", "Small", "Normal", "Large", "Huge"], group="Info Bar")
-showATR = input.bool(true, "Show ATR in Info Bar", group="Info Bar")
-atrPeriod = input.int(20, "ATR Period (Days)", minval=1, maxval=500, group="Info Bar", tooltip="Number of days for Average True Range calculation")
-riskAmount = input.float(2000, "ATR Position Size", minval=0, step=100, group="Info Bar", tooltip="Dollar risk per 1 ATR move - calculates shares/lots based on volatility")
-showVolume = input.bool(true, "Show Volume in Info Bar", group="Info Bar")
-volumePeriod = input.int(20, "Volume Period (Days)", minval=1, maxval=500, group="Info Bar", tooltip="Number of days for average volume calculation")
-
 // Pivot Points (Traditional Daily Levels)
 showPivots = input.bool(true, "Show Pivot Points", group="Pivot Points", tooltip="Display traditional pivot points: P, R1-R3, S1-S3")
 pivotIntradayOnly = input.bool(true, "Intraday Only", group="Pivot Points", tooltip="Only display on intraday timeframes, hide on daily/weekly charts")
-pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Pivot Points")
-pivotLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Pivot Points")
-pivotLabelSize = input.string("Normal", "Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Pivot Points")
 showPivotP = input.bool(false, "P", inline="P", group="Pivot Points")
 pivotColorP = input.color(#000000, "", inline="P", group="Pivot Points")
 showPivotR1 = input.bool(false, "R1", inline="R", group="Pivot Points")
@@ -102,19 +92,22 @@ showPivotS2 = input.bool(true, "S2", inline="S", group="Pivot Points")
 pivotColorS2 = input.color(#b51b00, "", inline="S", group="Pivot Points")
 showPivotS3 = input.bool(true, "S3", inline="S", group="Pivot Points")
 pivotColorS3 = input.color(#d37666, "", inline="S", group="Pivot Points")
+pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Pivot Points")
+pivotLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Pivot Points")
+pivotLabelSize = input.string("Normal", "Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Pivot Points")
 
 // Settlement Prices (Futures Only)
 showSettlements = input.bool(true, "Show Settlement Prices", group="Settlement Prices", tooltip="Display last X settlement prices - FUTURES ONLY")
 settlementIntradayOnly = input.bool(true, "Intraday Only", group="Settlement Prices", tooltip="Only display on intraday timeframes, hide on daily/weekly charts")
 settlementCount = input.int(10, "Number of Settlements", minval=1, maxval=50, group="Settlement Prices", tooltip="How many settlement prices to display")
-settlementLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Settlement Prices")
-settlementLineStyle = input.string("Dotted", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Settlement Prices")
-settlementLabelSize = input.string("Normal", "Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Settlement Prices")
-settlementColor = input.color(#000000, "Weekday Color", group="Settlement Prices")
-settlementFridayColor = input.color(#ff0014, "Friday/Weekend Color", group="Settlement Prices", tooltip="Separate color for Friday and weekend settlements")
 settlementDistanceFilter = input.bool(true, "Filter by Distance", group="Settlement Prices", tooltip="Only show settlements within X ticks of current price (dynamic)")
 settlementMaxDistance = input.int(1000, "Max Distance (Ticks)", minval=1, group="Settlement Prices", tooltip="Maximum distance from current price to display settlement line")
 settlementHideCrossed = input.bool(true, "Hide Crossed Settlements", group="Settlement Prices", tooltip="Hide settlements that price has touched/crossed (like naked POC)")
+settlementColor = input.color(#000000, "Weekday Color", group="Settlement Prices")
+settlementFridayColor = input.color(#ff0014, "Friday/Weekend Color", group="Settlement Prices", tooltip="Separate color for Friday and weekend settlements")
+settlementLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Settlement Prices")
+settlementLineStyle = input.string("Dotted", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Settlement Prices")
+settlementLabelSize = input.string("Normal", "Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Settlement Prices")
 
 // Session Detection
 showSessionsMode = input.string("Only Futures", "Show Session Labels", options=["Always", "Only Futures", "Off"], group="Session Detection", tooltip="Display D/W/M/Y session markers on chart")
@@ -127,19 +120,32 @@ colorSessionWeekly = input.color(color.new(#b51b00, 0), "Weekly Color", group="S
 colorSessionMonthly = input.color(color.new(#00fcff, 0), "Monthly Color", group="Session Detection")
 colorSessionYearly = input.color(color.new(color.black, 0), "Yearly Color", group="Session Detection")
 
-// Thick Bars (Hi-DPI Readability Enhancement - Lowest Priority)
-showThickBars = input.bool(true, "Show Thick Bars", group="Thick Bars", tooltip="Draw thick bars for better visibility on hi-DPI displays in thin bar mode. Automatically reserves lines for other features.")
-thickBarsBaseOnPrevClose = input.bool(false, "Base Color on Previous Close", group="Thick Bars", tooltip="When disabled, color is based on Open vs Close. When enabled, based on Previous Close vs Close")
-thickBarsWidth = input.int(2, "Bar Width", minval=1, maxval=10, group="Thick Bars")
-thickBarsColorUp = input.color(color.black, "Up Color", group="Thick Bars")
-thickBarsColorDown = input.color(color.black, "Down Color", group="Thick Bars")
-
-// Dynamic Period Separators
+// Period Separators
 showPeriodSeparators = input.bool(true, "Show Period Separators", group="Period Separators", tooltip="Automatically draw period boundary lines based on chart timeframe")
 minBarsPerSegment = input.int(7, "Min Bars Per Segment", minval=1, maxval=50, group="Period Separators", tooltip="Minimum number of bars between separators - automatically selects appropriate timeframe")
 separatorColor = input.color(color.gray, "Separator Color", group="Period Separators")
 separatorStyle = input.string("Dotted", "Separator Style", options=["Solid", "Dashed", "Dotted"], group="Period Separators")
 separatorWidth = input.int(1, "Separator Width", minval=1, maxval=5, group="Period Separators")
+
+// Thick Bars (Hi-DPI Enhancement)
+showThickBars = input.bool(true, "Show Thick Bars", group="Thick Bars", tooltip="Draw thick bars for better visibility on hi-DPI displays")
+thickBarsBaseOnPrevClose = input.bool(false, "Base Color on Previous Close", group="Thick Bars", tooltip="When disabled, color is based on Open vs Close. When enabled, based on Previous Close vs Close")
+thickBarsColorUp = input.color(color.black, "Up Color", group="Thick Bars")
+thickBarsColorDown = input.color(color.black, "Down Color", group="Thick Bars")
+thickBarsWidth = input.int(2, "Bar Width", minval=1, maxval=10, group="Thick Bars")
+
+// Info Bar (Compact Display)
+showInfoBar = input.bool(false, "Show Info Bar", group="Info Bar", tooltip="Display compact info panel with ATR and volume data")
+infoBarPosition = input.string("Top Center", "Position", options=["Top Left", "Top Center", "Top Right", "Bottom Left", "Bottom Center", "Bottom Right"], group="Info Bar")
+showTicker = input.bool(true, "Show Ticker", group="Info Bar", tooltip="Display ticker symbol at start of info bar")
+showATR = input.bool(true, "Show ATR", group="Info Bar")
+atrPeriod = input.int(20, "ATR Period (Days)", minval=1, maxval=500, group="Info Bar", tooltip="Number of days for Average True Range calculation")
+riskAmount = input.float(2000, "ATR Position Size", minval=0, step=100, group="Info Bar", tooltip="Dollar risk per 1 ATR move - calculates shares/lots based on volatility")
+showVolume = input.bool(true, "Show Volume", group="Info Bar")
+volumePeriod = input.int(20, "Volume Period (Days)", minval=1, maxval=500, group="Info Bar", tooltip="Number of days for average volume calculation")
+infoBarTextSize = input.string("Normal", "Text Size", options=["Auto", "Tiny", "Small", "Normal", "Large", "Huge"], group="Info Bar")
+infoBarBgColor = input.color(color.gray, "Background Color", group="Info Bar")
+infoBarTextColor = input.color(color.white, "Text Color", group="Info Bar")
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // ADAPTIVE BARS PER DAY CALCULATION
@@ -302,11 +308,12 @@ show20  = not isWeekly and canShow20 and bar_index >= len20 - 1
 show50  = not isWeekly and canShow50 and bar_index >= len50 - 1
 show200 = not isWeekly and canShow200 and bar_index >= len200 - 1
 
-// Shading logic (only for 5-day SMA)
+// Determine shading color based on trend (5-day SMA only)
 canShade = show5 and not na(sma5[1])
-smaColor = canShade and close > sma5 and sma5 > sma5[1] ? COL_SHADE_BULLISH :
-           canShade and close <= sma5 and sma5 <= sma5[1] ? COL_SHADE_BEARISH :
-           canShade ? COL_SHADE_TRANSITION : na
+bool isBullish = canShade and close > sma5 and sma5 > sma5[1]
+bool isBearish = canShade and close <= sma5 and sma5 <= sma5[1]
+bool isTransition = canShade and not isBullish and not isBearish
+color baseColor = isBullish ? shadeBullishColor : isBearish ? shadeBearishColor : isTransition ? shadeTransitionColor : na
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // PLOTS - DAILY SMAs
@@ -330,7 +337,37 @@ plot(isWeekly and bar_index >= 41 ? sma42w : na, "42W SMA", COL_SMA42W, 2)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 pClose = plot(close, display=display.none, editable=false)
-fill(pClose, p5, smaColor, title="5-Day SMA Shading")
+
+// Prepare shading fill parameters based on mode
+color flatColor = na
+color gradientColorTop = na
+color gradientColorBottom = na
+float gradientTop = na
+float gradientBottom = na
+
+if canShade and not na(baseColor) and shadingMode != "None"
+    if shadingMode == "Gradient"
+        // Gradient mode: shadow fades from bar toward SMA direction
+        float shadowDistance = close * (shadowLengthPercent / 100)
+        bool aboveSMA = close > sma5
+
+        if aboveSMA
+            gradientTop := close
+            gradientBottom := close - shadowDistance
+            gradientColorTop := baseColor
+            gradientColorBottom := color.new(color.rgb(color.r(baseColor), color.g(baseColor), color.b(baseColor)), gradientMaxAlpha)
+        else
+            gradientTop := close + shadowDistance
+            gradientBottom := close
+            gradientColorTop := color.new(color.rgb(color.r(baseColor), color.g(baseColor), color.b(baseColor)), gradientMaxAlpha)
+            gradientColorBottom := baseColor
+    else
+        // Flat mode: uniform color between close and SMA
+        flatColor := baseColor
+
+// Render fills (only one will be active based on non-na values)
+fill(pClose, p5, gradientTop, gradientBottom, gradientColorTop, gradientColorBottom, title="5-Day SMA Gradient")
+fill(pClose, p5, flatColor, title="5-Day SMA Flat")
 
 getLineStyle(s) => s == "Solid" ? line.style_solid : s == "Dotted" ? line.style_dotted : line.style_dashed
 
@@ -361,8 +398,10 @@ if barstate.islast and show200 and show200StartLineInput and na(startLine200)
 
 if showInfoBar and barstate.islast
     pos = infoBarPosition == "Top Left" ? position.top_left :
+          infoBarPosition == "Top Center" ? position.top_center :
           infoBarPosition == "Top Right" ? position.top_right :
           infoBarPosition == "Bottom Left" ? position.bottom_left :
+          infoBarPosition == "Bottom Center" ? position.bottom_center :
           position.bottom_right
 
     txtSize = infoBarTextSize == "Auto" ? size.auto :
@@ -376,6 +415,9 @@ if showInfoBar and barstate.islast
     table.clear(infoTable, 0, 0, 0, 0)
 
     string infoText = ""
+
+    if showTicker
+        infoText := syminfo.ticker
 
     if showATR
         string atrText = atrValue > 0 ?
@@ -391,7 +433,7 @@ if showInfoBar and barstate.islast
                  "N/A"
             atrText := atrText + " | 1 ATR = " + currSymbol + str.tostring(riskAmount, "#,###") + " → " + positionText
 
-        infoText := atrText
+        infoText := infoText == "" ? atrText : infoText + " | " + atrText
 
     if showVolume and avgVolumeFormatted > 0
         string volumeText = "Avg Vol(" + str.tostring(volumePeriod) + "): " + str.tostring(avgVolumeFormatted / 1000000, "#.##") + "M"
