@@ -41,6 +41,7 @@ const int SECONDS_CRYPTO_DAY  = 86400 // 24 hours (crypto trading)
 max_bars_back(close, MAX_BARS)
 max_bars_back(time, 5000)
 max_bars_back(high, 5000)
+max_bars_back(low, 5000)
 
 // SMA Colors - Daily
 const color COL_SMA5   = #fbbe30  // Yellow - 5-day
@@ -66,6 +67,11 @@ shadeBearishColor = input.color(color.new(#e43b38, 90), "Bearish Color", group="
 shadeTransitionColor = input.color(color.new(#fbbe30, 90), "Transition Color", group="5-Day SMA Shading", tooltip="Shading during mixed conditions")
 shadowLengthPercent = input.float(0.2, "Shadow Length (%)", minval=0.01, step=0.01, group="5-Day SMA Shading", tooltip="Shadow distance from bar (gradient mode only)")
 gradientMaxAlpha = input.int(100, "Fade To Alpha", group="5-Day SMA Shading", tooltip="Transparency at shadow end (gradient mode only)")
+
+// Global Line Label Configuration (applies to Pivots, Settlements, Key Levels)
+globalLabelSize = input.string("Normal", "Line Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Global Line Label Settings", tooltip="Label size for all horizontal level lines (Pivots, Settlements, Key Levels)")
+globalShowPriceValues = input.bool(true, "Show Price in Labels", group="Global Line Label Settings", tooltip="Display price values in line labels (e.g., 'PDH (4523.50)' vs 'PDH')")
+globalLineLengthBars = input.int(100, "Level Line Length (Bars)", minval=10, maxval=500, group="Global Line Label Settings", tooltip="How many bars back level lines extend (Settlements, Key Levels). Pivots always span current day only.")
 
 // SMA Start Lines
 show5StartLineInput = input.bool(true, "Show 5-Day", inline="5", group="SMA Start Lines")
@@ -94,12 +100,11 @@ showPivotS3 = input.bool(true, "S3", inline="S", group="Pivot Points")
 pivotColorS3 = input.color(#d37666, "", inline="S", group="Pivot Points")
 pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Pivot Points")
 pivotLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Pivot Points")
-pivotLabelSize = input.string("Normal", "Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Pivot Points")
 
 // Settlement Prices (Futures Only)
 showSettlements = input.bool(true, "Show Settlement Prices", group="Settlement Prices", tooltip="Display last X settlement prices - FUTURES ONLY")
 settlementIntradayOnly = input.bool(true, "Intraday Only", group="Settlement Prices", tooltip="Only display on intraday timeframes, hide on daily/weekly charts")
-settlementCount = input.int(10, "Number of Settlements", minval=1, maxval=50, group="Settlement Prices", tooltip="How many settlement prices to display")
+settlementCount = input.int(10, "Number of Settlements", minval=1, maxval=50, group="Settlement Prices", tooltip="Display the LAST X most recent settlement prices (rolling window)")
 settlementDistanceFilter = input.bool(true, "Filter by Distance", group="Settlement Prices", tooltip="Only show settlements within X ticks of current price (dynamic)")
 settlementMaxDistance = input.int(1000, "Max Distance (Ticks)", minval=1, group="Settlement Prices", tooltip="Maximum distance from current price to display settlement line")
 settlementHideCrossed = input.bool(true, "Hide Crossed Settlements", group="Settlement Prices", tooltip="Hide settlements that price has touched/crossed (like naked POC)")
@@ -107,7 +112,29 @@ settlementColor = input.color(#000000, "Weekday Color", group="Settlement Prices
 settlementFridayColor = input.color(#ff0014, "Friday/Weekend Color", group="Settlement Prices", tooltip="Separate color for Friday and weekend settlements")
 settlementLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Settlement Prices")
 settlementLineStyle = input.string("Dotted", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Settlement Prices")
-settlementLabelSize = input.string("Normal", "Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Settlement Prices")
+
+// Key Levels (PDH/PDL, PWH/PWL, PMH/PML, PYH/PYL, ATH)
+showKeyLevels = input.bool(false, "Show Key Levels", group="Key Levels", tooltip="Display Previous Day/Week/Month/Year High/Low levels and All-Time High")
+showPDH = input.bool(true, "PDH", inline="PD", group="Key Levels")
+showPDL = input.bool(true, "PDL", inline="PD", group="Key Levels")
+colorPDH = input.color(#ffa500, "PDH", inline="PD", group="Key Levels")
+colorPDL = input.color(#4169e1, "PDL", inline="PD", group="Key Levels")
+showPWH = input.bool(true, "PWH", inline="PW", group="Key Levels")
+showPWL = input.bool(true, "PWL", inline="PW", group="Key Levels")
+colorPWH = input.color(#ff69b4, "PWH", inline="PW", group="Key Levels")
+colorPWL = input.color(#9370db, "PWL", inline="PW", group="Key Levels")
+showPMH = input.bool(true, "PMH", inline="PM", group="Key Levels")
+showPML = input.bool(true, "PML", inline="PM", group="Key Levels")
+colorPMH = input.color(#32cd32, "PMH", inline="PM", group="Key Levels")
+colorPML = input.color(#dc143c, "PML", inline="PM", group="Key Levels")
+showPYH = input.bool(true, "PYH", inline="PY", group="Key Levels")
+showPYL = input.bool(true, "PYL", inline="PY", group="Key Levels")
+colorPYH = input.color(#ffd700, "PYH", inline="PY", group="Key Levels")
+colorPYL = input.color(#8b4513, "PYL", inline="PY", group="Key Levels")
+showATH = input.bool(true, "ATH", inline="ATH", group="Key Levels")
+colorATH = input.color(#00ff00, "ATH", inline="ATH", group="Key Levels", tooltip="All-Time High")
+keyLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Key Levels")
+keyLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Key Levels")
 
 // Session Detection
 showSessionsMode = input.string("Only Futures", "Show Session Labels", options=["Always", "Only Futures", "Off"], group="Session Detection", tooltip="Display D/W/M/Y session markers on chart")
@@ -169,6 +196,22 @@ var float barsPerDay = theoreticalBarsPerDay
 var array<int> barCountsPerDay = array.new<int>()
 var int dayStartBar = na
 bool hasEnoughData = bar_index >= MIN_BARS_TOTAL
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HELPER FUNCTIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Convert label size string to Pine Script size constant
+getLabelSize(string sizeStr) =>
+    sizeStr == "Tiny" ? size.tiny : sizeStr == "Small" ? size.small : sizeStr == "Large" ? size.large : sizeStr == "Huge" ? size.huge : size.normal
+
+// Convert line style string to Pine Script line style constant
+getLineStyle(string styleStr) =>
+    styleStr == "Solid" ? line.style_solid : styleStr == "Dashed" ? line.style_dashed : line.style_dotted
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SESSION DETECTION
+// ═══════════════════════════════════════════════════════════════════════════════
 
 // Session detection arrays
 var array<int> sessionBars = array.new<int>()
@@ -297,6 +340,158 @@ if riskAmount > 0 and atrValue > 0
     else
         calculatedShares := riskAmount / atrValue
         capitalAmount := calculatedShares * close
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// KEY LEVELS DATA (PDH/PDL, PWH/PWL, PMH/PML, PYH/PYL, ATH)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Calculate ATH (All-Time High) using running maximum (no lookback limit)
+var float ath = na
+if na(ath)
+    ath := high
+else if high > ath
+    ath := high
+
+var line linePDH = na, var line linePDL = na, var label labelPDH = na, var label labelPDL = na
+var line linePWH = na, var line linePWL = na, var label labelPWH = na, var label labelPWL = na
+var line linePMH = na, var line linePML = na, var label labelPMH = na, var label labelPML = na
+var line linePYH = na, var line linePYL = na, var label labelPYH = na, var label labelPYL = na
+var line lineATH = na, var label labelATH = na
+
+if showKeyLevels and isIntraday and barstate.islast
+    [pdh, pdl] = request.security(syminfo.tickerid, "D", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+    [pwh, pwl] = request.security(syminfo.tickerid, "W", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+    [pmh, pml] = request.security(syminfo.tickerid, "M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+    [pyh, pyl] = request.security(syminfo.tickerid, "12M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+
+    int startBar = math.max(0, bar_index - globalLineLengthBars)
+    string keyLevelsLineStyleActual = getLineStyle(keyLevelsLineStyle)
+    string labelSizeActual = getLabelSize(globalLabelSize)
+
+    // Track rendered prices to avoid duplicates (priority: ATH > PYH/PYL > PMH/PML > PWH/PWL > PDH/PDL)
+    var array<float> renderedPrices = array.new<float>()
+    array.clear(renderedPrices)
+
+    // ATH (Highest Priority)
+    if showATH and not na(ath)
+        string labelText = globalShowPriceValues ? "ATH (" + str.tostring(ath, format.mintick) + ")" : "ATH"
+        if na(lineATH)
+            lineATH := line.new(startBar, ath, bar_index, ath, color=colorATH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelATH := label.new(bar_index, ath, labelText, color=color.new(colorATH, 100), textcolor=colorATH, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(lineATH, startBar, ath), line.set_xy2(lineATH, bar_index, ath)
+            label.set_xy(labelATH, bar_index, ath), label.set_text(labelATH, labelText)
+        array.push(renderedPrices, ath)
+    else
+        // Hide line/label if not rendered
+        if not na(lineATH)
+            line.delete(lineATH), lineATH := na
+        if not na(labelATH)
+            label.delete(labelATH), labelATH := na
+
+    // PYH (Yearly High)
+    if showPYH and not na(pyh) and not array.includes(renderedPrices, pyh)
+        string labelText = globalShowPriceValues ? "PYH (" + str.tostring(pyh, format.mintick) + ")" : "PYH"
+        if na(linePYH)
+            linePYH := line.new(startBar, pyh, bar_index, pyh, color=colorPYH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPYH := label.new(bar_index, pyh, labelText, color=color.new(colorPYH, 100), textcolor=colorPYH, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePYH, startBar, pyh), line.set_xy2(linePYH, bar_index, pyh)
+            label.set_xy(labelPYH, bar_index, pyh), label.set_text(labelPYH, labelText)
+        array.push(renderedPrices, pyh)
+    else if not na(linePYH)
+        line.delete(linePYH), linePYH := na, label.delete(labelPYH), labelPYH := na
+
+    // PYL (Yearly Low)
+    if showPYL and not na(pyl) and not array.includes(renderedPrices, pyl)
+        string labelText = globalShowPriceValues ? "PYL (" + str.tostring(pyl, format.mintick) + ")" : "PYL"
+        if na(linePYL)
+            linePYL := line.new(startBar, pyl, bar_index, pyl, color=colorPYL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPYL := label.new(bar_index, pyl, labelText, color=color.new(colorPYL, 100), textcolor=colorPYL, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePYL, startBar, pyl), line.set_xy2(linePYL, bar_index, pyl)
+            label.set_xy(labelPYL, bar_index, pyl), label.set_text(labelPYL, labelText)
+        array.push(renderedPrices, pyl)
+    else if not na(linePYL)
+        line.delete(linePYL), linePYL := na, label.delete(labelPYL), labelPYL := na
+
+    // PMH (Monthly High)
+    if showPMH and not na(pmh) and not array.includes(renderedPrices, pmh)
+        string labelText = globalShowPriceValues ? "PMH (" + str.tostring(pmh, format.mintick) + ")" : "PMH"
+        if na(linePMH)
+            linePMH := line.new(startBar, pmh, bar_index, pmh, color=colorPMH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPMH := label.new(bar_index, pmh, labelText, color=color.new(colorPMH, 100), textcolor=colorPMH, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePMH, startBar, pmh), line.set_xy2(linePMH, bar_index, pmh)
+            label.set_xy(labelPMH, bar_index, pmh), label.set_text(labelPMH, labelText)
+        array.push(renderedPrices, pmh)
+    else if not na(linePMH)
+        line.delete(linePMH), linePMH := na, label.delete(labelPMH), labelPMH := na
+
+    // PML (Monthly Low)
+    if showPML and not na(pml) and not array.includes(renderedPrices, pml)
+        string labelText = globalShowPriceValues ? "PML (" + str.tostring(pml, format.mintick) + ")" : "PML"
+        if na(linePML)
+            linePML := line.new(startBar, pml, bar_index, pml, color=colorPML, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPML := label.new(bar_index, pml, labelText, color=color.new(colorPML, 100), textcolor=colorPML, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePML, startBar, pml), line.set_xy2(linePML, bar_index, pml)
+            label.set_xy(labelPML, bar_index, pml), label.set_text(labelPML, labelText)
+        array.push(renderedPrices, pml)
+    else if not na(linePML)
+        line.delete(linePML), linePML := na, label.delete(labelPML), labelPML := na
+
+    // PWH (Weekly High)
+    if showPWH and not na(pwh) and not array.includes(renderedPrices, pwh)
+        string labelText = globalShowPriceValues ? "PWH (" + str.tostring(pwh, format.mintick) + ")" : "PWH"
+        if na(linePWH)
+            linePWH := line.new(startBar, pwh, bar_index, pwh, color=colorPWH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPWH := label.new(bar_index, pwh, labelText, color=color.new(colorPWH, 100), textcolor=colorPWH, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePWH, startBar, pwh), line.set_xy2(linePWH, bar_index, pwh)
+            label.set_xy(labelPWH, bar_index, pwh), label.set_text(labelPWH, labelText)
+        array.push(renderedPrices, pwh)
+    else if not na(linePWH)
+        line.delete(linePWH), linePWH := na, label.delete(labelPWH), labelPWH := na
+
+    // PWL (Weekly Low)
+    if showPWL and not na(pwl) and not array.includes(renderedPrices, pwl)
+        string labelText = globalShowPriceValues ? "PWL (" + str.tostring(pwl, format.mintick) + ")" : "PWL"
+        if na(linePWL)
+            linePWL := line.new(startBar, pwl, bar_index, pwl, color=colorPWL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPWL := label.new(bar_index, pwl, labelText, color=color.new(colorPWL, 100), textcolor=colorPWL, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePWL, startBar, pwl), line.set_xy2(linePWL, bar_index, pwl)
+            label.set_xy(labelPWL, bar_index, pwl), label.set_text(labelPWL, labelText)
+        array.push(renderedPrices, pwl)
+    else if not na(linePWL)
+        line.delete(linePWL), linePWL := na, label.delete(labelPWL), labelPWL := na
+
+    // PDH (Daily High)
+    if showPDH and not na(pdh) and not array.includes(renderedPrices, pdh)
+        string labelText = globalShowPriceValues ? "PDH (" + str.tostring(pdh, format.mintick) + ")" : "PDH"
+        if na(linePDH)
+            linePDH := line.new(startBar, pdh, bar_index, pdh, color=colorPDH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPDH := label.new(bar_index, pdh, labelText, color=color.new(colorPDH, 100), textcolor=colorPDH, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePDH, startBar, pdh), line.set_xy2(linePDH, bar_index, pdh)
+            label.set_xy(labelPDH, bar_index, pdh), label.set_text(labelPDH, labelText)
+        array.push(renderedPrices, pdh)
+    else if not na(linePDH)
+        line.delete(linePDH), linePDH := na, label.delete(labelPDH), labelPDH := na
+
+    // PDL (Daily Low)
+    if showPDL and not na(pdl) and not array.includes(renderedPrices, pdl)
+        string labelText = globalShowPriceValues ? "PDL (" + str.tostring(pdl, format.mintick) + ")" : "PDL"
+        if na(linePDL)
+            linePDL := line.new(startBar, pdl, bar_index, pdl, color=colorPDL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPDL := label.new(bar_index, pdl, labelText, color=color.new(colorPDL, 100), textcolor=colorPDL, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePDL, startBar, pdl), line.set_xy2(linePDL, bar_index, pdl)
+            label.set_xy(labelPDL, bar_index, pdl), label.set_text(labelPDL, labelText)
+        array.push(renderedPrices, pdl)
+    else if not na(linePDL)
+        line.delete(linePDL), linePDL := na, label.delete(labelPDL), labelPDL := na
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DISPLAY CONDITIONS & SHADING
@@ -447,8 +642,8 @@ if showInfoBar and barstate.islast
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Convert style inputs once
-string lineStyleActual = pivotLineStyle == "Solid" ? line.style_solid : pivotLineStyle == "Dashed" ? line.style_dashed : line.style_dotted
-string labelSizeActual = pivotLabelSize == "Tiny" ? size.tiny : pivotLabelSize == "Small" ? size.small : pivotLabelSize == "Large" ? size.large : pivotLabelSize == "Huge" ? size.huge : size.normal
+string lineStyleActual = getLineStyle(pivotLineStyle)
+string labelSizeActual = getLabelSize(globalLabelSize)
 
 // Store pivot lines and labels
 var line lineP = na, var line lineR1 = na, var line lineR2 = na, var line lineR3 = na
@@ -456,13 +651,13 @@ var line lineS1 = na, var line lineS2 = na, var line lineS3 = na
 var label labelP = na, var label labelR1 = na, var label labelR2 = na, var label labelR3 = na
 var label labelS1 = na, var label labelS2 = na, var label labelS3 = na
 
-// Draw/update pivot levels
+// Draw/update pivot levels (always span from start of current day)
 if showPivots and (not pivotIntradayOnly or timeframe.isintraday) and not na(dayStartBar)
     int startBar = dayStartBar
 
     // P Level
     if showPivotP and not na(pivotP)
-        string labelTextP = "P (" + str.tostring(pivotP, format.mintick) + ")"
+        string labelTextP = globalShowPriceValues ? "P (" + str.tostring(pivotP, format.mintick) + ")" : "P"
         if na(lineP)
             lineP := line.new(startBar, pivotP, bar_index, pivotP, color=pivotColorP, width=pivotLineWidth, style=lineStyleActual)
             labelP := label.new(bar_index, pivotP, labelTextP, color=color.new(pivotColorP, 100), textcolor=pivotColorP, style=label.style_label_left, size=labelSizeActual)
@@ -472,7 +667,7 @@ if showPivots and (not pivotIntradayOnly or timeframe.isintraday) and not na(day
 
     // R1 Level
     if showPivotR1 and not na(pivotR1)
-        string labelTextR1 = "R1 (" + str.tostring(pivotR1, format.mintick) + ")"
+        string labelTextR1 = globalShowPriceValues ? "R1 (" + str.tostring(pivotR1, format.mintick) + ")" : "R1"
         if na(lineR1)
             lineR1 := line.new(startBar, pivotR1, bar_index, pivotR1, color=pivotColorR1, width=pivotLineWidth, style=lineStyleActual)
             labelR1 := label.new(bar_index, pivotR1, labelTextR1, color=color.new(pivotColorR1, 100), textcolor=pivotColorR1, style=label.style_label_left, size=labelSizeActual)
@@ -482,7 +677,7 @@ if showPivots and (not pivotIntradayOnly or timeframe.isintraday) and not na(day
 
     // R2 Level
     if showPivotR2 and not na(pivotR2)
-        string labelTextR2 = "R2 (" + str.tostring(pivotR2, format.mintick) + ")"
+        string labelTextR2 = globalShowPriceValues ? "R2 (" + str.tostring(pivotR2, format.mintick) + ")" : "R2"
         if na(lineR2)
             lineR2 := line.new(startBar, pivotR2, bar_index, pivotR2, color=pivotColorR2, width=pivotLineWidth, style=lineStyleActual)
             labelR2 := label.new(bar_index, pivotR2, labelTextR2, color=color.new(pivotColorR2, 100), textcolor=pivotColorR2, style=label.style_label_left, size=labelSizeActual)
@@ -492,7 +687,7 @@ if showPivots and (not pivotIntradayOnly or timeframe.isintraday) and not na(day
 
     // R3 Level
     if showPivotR3 and not na(pivotR3)
-        string labelTextR3 = "R3 (" + str.tostring(pivotR3, format.mintick) + ")"
+        string labelTextR3 = globalShowPriceValues ? "R3 (" + str.tostring(pivotR3, format.mintick) + ")" : "R3"
         if na(lineR3)
             lineR3 := line.new(startBar, pivotR3, bar_index, pivotR3, color=pivotColorR3, width=pivotLineWidth, style=lineStyleActual)
             labelR3 := label.new(bar_index, pivotR3, labelTextR3, color=color.new(pivotColorR3, 100), textcolor=pivotColorR3, style=label.style_label_left, size=labelSizeActual)
@@ -502,7 +697,7 @@ if showPivots and (not pivotIntradayOnly or timeframe.isintraday) and not na(day
 
     // S1 Level
     if showPivotS1 and not na(pivotS1)
-        string labelTextS1 = "S1 (" + str.tostring(pivotS1, format.mintick) + ")"
+        string labelTextS1 = globalShowPriceValues ? "S1 (" + str.tostring(pivotS1, format.mintick) + ")" : "S1"
         if na(lineS1)
             lineS1 := line.new(startBar, pivotS1, bar_index, pivotS1, color=pivotColorS1, width=pivotLineWidth, style=lineStyleActual)
             labelS1 := label.new(bar_index, pivotS1, labelTextS1, color=color.new(pivotColorS1, 100), textcolor=pivotColorS1, style=label.style_label_left, size=labelSizeActual)
@@ -512,7 +707,7 @@ if showPivots and (not pivotIntradayOnly or timeframe.isintraday) and not na(day
 
     // S2 Level
     if showPivotS2 and not na(pivotS2)
-        string labelTextS2 = "S2 (" + str.tostring(pivotS2, format.mintick) + ")"
+        string labelTextS2 = globalShowPriceValues ? "S2 (" + str.tostring(pivotS2, format.mintick) + ")" : "S2"
         if na(lineS2)
             lineS2 := line.new(startBar, pivotS2, bar_index, pivotS2, color=pivotColorS2, width=pivotLineWidth, style=lineStyleActual)
             labelS2 := label.new(bar_index, pivotS2, labelTextS2, color=color.new(pivotColorS2, 100), textcolor=pivotColorS2, style=label.style_label_left, size=labelSizeActual)
@@ -522,7 +717,7 @@ if showPivots and (not pivotIntradayOnly or timeframe.isintraday) and not na(day
 
     // S3 Level
     if showPivotS3 and not na(pivotS3)
-        string labelTextS3 = "S3 (" + str.tostring(pivotS3, format.mintick) + ")"
+        string labelTextS3 = globalShowPriceValues ? "S3 (" + str.tostring(pivotS3, format.mintick) + ")" : "S3"
         if na(lineS3)
             lineS3 := line.new(startBar, pivotS3, bar_index, pivotS3, color=pivotColorS3, width=pivotLineWidth, style=lineStyleActual)
             labelS3 := label.new(bar_index, pivotS3, labelTextS3, color=color.new(pivotColorS3, 100), textcolor=pivotColorS3, style=label.style_label_left, size=labelSizeActual)
@@ -535,8 +730,8 @@ if showPivots and (not pivotIntradayOnly or timeframe.isintraday) and not na(day
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Convert style inputs once
-string settlementLineStyleActual = settlementLineStyle == "Solid" ? line.style_solid : settlementLineStyle == "Dashed" ? line.style_dashed : line.style_dotted
-string settlementLabelSizeActual = settlementLabelSize == "Tiny" ? size.tiny : settlementLabelSize == "Small" ? size.small : settlementLabelSize == "Large" ? size.large : settlementLabelSize == "Huge" ? size.huge : size.normal
+string settlementLineStyleActual = getLineStyle(settlementLineStyle)
+string settlementLabelSizeActual = getLabelSize(globalLabelSize)
 
 // Only show for futures and optionally only on intraday timeframes
 bool showSettlementsCondition = showSettlements and isFutures and (not settlementIntradayOnly or isIntraday)
@@ -582,7 +777,7 @@ if showSettlementsCondition and array.size(settlementPrices) > 0
 // Render settlement lines on last bar only (drawn fresh each time - no expensive updates)
 // Lines span last ~100 bars to balance visibility and performance
 if showSettlementsCondition and barstate.islast and array.size(settlementPrices) > 0
-    int startDrawBar = math.max(0, bar_index - 100)
+    int startDrawBar = math.max(0, bar_index - globalLineLengthBars)
     // Cache close to prevent execution order issues with SMA start lines
     float referenceClose = close
 
@@ -600,7 +795,8 @@ if showSettlementsCondition and barstate.islast and array.size(settlementPrices)
         if shouldBeVisible
             line.new(startDrawBar, price, bar_index, price,
                  color=array.get(settlementColors, i), width=settlementLineWidth, style=settlementLineStyleActual)
-            label.new(bar_index, price, array.get(settlementDateLabels, i),
+            string settlementLabelText = globalShowPriceValues ? array.get(settlementDateLabels, i) + " (" + str.tostring(price, format.mintick) + ")" : array.get(settlementDateLabels, i)
+            label.new(bar_index, price, settlementLabelText,
                  color=color.new(array.get(settlementColors, i), 100), textcolor=array.get(settlementColors, i),
                  style=label.style_label_left, size=settlementLabelSizeActual)
 
@@ -698,16 +894,15 @@ if showPeriodSeparators
 
     // Determine which timeframe to use (smallest to largest)
     string separatorTimeframe =
-         barsPerMinute >= minBarsPerSegment ? "1" :
-         barsPerHour >= minBarsPerSegment ? "60" :
-         barsPerDay >= minBarsPerSegment ? "D" :
-         barsPerWeek >= minBarsPerSegment ? "W" :
-         barsPerMonth >= minBarsPerSegment ? "M" : "12M"
+         not na(barsPerMinute) and barsPerMinute >= minBarsPerSegment ? "1" :
+         not na(barsPerHour) and barsPerHour >= minBarsPerSegment ? "60" :
+         not na(barsPerDay) and barsPerDay >= minBarsPerSegment ? "D" :
+         not na(barsPerWeek) and barsPerWeek >= minBarsPerSegment ? "W" :
+         not na(barsPerMonth) and barsPerMonth >= minBarsPerSegment ? "M" : "12M"
 
     // Draw separator on timeframe boundary
     if timeframe.change(separatorTimeframe)
-        string separatorLineStyle = separatorStyle == "Solid" ? line.style_solid :
-             separatorStyle == "Dashed" ? line.style_dashed : line.style_dotted
+        string separatorLineStyle = getLineStyle(separatorStyle)
         line.new(bar_index, high, bar_index, low,
              extend=extend.both, color=separatorColor, style=separatorLineStyle, width=separatorWidth)
 
@@ -716,11 +911,12 @@ if showPeriodSeparators
 // ═══════════════════════════════════════════════════════════════════════════════
 
 if showThickBars
-    int reservedLines = ((show5StartLineInput or show50StartLineInput or show200StartLineInput) ? 3 : 0) + (showPivots ? 7 : 0) + (showSettlements and isFutures ? settlementCount : 0)
+    int keyLevelsCount = showKeyLevels ? ((showPDH ? 1 : 0) + (showPDL ? 1 : 0) + (showPWH ? 1 : 0) + (showPWL ? 1 : 0) + (showPMH ? 1 : 0) + (showPML ? 1 : 0) + (showPYH ? 1 : 0) + (showPYL ? 1 : 0) + (showATH ? 1 : 0)) : 0
+    int reservedLines = ((show5StartLineInput or show50StartLineInput or show200StartLineInput) ? 3 : 0) + (showPivots ? 7 : 0) + (showSettlements and isFutures ? settlementCount : 0) + keyLevelsCount
     int barsFromEnd = last_bar_index - bar_index
 
     if barsFromEnd < (500 - reservedLines)
         color barColor = thickBarsBaseOnPrevClose ?
-             (close >= close[1] ? thickBarsColorUp : thickBarsColorDown) :
+             (bar_index > 0 and close >= close[1] ? thickBarsColorUp : close < close[1] ? thickBarsColorDown : close >= open ? thickBarsColorUp : thickBarsColorDown) :
              (close >= open ? thickBarsColorUp : thickBarsColorDown)
         line.new(bar_index, high, bar_index, low, width=thickBarsWidth, color=barColor, xloc=xloc.bar_index)
