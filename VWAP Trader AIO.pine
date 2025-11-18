@@ -149,7 +149,7 @@ colorSessionYearly = input.color(color.new(color.black, 0), "Yearly Color", grou
 
 // Period Separators
 showPeriodSeparators = input.bool(true, "Show Period Separators", group="Period Separators", tooltip="Automatically draw period boundary lines based on chart timeframe")
-minBarsPerSegment = input.int(7, "Min Bars Per Segment", minval=1, maxval=50, group="Period Separators", tooltip="Minimum number of bars between separators - automatically selects appropriate timeframe")
+minBarsPerSegment = input.int(6, "Min Bars Per Segment", minval=1, maxval=50, group="Period Separators", tooltip="Minimum number of bars between separators - automatically selects appropriate timeframe")
 separatorColor = input.color(color.gray, "Separator Color", group="Period Separators")
 separatorStyle = input.string("Dotted", "Separator Style", options=["Solid", "Dashed", "Dotted"], group="Period Separators")
 separatorWidth = input.int(1, "Separator Width", minval=1, maxval=5, group="Period Separators")
@@ -920,3 +920,4 @@ if showThickBars
              (bar_index > 0 and close >= close[1] ? thickBarsColorUp : close < close[1] ? thickBarsColorDown : close >= open ? thickBarsColorUp : thickBarsColorDown) :
              (close >= open ? thickBarsColorUp : thickBarsColorDown)
         line.new(bar_index, high, bar_index, low, width=thickBarsWidth, color=barColor, xloc=xloc.bar_index)
+
