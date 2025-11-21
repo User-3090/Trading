@@ -362,36 +362,42 @@ if riskAmount > 0 and atrValue > 0
 // KEY LEVELS DATA (PDH/PDL, PWH/PWL, PMH/PML, PYH/PYL, ATH)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Manual session tracking approach - request.security doesn't work reliably with RTH
-// We track high/low during each period and capture values when period changes
+// HYBRID APPROACH:
+// - Manual tracking for DAILY levels (PDH/PDL) - avoids settlement contamination on RTH charts
+// - request.security for WEEKLY/MONTHLY/YEARLY - reliable across all timeframes
+// - ATH calculated from current bar to get true all-time high
 
 // Detect if chart is showing extended hours (ETH) or regular hours (RTH)
 bool isEthChart = syminfo.session == session.extended
 
-// OPTIMIZED: Yearly data using consistent pattern - [1] offset with lookahead_on
 // For futures on ETH charts, use settlement_as_close for proper daily close values
-string yearlyTicker = isFutures and isEthChart ?
+string keyLevelsTicker = isFutures and isEthChart ?
      ticker.new(syminfo.prefix, syminfo.ticker, session.extended, settlement_as_close=settlement_as_close.on) :
      syminfo.tickerid
-[ath, pyh, pyl] = request.security(yearlyTicker, "12M", [ta.highest(high[1], 5000), high[1], low[1]], lookahead=barmerge.lookahead_on)
 
-// Manual tracking of previous periods using var variables
+// For ATH calculation, always use OHLC data (never settlement_as_close)
+string athTicker = syminfo.tickerid
+
+// WEEKLY, MONTHLY, YEARLY levels via request.security (works on all timeframes)
+[pwh, pwl] = request.security(keyLevelsTicker, "W", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+[pmh, pml] = request.security(keyLevelsTicker, "M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+[pyh, pyl] = request.security(keyLevelsTicker, "12M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+
+// ATH - use ta.highest with request.security, fallback to chart timeframe if daily fails
+// Approach 1: Daily timeframe (5000 bars = ~20 years)
+float athDaily = request.security(athTicker, "D", ta.highest(high, 5000), lookahead=barmerge.lookahead_on)
+// Approach 2: Chart timeframe fallback (5000 bars on current timeframe)
+float athChart = request.security(athTicker, timeframe.period, ta.highest(high, 5000), lookahead=barmerge.lookahead_on)
+// Use Daily if available, otherwise use chart timeframe
+float ath = na(athDaily) ? athChart : athDaily
+
+// MANUAL TRACKING for DAILY levels (PDH/PDL) - prevents settlement contamination on RTH
 var float prevDayHigh = na
 var float prevDayLow = na
-var float prevWeekHigh = na
-var float prevWeekLow = na
-var float prevMonthHigh = na
-var float prevMonthLow = na
-
-// Track current period highs/lows
 var float currentDayHigh = na
 var float currentDayLow = na
-var float currentWeekHigh = na
-var float currentWeekLow = na
-var float currentMonthHigh = na
-var float currentMonthLow = na
 
-// On period change, save previous period values (uses newDay/newWeek/newMonth from line 265)
+// On calendar day change, save previous day values
 if newDay and not na(currentDayHigh)
     prevDayHigh := currentDayHigh
     prevDayLow := currentDayLow
@@ -401,31 +407,9 @@ else
     currentDayHigh := na(currentDayHigh) ? high : math.max(currentDayHigh, high)
     currentDayLow := na(currentDayLow) ? low : math.min(currentDayLow, low)
 
-if newWeek and not na(currentWeekHigh)
-    prevWeekHigh := currentWeekHigh
-    prevWeekLow := currentWeekLow
-    currentWeekHigh := high
-    currentWeekLow := low
-else
-    currentWeekHigh := na(currentWeekHigh) ? high : math.max(currentWeekHigh, high)
-    currentWeekLow := na(currentWeekLow) ? low : math.min(currentWeekLow, low)
-
-if newMonth and not na(currentMonthHigh)
-    prevMonthHigh := currentMonthHigh
-    prevMonthLow := currentMonthLow
-    currentMonthHigh := high
-    currentMonthLow := low
-else
-    currentMonthHigh := na(currentMonthHigh) ? high : math.max(currentMonthHigh, high)
-    currentMonthLow := na(currentMonthLow) ? low : math.min(currentMonthLow, low)
-
 // Assign to standard variable names for rendering
 float pdh = prevDayHigh
 float pdl = prevDayLow
-float pwh = prevWeekHigh
-float pwl = prevWeekLow
-float pmh = prevMonthHigh
-float pml = prevMonthLow
 
 var line linePDH = na, var line linePDL = na, var label labelPDH = na, var label labelPDL = na
 var line linePWH = na, var line linePWL = na, var label labelPWH = na, var label labelPWL = na
@@ -434,10 +418,9 @@ var line linePYH = na, var line linePYL = na, var label labelPYH = na, var label
 var line lineATH = na, var label labelATH = na
 
 // Render key levels (updates every bar to extend lines to current bar_index)
-if showKeyLevels and isIntraday and barstate.islast
-    // Using manually tracked values from var variables above
-    // No request.security needed - we track the values ourselves
-
+// Works on all timeframes (intraday, daily, weekly)
+if showKeyLevels and barstate.islast
+    // Using values from request.security calls above - works on all timeframes
     int startBar = math.max(0, bar_index - globalLineLengthBars)
     string keyLevelsLineStyleActual = getLineStyle(keyLevelsLineStyle)
     string labelSizeActual = getLabelSize(globalLabelSize)
@@ -446,7 +429,7 @@ if showKeyLevels and isIntraday and barstate.islast
     var array<float> renderedPrices = array.new<float>()
     array.clear(renderedPrices)
 
-    // ATH (Highest Priority)
+    // ATH (ABSOLUTE HIGHEST PRIORITY - always shows, blocks all duplicates)
     if showATH and not na(ath)
         string labelText = globalShowPriceValues ? "ATH (" + str.tostring(ath, format.mintick) + ")" : "ATH"
         if na(lineATH)
@@ -455,6 +438,7 @@ if showKeyLevels and isIntraday and barstate.islast
         else
             line.set_xy1(lineATH, startBar, ath), line.set_xy2(lineATH, bar_index, ath)
             label.set_xy(labelATH, bar_index, ath), label.set_text(labelATH, labelText)
+        // Add to rendered prices to block any other level at same price
         array.push(renderedPrices, ath)
     else
         // Hide line/label if not rendered
