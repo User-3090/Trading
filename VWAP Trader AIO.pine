@@ -362,36 +362,16 @@ if riskAmount > 0 and atrValue > 0
 // KEY LEVELS DATA (PDH/PDL, PWH/PWL, PMH/PML, PYH/PYL, ATH)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// HYBRID APPROACH:
-// - Manual tracking for DAILY levels (PDH/PDL) - avoids settlement contamination on RTH charts
-// - request.security for WEEKLY/MONTHLY/YEARLY - reliable across all timeframes
-// - ATH calculated from current bar to get true all-time high
-
-// Detect if chart is showing extended hours (ETH) or regular hours (RTH)
-bool isEthChart = syminfo.session == session.extended
-
-// For futures on ETH charts, use settlement_as_close for proper daily close values
-string keyLevelsTicker = isFutures and isEthChart ?
-     ticker.new(syminfo.prefix, syminfo.ticker, session.extended, settlement_as_close=settlement_as_close.on) :
-     syminfo.tickerid
-
-// For ATH calculation, always use OHLC data (never settlement_as_close)
-string athTicker = syminfo.tickerid
+string keyLevelsTicker = ticker.new(syminfo.prefix, syminfo.ticker, session.extended, settlement_as_close=settlement_as_close.off)
 
 // WEEKLY, MONTHLY, YEARLY levels via request.security (works on all timeframes)
 [pwh, pwl] = request.security(keyLevelsTicker, "W", [high[1], low[1]], lookahead=barmerge.lookahead_on)
 [pmh, pml] = request.security(keyLevelsTicker, "M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
 [pyh, pyl] = request.security(keyLevelsTicker, "12M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
 
-// ATH - use ta.highest with request.security, fallback to chart timeframe if daily fails
-// Approach 1: Daily timeframe (5000 bars = ~20 years)
-float athDaily = request.security(athTicker, "D", ta.highest(high, 5000), lookahead=barmerge.lookahead_on)
-// Approach 2: Chart timeframe fallback (5000 bars on current timeframe)
-float athChart = request.security(athTicker, timeframe.period, ta.highest(high, 5000), lookahead=barmerge.lookahead_on)
-// Use Daily if available, otherwise use chart timeframe
-float ath = na(athDaily) ? athChart : athDaily
+float ath = request.security(keyLevelsTicker, "D", ta.highest(high, bar_index + 1), lookahead=barmerge.lookahead_on)
 
-// MANUAL TRACKING for DAILY levels (PDH/PDL) - prevents settlement contamination on RTH
+// MANUAL TRACKING for DAILY levels (PDH/PDL)
 var float prevDayHigh = na
 var float prevDayLow = na
 var float currentDayHigh = na
