@@ -110,7 +110,7 @@ pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Pivot Poi
 pivotLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Pivot Points")
 
 // Settlement Prices (Futures Only)
-showSettlements = input.bool(true, "Show Settlement Prices", group="Settlement Prices", tooltip="Display last X settlement prices - FUTURES ONLY")
+showSettlements = input.bool(false, "Show Settlement Prices", group="Settlement Prices", tooltip="Display last X settlement prices - FUTURES ONLY")
 settlementIntradayOnly = input.bool(true, "Intraday Only", group="Settlement Prices", tooltip="Only display on intraday timeframes, hide on daily/weekly charts")
 settlementCount = input.int(10, "Number of Settlements", minval=1, maxval=50, group="Settlement Prices", tooltip="Display the LAST X most recent settlement prices (rolling window)")
 settlementDistanceFilter = input.bool(false, "Filter by Distance (Display Only)", group="Settlement Prices", tooltip="Only DISPLAY settlements within X ticks of current price - does not affect crossing detection")
