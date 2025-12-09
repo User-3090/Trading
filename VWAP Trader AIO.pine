@@ -27,8 +27,6 @@ indicator("VWAP Trader AIO", overlay=true, max_lines_count=500)
 // CONSTANTS & CONFIGURATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-const bool IS_COMBINED = true
-
 const int MAX_BARS            = 5000
 const int SCAN_WINDOW         = 10    // Rolling window: keep last N days
 const int MIN_DAYS_FOR_SCAN   = 2     // Minimum days needed before using scanned data
@@ -112,7 +110,7 @@ pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Pivot Poi
 pivotLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Pivot Points")
 
 // Settlement Prices (Futures Only)
-showSettlements = input.bool(true, "Show Settlement Prices", group="Settlement Prices", tooltip="Display last X settlement prices - FUTURES ONLY")
+showSettlements = input.bool(false, "Show Settlement Prices", group="Settlement Prices", tooltip="Display last X settlement prices - FUTURES ONLY")
 settlementIntradayOnly = input.bool(true, "Intraday Only", group="Settlement Prices", tooltip="Only display on intraday timeframes, hide on daily/weekly charts")
 settlementCount = input.int(10, "Number of Settlements", minval=1, maxval=50, group="Settlement Prices", tooltip="Display the LAST X most recent settlement prices (rolling window)")
 settlementDistanceFilter = input.bool(false, "Filter by Distance (Display Only)", group="Settlement Prices", tooltip="Only DISPLAY settlements within X ticks of current price - does not affect crossing detection")
@@ -128,79 +126,28 @@ settlementLineStyle = input.string("Dotted", "Line Style", options=["Solid", "Da
 settlementGapLineWidth = input.int(4, "Gap Close Line Width", minval=1, maxval=5, group="Settlement Prices", tooltip="Line width for gap close target")
 settlementGapLineStyle = input.string("Solid", "Gap Close Line Style", options=["Solid", "Dashed", "Dotted"], group="Settlement Prices", tooltip="Line style for gap close target")
 
-// Key Levels - Display Filters
-showKeyLevels = input.bool(true, "Show Key Levels", group="Key Levels", tooltip="Display Previous/Current Day/Week/Month/Year High/Low levels and All-Time High")
-keyLevelsMode = input.string("Only Futures", "Instrument Filter", options=["Always", "Only Futures", "Off"], group="Key Levels", tooltip="Display key levels always, only on futures, or disable")
-keyLevelsMinTimeframe = input.string("2h", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "2h", "4h"], group="Key Levels", tooltip="Only show levels on timeframes below this value (None = all timeframes)")
-keyLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Key Levels")
-keyLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Key Levels")
-
-// Daily Levels
+// Key Levels (PDH/PDL, PWH/PWL, PMH/PML, PYH/PYL, ATH)
+showKeyLevels = input.bool(false, "Show Key Levels", group="Key Levels", tooltip="Display Previous Day/Week/Month/Year High/Low levels and All-Time High")
 showPDH = input.bool(true, "PDH", inline="PD", group="Key Levels")
 showPDL = input.bool(true, "PDL", inline="PD", group="Key Levels")
-colorPDH = input.color(#81ce6f, "PDH", inline="PD", group="Key Levels")
-colorPDL = input.color(#d37666, "PDL", inline="PD", group="Key Levels")
-showCDH = input.bool(true, "CDH", inline="CD", group="Key Levels")
-showCDL = input.bool(true, "CDL", inline="CD", group="Key Levels")
-colorCDH = input.color(#a8e6a1, "CDH", inline="CD", group="Key Levels")
-colorCDL = input.color(#e8a090, "CDL", inline="CD", group="Key Levels")
-
-// Weekly Levels
+colorPDH = input.color(#ffa500, "PDH", inline="PD", group="Key Levels")
+colorPDL = input.color(#4169e1, "PDL", inline="PD", group="Key Levels")
 showPWH = input.bool(true, "PWH", inline="PW", group="Key Levels")
 showPWL = input.bool(true, "PWL", inline="PW", group="Key Levels")
-colorPWH = input.color(#449955, "PWH", inline="PW", group="Key Levels")
-colorPWL = input.color(#b51b00, "PWL", inline="PW", group="Key Levels")
-showCWH = input.bool(true, "CWH", inline="CW", group="Key Levels")
-showCWL = input.bool(true, "CWL", inline="CW", group="Key Levels")
-colorCWH = input.color(#6bb370, "CWH", inline="CW", group="Key Levels")
-colorCWL = input.color(#d84530, "CWL", inline="CW", group="Key Levels")
-
-// Monthly Levels
+colorPWH = input.color(#ff69b4, "PWH", inline="PW", group="Key Levels")
+colorPWL = input.color(#9370db, "PWL", inline="PW", group="Key Levels")
 showPMH = input.bool(true, "PMH", inline="PM", group="Key Levels")
 showPML = input.bool(true, "PML", inline="PM", group="Key Levels")
-colorPMH = input.color(#2e8b3a, "PMH", inline="PM", group="Key Levels")
-colorPML = input.color(#8b1500, "PML", inline="PM", group="Key Levels")
-showCMH = input.bool(true, "CMH", inline="CM", group="Key Levels")
-showCML = input.bool(true, "CML", inline="CM", group="Key Levels")
-colorCMH = input.color(#50a555, "CMH", inline="CM", group="Key Levels")
-colorCML = input.color(#a83020, "CML", inline="CM", group="Key Levels")
-
-// Yearly Levels
+colorPMH = input.color(#32cd32, "PMH", inline="PM", group="Key Levels")
+colorPML = input.color(#dc143c, "PML", inline="PM", group="Key Levels")
 showPYH = input.bool(true, "PYH", inline="PY", group="Key Levels")
 showPYL = input.bool(true, "PYL", inline="PY", group="Key Levels")
-colorPYH = input.color(#1e6b28, "PYH", inline="PY", group="Key Levels")
-colorPYL = input.color(#6b0f00, "PYL", inline="PY", group="Key Levels")
-showCYH = input.bool(true, "CYH", inline="CY", group="Key Levels")
-showCYL = input.bool(true, "CYL", inline="CY", group="Key Levels")
-colorCYH = input.color(#3a8540, "CYH", inline="CY", group="Key Levels")
-colorCYL = input.color(#851a00, "CYL", inline="CY", group="Key Levels")
-
-// All-Time High
+colorPYH = input.color(#ffd700, "PYH", inline="PY", group="Key Levels")
+colorPYL = input.color(#8b4513, "PYL", inline="PY", group="Key Levels")
 showATH = input.bool(true, "ATH", inline="ATH", group="Key Levels")
-colorATH = input.color(#00fcff, "ATH", inline="ATH", group="Key Levels", tooltip="All-Time High")
-
-// Session Levels - Display Filters
-showSessionLevels = input.bool(true, "Show Session Levels", group="Session Levels", tooltip="Display Opening Price, Open Range, and Initial Balance for selected session")
-sessionLevelsMode = input.string("Only Futures", "Instrument Filter", options=["Always", "Only Futures", "Off"], group="Session Levels", tooltip="Display session levels always or only on futures")
-sessionChoice = input.string("New York", "Session", options=["New York", "London", "Asia"], group="Session Levels", tooltip="Trading session to track")
-sessionLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Session Levels")
-sessionLevelsLineStyle = input.string("Dashed", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Session Levels")
-
-// Opening Price
-showOpenPrice = input.bool(true, "Opening Price", inline="OP", group="Session Levels")
-colorOpenPrice = input.color(#fbbe30, "", inline="OP", group="Session Levels", tooltip="First price at session open")
-
-// Open Range
-showOpenRange = input.bool(true, "Open Range", inline="OR", group="Session Levels")
-openRangePeriod = input.string("15m", "", inline="OR", options=["1m", "5m", "15m"], group="Session Levels")
-colorORH = input.color(#00b8bd, "High", inline="OR", group="Session Levels")
-colorORL = input.color(#b51b00, "Low", inline="OR", group="Session Levels", tooltip="High/Low of first X minutes")
-
-// Initial Balance
-showInitialBalance = input.bool(false, "Initial Balance", inline="IB", group="Session Levels")
-initialBalancePeriod = input.string("1h", "", inline="IB", options=["30m", "1h"], group="Session Levels")
-colorIBH = input.color(#81ce6f, "High", inline="IB", group="Session Levels")
-colorIBL = input.color(#e43b38, "Low", inline="IB", group="Session Levels", tooltip="High/Low of first 30m or 1h")
+colorATH = input.color(#00ff00, "ATH", inline="ATH", group="Key Levels", tooltip="All-Time High")
+keyLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Key Levels")
+keyLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Key Levels")
 
 // Session Detection
 showSessionsMode = input.string("Only Futures", "Show Session Labels", options=["Always", "Only Futures", "Off"], group="Session Detection", tooltip="Display D/W/M/Y session markers on chart")
@@ -277,36 +224,6 @@ getLineStyle(string styleStr) =>
 
 // Create transparent label background color (100% transparency)
 labelBgColor(color c) => color.new(c, 100)
-
-// Round price to mintick precision for consistent map keys
-roundToTick(float price) =>
-    syminfo.mintick > 0 ? math.round(price / syminfo.mintick) * syminfo.mintick : price
-
-// Session time definitions (in UTC)
-getSessionSpec(string session) =>
-    session == "New York" ? "0930-1600" : session == "London" ? "0300-1130" : "1800-0200"
-
-getSessionTimezone(string session) =>
-    session == "New York" ? "America/New_York" : session == "London" ? "Europe/London" : "Asia/Tokyo"
-
-// Convert period string to minutes
-periodToMinutes(string period) =>
-    period == "1m" ? 1 : period == "2m" ? 2 : period == "3m" ? 3 : period == "5m" ? 5 : period == "15m" ? 15 : period == "30m" ? 30 : period == "1h" ? 60 : period == "2h" ? 120 : period == "4h" ? 240 : 0
-
-// Get timeframe in minutes for comparison
-getTimeframeMinutes() =>
-    int localTfSeconds = timeframe.in_seconds()
-    int tfMinutes = localTfSeconds / 60
-    tfMinutes
-
-// Add level to priceLabels map with duplicate detection
-addToMap(map<float, string> priceMap, float price, string label) =>
-    float key = roundToTick(price)
-    string existing = map.contains(priceMap, key) ? map.get(priceMap, key) : ""
-    if existing != ""
-        map.put(priceMap, key, existing + "/" + label)
-    else
-        map.put(priceMap, key, label)
 
 // Currency symbol formatter
 getCurrencySymbol(string curr) =>
@@ -442,701 +359,177 @@ if riskAmount > 0 and atrValue > 0
         capitalAmount := calculatedShares * close
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// DISPLAY CONDITIONS
+// KEY LEVELS DATA (PDH/PDL, PWH/PWL, PMH/PML, PYH/PYL, ATH)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Check timeframe conditions
-int currentTfMinutes = getTimeframeMinutes()
-int minTfMinutes = periodToMinutes(keyLevelsMinTimeframe)
-bool meetsMinTimeframe = keyLevelsMinTimeframe == "None" or currentTfMinutes < minTfMinutes
+string keyLevelsTicker = ticker.new(syminfo.prefix, syminfo.ticker, session.extended, settlement_as_close=settlement_as_close.off)
 
-// Check if key levels should be shown (futures filter + min timeframe filter)
-bool showKeyLevelsCondition = showKeyLevels and (keyLevelsMode == "Always" or (keyLevelsMode == "Only Futures" and isFutures)) and meetsMinTimeframe
+// WEEKLY, MONTHLY, YEARLY levels via request.security (works on all timeframes)
+[pwh, pwl] = request.security(keyLevelsTicker, "W", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+[pmh, pml] = request.security(keyLevelsTicker, "M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
+[pyh, pyl] = request.security(keyLevelsTicker, "12M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
 
-// Check if session levels should be shown (futures-only by default + min timeframe)
-bool showSessionLevelsCondition = showSessionLevels and (sessionLevelsMode == "Always" or (sessionLevelsMode == "Only Futures" and isFutures)) and meetsMinTimeframe
+float ath = request.security(keyLevelsTicker, "D", ta.highest(high, bar_index + 1), lookahead=barmerge.lookahead_on)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// KEY LEVELS DATA (PDH/PDL, PWH/PWL, PMH/PML, PYH/PYL, ATH + Current Periods)
-// ═══════════════════════════════════════════════════════════════════════════════
+// MANUAL TRACKING for DAILY levels (PDH/PDL)
+var float prevDayHigh = na
+var float prevDayLow = na
+var float currentDayHigh = na
+var float currentDayLow = na
 
-// Request 4H data for fallback when chart doesn't have enough history
-string h4Ticker = ticker.new(syminfo.prefix, syminfo.ticker, syminfo.session, settlement_as_close=settlement_as_close.off)
-[h4_high, h4_low, h4_time] = request.security(h4Ticker, "240", [high, low, time], lookahead=barmerge.lookahead_off, ignore_invalid_symbol=true)
-
-// Calculate period info from chart's own data
-int chart_dayOfMonth = dayofmonth(time, syminfo.timezone)
-int chart_weekOfYear = weekofyear(time, syminfo.timezone)
-int chart_month = month(time, syminfo.timezone)
-int chart_year = year(time, syminfo.timezone)
-
-// Calculate period info from 4H data
-int h4_dayOfMonth = dayofmonth(h4_time, syminfo.timezone)
-int h4_weekOfYear = weekofyear(h4_time, syminfo.timezone)
-int h4_month = month(h4_time, syminfo.timezone)
-int h4_year = year(h4_time, syminfo.timezone)
-
-// Track levels from CHART data
-var float chart_pdh = na, var float chart_pdl = na
-var float chart_pwh = na, var float chart_pwl = na
-var float chart_pmh = na, var float chart_pml = na
-var float chart_pyh = na, var float chart_pyl = na
-var float chart_ath = na
-
-var float chart_currentDayHigh = na, var float chart_currentDayLow = na
-var float chart_currentWeekHigh = na, var float chart_currentWeekLow = na
-var float chart_currentMonthHigh = na, var float chart_currentMonthLow = na
-var float chart_currentYearHigh = na, var float chart_currentYearLow = na
-
-var int chart_lastDayOfMonth = na
-var int chart_lastWeekOfYear = na
-var int chart_lastMonth = na
-var int chart_lastYear = na
-
-// Track levels from 4H data
-var float h4_pdh = na, var float h4_pdl = na
-var float h4_pwh = na, var float h4_pwl = na
-var float h4_pmh = na, var float h4_pml = na
-var float h4_pyh = na, var float h4_pyl = na
-var float h4_ath = na
-
-var float h4_currentDayHigh = na, var float h4_currentDayLow = na
-var float h4_currentWeekHigh = na, var float h4_currentWeekLow = na
-var float h4_currentMonthHigh = na, var float h4_currentMonthLow = na
-var float h4_currentYearHigh = na, var float h4_currentYearLow = na
-
-var int h4_lastDayOfMonth = na
-var int h4_lastWeekOfYear = na
-var int h4_lastMonth = na
-var int h4_lastYear = na
-
-// ========== CHART DATA CALCULATIONS ==========
-// Initialize chart tracking
-if na(chart_lastDayOfMonth)
-    chart_lastDayOfMonth := chart_dayOfMonth
-    chart_lastWeekOfYear := chart_weekOfYear
-    chart_lastMonth := chart_month
-    chart_lastYear := chart_year
-    chart_currentDayHigh := high, chart_currentDayLow := low
-    chart_currentWeekHigh := high, chart_currentWeekLow := low
-    chart_currentMonthHigh := high, chart_currentMonthLow := low
-    chart_currentYearHigh := high, chart_currentYearLow := low
-
-// Detect period changes from chart data
-bool chart_newDay = (chart_year != chart_lastYear) or (chart_month != chart_lastMonth) or (chart_dayOfMonth != chart_lastDayOfMonth)
-bool chart_newWeek = (chart_year != chart_lastYear) or (chart_weekOfYear != chart_lastWeekOfYear)
-bool chart_newMonth = (chart_year != chart_lastYear) or (chart_month != chart_lastMonth)
-bool chart_newYear = chart_year != chart_lastYear
-
-if chart_newDay
-    chart_pdh := chart_currentDayHigh, chart_pdl := chart_currentDayLow
-    chart_currentDayHigh := high, chart_currentDayLow := low
-    chart_lastDayOfMonth := chart_dayOfMonth
-    chart_lastMonth := chart_month
-    chart_lastYear := chart_year
+// On calendar day change, save previous day values
+if newDay and not na(currentDayHigh)
+    prevDayHigh := currentDayHigh
+    prevDayLow := currentDayLow
+    currentDayHigh := high
+    currentDayLow := low
 else
-    chart_currentDayHigh := na(chart_currentDayHigh) ? high : math.max(chart_currentDayHigh, high)
-    chart_currentDayLow := na(chart_currentDayLow) ? low : math.min(chart_currentDayLow, low)
+    currentDayHigh := na(currentDayHigh) ? high : math.max(currentDayHigh, high)
+    currentDayLow := na(currentDayLow) ? low : math.min(currentDayLow, low)
 
-if chart_newWeek
-    chart_pwh := chart_currentWeekHigh, chart_pwl := chart_currentWeekLow
-    chart_currentWeekHigh := high, chart_currentWeekLow := low
-    chart_lastWeekOfYear := chart_weekOfYear
-    if chart_newYear
-        chart_lastYear := chart_year
-else
-    chart_currentWeekHigh := na(chart_currentWeekHigh) ? high : math.max(chart_currentWeekHigh, high)
-    chart_currentWeekLow := na(chart_currentWeekLow) ? low : math.min(chart_currentWeekLow, low)
-
-if chart_newMonth
-    chart_pmh := chart_currentMonthHigh, chart_pml := chart_currentMonthLow
-    chart_currentMonthHigh := high, chart_currentMonthLow := low
-    chart_lastMonth := chart_month
-    if chart_newYear
-        chart_lastYear := chart_year
-else
-    chart_currentMonthHigh := na(chart_currentMonthHigh) ? high : math.max(chart_currentMonthHigh, high)
-    chart_currentMonthLow := na(chart_currentMonthLow) ? low : math.min(chart_currentMonthLow, low)
-
-if chart_newYear
-    chart_pyh := chart_currentYearHigh, chart_pyl := chart_currentYearLow
-    chart_currentYearHigh := high, chart_currentYearLow := low
-    chart_lastYear := chart_year
-else
-    chart_currentYearHigh := na(chart_currentYearHigh) ? high : math.max(chart_currentYearHigh, high)
-    chart_currentYearLow := na(chart_currentYearLow) ? low : math.min(chart_currentYearLow, low)
-
-// Chart ATH
-chart_ath := na(chart_ath) ? high : math.max(chart_ath, high)
-
-// ========== 4H DATA CALCULATIONS ==========
-// Initialize 4H tracking
-if na(h4_lastDayOfMonth)
-    h4_lastDayOfMonth := h4_dayOfMonth
-    h4_lastWeekOfYear := h4_weekOfYear
-    h4_lastMonth := h4_month
-    h4_lastYear := h4_year
-    h4_currentDayHigh := h4_high, h4_currentDayLow := h4_low
-    h4_currentWeekHigh := h4_high, h4_currentWeekLow := h4_low
-    h4_currentMonthHigh := h4_high, h4_currentMonthLow := h4_low
-    h4_currentYearHigh := h4_high, h4_currentYearLow := h4_low
-
-// Detect period changes from 4H data
-bool h4_newDay = (h4_year != h4_lastYear) or (h4_month != h4_lastMonth) or (h4_dayOfMonth != h4_lastDayOfMonth)
-bool h4_newWeek = (h4_year != h4_lastYear) or (h4_weekOfYear != h4_lastWeekOfYear)
-bool h4_newMonth = (h4_year != h4_lastYear) or (h4_month != h4_lastMonth)
-bool h4_newYear = h4_year != h4_lastYear
-
-if h4_newDay
-    h4_pdh := h4_currentDayHigh, h4_pdl := h4_currentDayLow
-    h4_currentDayHigh := h4_high, h4_currentDayLow := h4_low
-    h4_lastDayOfMonth := h4_dayOfMonth
-    h4_lastMonth := h4_month
-    h4_lastYear := h4_year
-else
-    h4_currentDayHigh := na(h4_currentDayHigh) ? h4_high : math.max(h4_currentDayHigh, h4_high)
-    h4_currentDayLow := na(h4_currentDayLow) ? h4_low : math.min(h4_currentDayLow, h4_low)
-
-if h4_newWeek
-    h4_pwh := h4_currentWeekHigh, h4_pwl := h4_currentWeekLow
-    h4_currentWeekHigh := h4_high, h4_currentWeekLow := h4_low
-    h4_lastWeekOfYear := h4_weekOfYear
-    if h4_newYear
-        h4_lastYear := h4_year
-else
-    h4_currentWeekHigh := na(h4_currentWeekHigh) ? h4_high : math.max(h4_currentWeekHigh, h4_high)
-    h4_currentWeekLow := na(h4_currentWeekLow) ? h4_low : math.min(h4_currentWeekLow, h4_low)
-
-if h4_newMonth
-    h4_pmh := h4_currentMonthHigh, h4_pml := h4_currentMonthLow
-    h4_currentMonthHigh := h4_high, h4_currentMonthLow := h4_low
-    h4_lastMonth := h4_month
-    if h4_newYear
-        h4_lastYear := h4_year
-else
-    h4_currentMonthHigh := na(h4_currentMonthHigh) ? h4_high : math.max(h4_currentMonthHigh, h4_high)
-    h4_currentMonthLow := na(h4_currentMonthLow) ? h4_low : math.min(h4_currentMonthLow, h4_low)
-
-if h4_newYear
-    h4_pyh := h4_currentYearHigh, h4_pyl := h4_currentYearLow
-    h4_currentYearHigh := h4_high, h4_currentYearLow := h4_low
-    h4_lastYear := h4_year
-else
-    h4_currentYearHigh := na(h4_currentYearHigh) ? h4_high : math.max(h4_currentYearHigh, h4_high)
-    h4_currentYearLow := na(h4_currentYearLow) ? h4_low : math.min(h4_currentYearLow, h4_low)
-
-// 4H ATH
-h4_ath := na(h4_ath) ? h4_high : math.max(h4_ath, h4_high)
-
-// ========== SELECT BEST DATA SOURCE ==========
-// Use chart data if available (not NA), otherwise fall back to 4H data
-// Previous period levels
-float pdh = not na(chart_pdh) ? chart_pdh : h4_pdh
-float pdl = not na(chart_pdl) ? chart_pdl : h4_pdl
-float pwh = not na(chart_pwh) ? chart_pwh : h4_pwh
-float pwl = not na(chart_pwl) ? chart_pwl : h4_pwl
-float pmh = not na(chart_pmh) ? chart_pmh : h4_pmh
-float pml = not na(chart_pml) ? chart_pml : h4_pml
-float pyh = not na(chart_pyh) ? chart_pyh : h4_pyh
-float pyl = not na(chart_pyl) ? chart_pyl : h4_pyl
-float ath = not na(chart_ath) ? chart_ath : h4_ath
-
-// Current period levels
-float cdh = not na(chart_currentDayHigh) ? chart_currentDayHigh : h4_currentDayHigh
-float cdl = not na(chart_currentDayLow) ? chart_currentDayLow : h4_currentDayLow
-float cwh = not na(chart_currentWeekHigh) ? chart_currentWeekHigh : h4_currentWeekHigh
-float cwl = not na(chart_currentWeekLow) ? chart_currentWeekLow : h4_currentWeekLow
-float cmh = not na(chart_currentMonthHigh) ? chart_currentMonthHigh : h4_currentMonthHigh
-float cml = not na(chart_currentMonthLow) ? chart_currentMonthLow : h4_currentMonthLow
-float cyh = not na(chart_currentYearHigh) ? chart_currentYearHigh : h4_currentYearHigh
-float cyl = not na(chart_currentYearLow) ? chart_currentYearLow : h4_currentYearLow
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SESSION-BASED LEVELS (Opening Price, Open Range, Initial Balance)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-string sessionSpec = getSessionSpec(sessionChoice)
-string sessionTz = getSessionTimezone(sessionChoice)
-
-// Detect session change
-bool inSession = not na(time(timeframe.period, sessionSpec, sessionTz))
-bool sessionChange = inSession and not inSession[1]
-
-// Track session levels
-var float sessionOpen = na
-var float openRangeHigh = na
-var float openRangeLow = na
-var float initialBalanceHigh = na
-var float initialBalanceLow = na
-var int sessionStartBar = na
-var int sessionStartTime = na
-
-// Calculate elapsed minutes in session
-int openRangeMinutes = periodToMinutes(openRangePeriod)
-int ibMinutes = periodToMinutes(initialBalancePeriod)
-
-if sessionChange
-    sessionOpen := open
-    openRangeHigh := high
-    openRangeLow := low
-    initialBalanceHigh := high
-    initialBalanceLow := low
-    sessionStartBar := bar_index
-    sessionStartTime := time
-
-if inSession and not na(sessionStartTime)
-    int elapsedMinutes = math.round((time - sessionStartTime) / 60000)
-
-    // Update Open Range
-    if elapsedMinutes <= openRangeMinutes
-        openRangeHigh := math.max(openRangeHigh, high)
-        openRangeLow := math.min(openRangeLow, low)
-
-    // Update Initial Balance
-    if elapsedMinutes <= ibMinutes
-        initialBalanceHigh := math.max(initialBalanceHigh, high)
-        initialBalanceLow := math.min(initialBalanceLow, low)
+// Assign to standard variable names for rendering
+float pdh = prevDayHigh
+float pdl = prevDayLow
 
 var line linePDH = na, var line linePDL = na, var label labelPDH = na, var label labelPDL = na
 var line linePWH = na, var line linePWL = na, var label labelPWH = na, var label labelPWL = na
 var line linePMH = na, var line linePML = na, var label labelPMH = na, var label labelPML = na
 var line linePYH = na, var line linePYL = na, var label labelPYH = na, var label labelPYL = na
 var line lineATH = na, var label labelATH = na
-var line lineCDH = na, var line lineCDL = na, var label labelCDH = na, var label labelCDL = na
-var line lineCWH = na, var line lineCWL = na, var label labelCWH = na, var label labelCWL = na
-var line lineCMH = na, var line lineCML = na, var label labelCMH = na, var label labelCML = na
-var line lineCYH = na, var line lineCYL = na, var label labelCYH = na, var label labelCYL = na
-var line lineOpenPrice = na, var label labelOpenPrice = na
-var line lineORH = na, var line lineORL = na, var label labelORH = na, var label labelORL = na
-var line lineIBH = na, var line lineIBL = na, var label labelIBH = na, var label labelIBL = na
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// KEY LEVELS RENDERING
-// ═══════════════════════════════════════════════════════════════════════════════
-
-if showKeyLevelsCondition and barstate.islast
+// Render key levels (updates every bar to extend lines to current bar_index)
+// Works on all timeframes (intraday, daily, weekly)
+if showKeyLevels and barstate.islast
+    // Using values from request.security calls above - works on all timeframes
     int startBar = math.max(0, bar_index - globalLineLengthBars)
     string keyLevelsLineStyleActual = getLineStyle(keyLevelsLineStyle)
     string labelSizeActual = getLabelSize(globalLabelSize)
 
-    // Cache rounded prices to avoid multiple roundToTick() calls
-    float athRounded = roundToTick(ath)
-    float pyhRounded = roundToTick(pyh)
-    float pylRounded = roundToTick(pyl)
-    float pmhRounded = roundToTick(pmh)
-    float pmlRounded = roundToTick(pml)
-    float pwhRounded = roundToTick(pwh)
-    float pwlRounded = roundToTick(pwl)
-    float pdhRounded = roundToTick(pdh)
-    float pdlRounded = roundToTick(pdl)
-    float cyhRounded = roundToTick(cyh)
-    float cylRounded = roundToTick(cyl)
-    float cmhRounded = roundToTick(cmh)
-    float cmlRounded = roundToTick(cml)
-    float cwhRounded = roundToTick(cwh)
-    float cwlRounded = roundToTick(cwl)
-    float cdhRounded = roundToTick(cdh)
-    float cdlRounded = roundToTick(cdl)
-
-    // Session levels rounded
-    float ibhRounded = roundToTick(initialBalanceHigh)
-    float iblRounded = roundToTick(initialBalanceLow)
-    float orhRounded = roundToTick(openRangeHigh)
-    float orlRounded = roundToTick(openRangeLow)
-    float openRounded = roundToTick(sessionOpen)
-
-    // Build map of price -> combined label names (priority DESC: ATH → PYH → PYL → PMH → PML → PWH → PWL → PDH → PDL → CYH → CYL → CMH → CML → CWH → CWL → CDH → CDL → IBH → IBL → ORH → ORL → Open)
-    var map<float, string> priceLabels = map.new<float, string>()
-    map.clear(priceLabels)
-
-    // Collect all enabled levels with their labels (highest priority first)
-    if showATH
-        addToMap(priceLabels, ath, "ATH")
-    if showPYH
-        addToMap(priceLabels, pyh, "PYH")
-    if showPYL
-        addToMap(priceLabels, pyl, "PYL")
-    if showPMH
-        addToMap(priceLabels, pmh, "PMH")
-    if showPML
-        addToMap(priceLabels, pml, "PML")
-    if showPWH
-        addToMap(priceLabels, pwh, "PWH")
-    if showPWL
-        addToMap(priceLabels, pwl, "PWL")
-    if showPDH
-        addToMap(priceLabels, pdh, "PDH")
-    if showPDL
-        addToMap(priceLabels, pdl, "PDL")
-    if showCYH
-        addToMap(priceLabels, cyh, "CYH")
-    if showCYL
-        addToMap(priceLabels, cyl, "CYL")
-    if showCMH
-        addToMap(priceLabels, cmh, "CMH")
-    if showCML
-        addToMap(priceLabels, cml, "CML")
-    if showCWH
-        addToMap(priceLabels, cwh, "CWH")
-    if showCWL
-        addToMap(priceLabels, cwl, "CWL")
-    if showCDH
-        addToMap(priceLabels, cdh, "CDH")
-    if showCDL
-        addToMap(priceLabels, cdl, "CDL")
-
-    // Session levels (lower priority)
-    if showSessionLevelsCondition and not na(sessionOpen)
-        if showInitialBalance and not na(initialBalanceHigh)
-            addToMap(priceLabels, initialBalanceHigh, "IBH")
-        if showInitialBalance and not na(initialBalanceLow)
-            addToMap(priceLabels, initialBalanceLow, "IBL")
-        if showOpenRange and not na(openRangeHigh)
-            addToMap(priceLabels, openRangeHigh, "ORH")
-        if showOpenRange and not na(openRangeLow)
-            addToMap(priceLabels, openRangeLow, "ORL")
-        if showOpenPrice
-            addToMap(priceLabels, sessionOpen, "Open")
-
+    // Track rendered prices to avoid duplicates (priority: ATH > PYH/PYL > PMH/PML > PWH/PWL > PDH/PDL)
     var array<float> renderedPrices = array.new<float>()
     array.clear(renderedPrices)
 
-    // ATH
-    // ATH
+    // ATH (ABSOLUTE HIGHEST PRIORITY - always shows, blocks all duplicates)
     if showATH and not na(ath)
-        if not array.includes(renderedPrices, athRounded)
-            string combinedLabel = map.contains(priceLabels, athRounded) ? map.get(priceLabels, athRounded) : "ATH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(ath, format.mintick) + ")" : combinedLabel
-            if na(lineATH)
-                lineATH := line.new(startBar, ath, bar_index, ath, color=colorATH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelATH := label.new(bar_index, ath, labelText, color=labelBgColor(colorATH), textcolor=colorATH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineATH, startBar, ath), line.set_xy2(lineATH, bar_index, ath)
-                label.set_xy(labelATH, bar_index, ath), label.set_text(labelATH, labelText)
-            array.push(renderedPrices, athRounded)
-    else if not na(lineATH)
-        line.delete(lineATH), lineATH := na, label.delete(labelATH), labelATH := na
+        string labelText = globalShowPriceValues ? "ATH (" + str.tostring(ath, format.mintick) + ")" : "ATH"
+        if na(lineATH)
+            lineATH := line.new(startBar, ath, bar_index, ath, color=colorATH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelATH := label.new(bar_index, ath, labelText, color=labelBgColor(colorATH), textcolor=colorATH, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(lineATH, startBar, ath), line.set_xy2(lineATH, bar_index, ath)
+            label.set_xy(labelATH, bar_index, ath), label.set_text(labelATH, labelText)
+        // Add to rendered prices to block any other level at same price
+        array.push(renderedPrices, ath)
+    else
+        // Hide line/label if not rendered
+        if not na(lineATH)
+            line.delete(lineATH), lineATH := na
+        if not na(labelATH)
+            label.delete(labelATH), labelATH := na
 
-    // PYH
-    if showPYH and not na(pyh)
-        if not array.includes(renderedPrices, pyhRounded)
-            string combinedLabel = map.contains(priceLabels, pyhRounded) ? map.get(priceLabels, pyhRounded) : "PYH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pyh, format.mintick) + ")" : combinedLabel
-            if na(linePYH)
-                linePYH := line.new(startBar, pyh, bar_index, pyh, color=colorPYH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelPYH := label.new(bar_index, pyh, labelText, color=labelBgColor(colorPYH), textcolor=colorPYH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(linePYH, startBar, pyh), line.set_xy2(linePYH, bar_index, pyh)
-                label.set_xy(labelPYH, bar_index, pyh), label.set_text(labelPYH, labelText)
-            array.push(renderedPrices, pyhRounded)
+    // PYH (Yearly High)
+    if showPYH and not na(pyh) and not array.includes(renderedPrices, pyh)
+        string labelText = globalShowPriceValues ? "PYH (" + str.tostring(pyh, format.mintick) + ")" : "PYH"
+        if na(linePYH)
+            linePYH := line.new(startBar, pyh, bar_index, pyh, color=colorPYH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPYH := label.new(bar_index, pyh, labelText, color=labelBgColor(colorPYH), textcolor=colorPYH, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePYH, startBar, pyh), line.set_xy2(linePYH, bar_index, pyh)
+            label.set_xy(labelPYH, bar_index, pyh), label.set_text(labelPYH, labelText)
+        array.push(renderedPrices, pyh)
     else if not na(linePYH)
         line.delete(linePYH), linePYH := na, label.delete(labelPYH), labelPYH := na
 
-    // PYL
-    if showPYL and not na(pyl)
-        if not array.includes(renderedPrices, pylRounded)
-            string combinedLabel = map.contains(priceLabels, pylRounded) ? map.get(priceLabels, pylRounded) : "PYL"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pyl, format.mintick) + ")" : combinedLabel
-            if na(linePYL)
-                linePYL := line.new(startBar, pyl, bar_index, pyl, color=colorPYL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelPYL := label.new(bar_index, pyl, labelText, color=labelBgColor(colorPYL), textcolor=colorPYL, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(linePYL, startBar, pyl), line.set_xy2(linePYL, bar_index, pyl)
-                label.set_xy(labelPYL, bar_index, pyl), label.set_text(labelPYL, labelText)
-            array.push(renderedPrices, pylRounded)
+    // PYL (Yearly Low)
+    if showPYL and not na(pyl) and not array.includes(renderedPrices, pyl)
+        string labelText = globalShowPriceValues ? "PYL (" + str.tostring(pyl, format.mintick) + ")" : "PYL"
+        if na(linePYL)
+            linePYL := line.new(startBar, pyl, bar_index, pyl, color=colorPYL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPYL := label.new(bar_index, pyl, labelText, color=labelBgColor(colorPYL), textcolor=colorPYL, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePYL, startBar, pyl), line.set_xy2(linePYL, bar_index, pyl)
+            label.set_xy(labelPYL, bar_index, pyl), label.set_text(labelPYL, labelText)
+        array.push(renderedPrices, pyl)
     else if not na(linePYL)
         line.delete(linePYL), linePYL := na, label.delete(labelPYL), labelPYL := na
 
-    // PMH
-    if showPMH and not na(pmh)
-        if not array.includes(renderedPrices, pmhRounded)
-            string combinedLabel = map.contains(priceLabels, pmhRounded) ? map.get(priceLabels, pmhRounded) : "PMH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pmh, format.mintick) + ")" : combinedLabel
-            if na(linePMH)
-                linePMH := line.new(startBar, pmh, bar_index, pmh, color=colorPMH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelPMH := label.new(bar_index, pmh, labelText, color=labelBgColor(colorPMH), textcolor=colorPMH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(linePMH, startBar, pmh), line.set_xy2(linePMH, bar_index, pmh)
-                label.set_xy(labelPMH, bar_index, pmh), label.set_text(labelPMH, labelText)
-            array.push(renderedPrices, pmhRounded)
+    // PMH (Monthly High)
+    if showPMH and not na(pmh) and not array.includes(renderedPrices, pmh)
+        string labelText = globalShowPriceValues ? "PMH (" + str.tostring(pmh, format.mintick) + ")" : "PMH"
+        if na(linePMH)
+            linePMH := line.new(startBar, pmh, bar_index, pmh, color=colorPMH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPMH := label.new(bar_index, pmh, labelText, color=labelBgColor(colorPMH), textcolor=colorPMH, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePMH, startBar, pmh), line.set_xy2(linePMH, bar_index, pmh)
+            label.set_xy(labelPMH, bar_index, pmh), label.set_text(labelPMH, labelText)
+        array.push(renderedPrices, pmh)
     else if not na(linePMH)
         line.delete(linePMH), linePMH := na, label.delete(labelPMH), labelPMH := na
 
-    // PML
-    if showPML and not na(pml)
-        if not array.includes(renderedPrices, pmlRounded)
-            string combinedLabel = map.contains(priceLabels, pmlRounded) ? map.get(priceLabels, pmlRounded) : "PML"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pml, format.mintick) + ")" : combinedLabel
-            if na(linePML)
-                linePML := line.new(startBar, pml, bar_index, pml, color=colorPML, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelPML := label.new(bar_index, pml, labelText, color=labelBgColor(colorPML), textcolor=colorPML, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(linePML, startBar, pml), line.set_xy2(linePML, bar_index, pml)
-                label.set_xy(labelPML, bar_index, pml), label.set_text(labelPML, labelText)
-            array.push(renderedPrices, pmlRounded)
+    // PML (Monthly Low)
+    if showPML and not na(pml) and not array.includes(renderedPrices, pml)
+        string labelText = globalShowPriceValues ? "PML (" + str.tostring(pml, format.mintick) + ")" : "PML"
+        if na(linePML)
+            linePML := line.new(startBar, pml, bar_index, pml, color=colorPML, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPML := label.new(bar_index, pml, labelText, color=labelBgColor(colorPML), textcolor=colorPML, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePML, startBar, pml), line.set_xy2(linePML, bar_index, pml)
+            label.set_xy(labelPML, bar_index, pml), label.set_text(labelPML, labelText)
+        array.push(renderedPrices, pml)
     else if not na(linePML)
         line.delete(linePML), linePML := na, label.delete(labelPML), labelPML := na
 
-    // PWH
-    if showPWH and not na(pwh)
-        if not array.includes(renderedPrices, pwhRounded)
-            string combinedLabel = map.contains(priceLabels, pwhRounded) ? map.get(priceLabels, pwhRounded) : "PWH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pwh, format.mintick) + ")" : combinedLabel
-            if na(linePWH)
-                linePWH := line.new(startBar, pwh, bar_index, pwh, color=colorPWH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelPWH := label.new(bar_index, pwh, labelText, color=labelBgColor(colorPWH), textcolor=colorPWH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(linePWH, startBar, pwh), line.set_xy2(linePWH, bar_index, pwh)
-                label.set_xy(labelPWH, bar_index, pwh), label.set_text(labelPWH, labelText)
-            array.push(renderedPrices, pwhRounded)
+    // PWH (Weekly High)
+    if showPWH and not na(pwh) and not array.includes(renderedPrices, pwh)
+        string labelText = globalShowPriceValues ? "PWH (" + str.tostring(pwh, format.mintick) + ")" : "PWH"
+        if na(linePWH)
+            linePWH := line.new(startBar, pwh, bar_index, pwh, color=colorPWH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPWH := label.new(bar_index, pwh, labelText, color=labelBgColor(colorPWH), textcolor=colorPWH, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePWH, startBar, pwh), line.set_xy2(linePWH, bar_index, pwh)
+            label.set_xy(labelPWH, bar_index, pwh), label.set_text(labelPWH, labelText)
+        array.push(renderedPrices, pwh)
     else if not na(linePWH)
         line.delete(linePWH), linePWH := na, label.delete(labelPWH), labelPWH := na
 
-    // PWL
-    if showPWL and not na(pwl)
-        if not array.includes(renderedPrices, pwlRounded)
-            string combinedLabel = map.contains(priceLabels, pwlRounded) ? map.get(priceLabels, pwlRounded) : "PWL"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pwl, format.mintick) + ")" : combinedLabel
-            if na(linePWL)
-                linePWL := line.new(startBar, pwl, bar_index, pwl, color=colorPWL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelPWL := label.new(bar_index, pwl, labelText, color=labelBgColor(colorPWL), textcolor=colorPWL, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(linePWL, startBar, pwl), line.set_xy2(linePWL, bar_index, pwl)
-                label.set_xy(labelPWL, bar_index, pwl), label.set_text(labelPWL, labelText)
-            array.push(renderedPrices, pwlRounded)
+    // PWL (Weekly Low)
+    if showPWL and not na(pwl) and not array.includes(renderedPrices, pwl)
+        string labelText = globalShowPriceValues ? "PWL (" + str.tostring(pwl, format.mintick) + ")" : "PWL"
+        if na(linePWL)
+            linePWL := line.new(startBar, pwl, bar_index, pwl, color=colorPWL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPWL := label.new(bar_index, pwl, labelText, color=labelBgColor(colorPWL), textcolor=colorPWL, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePWL, startBar, pwl), line.set_xy2(linePWL, bar_index, pwl)
+            label.set_xy(labelPWL, bar_index, pwl), label.set_text(labelPWL, labelText)
+        array.push(renderedPrices, pwl)
     else if not na(linePWL)
         line.delete(linePWL), linePWL := na, label.delete(labelPWL), labelPWL := na
 
-    // PDH
-    if showPDH and not na(pdh)
-        if not array.includes(renderedPrices, pdhRounded)
-            string combinedLabel = map.contains(priceLabels, pdhRounded) ? map.get(priceLabels, pdhRounded) : "PDH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pdh, format.mintick) + ")" : combinedLabel
-            if na(linePDH)
-                linePDH := line.new(startBar, pdh, bar_index, pdh, color=colorPDH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelPDH := label.new(bar_index, pdh, labelText, color=labelBgColor(colorPDH), textcolor=colorPDH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(linePDH, startBar, pdh), line.set_xy2(linePDH, bar_index, pdh)
-                label.set_xy(labelPDH, bar_index, pdh), label.set_text(labelPDH, labelText)
-            array.push(renderedPrices, pdhRounded)
+    // PDH (Daily High)
+    if showPDH and not na(pdh) and not array.includes(renderedPrices, pdh)
+        string labelText = globalShowPriceValues ? "PDH (" + str.tostring(pdh, format.mintick) + ")" : "PDH"
+        if na(linePDH)
+            linePDH := line.new(startBar, pdh, bar_index, pdh, color=colorPDH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPDH := label.new(bar_index, pdh, labelText, color=labelBgColor(colorPDH), textcolor=colorPDH, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePDH, startBar, pdh), line.set_xy2(linePDH, bar_index, pdh)
+            label.set_xy(labelPDH, bar_index, pdh), label.set_text(labelPDH, labelText)
+        array.push(renderedPrices, pdh)
     else if not na(linePDH)
         line.delete(linePDH), linePDH := na, label.delete(labelPDH), labelPDH := na
 
-    // PDL
-    if showPDL and not na(pdl)
-        if not array.includes(renderedPrices, pdlRounded)
-            string combinedLabel = map.contains(priceLabels, pdlRounded) ? map.get(priceLabels, pdlRounded) : "PDL"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pdl, format.mintick) + ")" : combinedLabel
-            if na(linePDL)
-                linePDL := line.new(startBar, pdl, bar_index, pdl, color=colorPDL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelPDL := label.new(bar_index, pdl, labelText, color=labelBgColor(colorPDL), textcolor=colorPDL, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(linePDL, startBar, pdl), line.set_xy2(linePDL, bar_index, pdl)
-                label.set_xy(labelPDL, bar_index, pdl), label.set_text(labelPDL, labelText)
-            array.push(renderedPrices, pdlRounded)
+    // PDL (Daily Low)
+    if showPDL and not na(pdl) and not array.includes(renderedPrices, pdl)
+        string labelText = globalShowPriceValues ? "PDL (" + str.tostring(pdl, format.mintick) + ")" : "PDL"
+        if na(linePDL)
+            linePDL := line.new(startBar, pdl, bar_index, pdl, color=colorPDL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
+            labelPDL := label.new(bar_index, pdl, labelText, color=labelBgColor(colorPDL), textcolor=colorPDL, style=label.style_label_left, size=labelSizeActual)
+        else
+            line.set_xy1(linePDL, startBar, pdl), line.set_xy2(linePDL, bar_index, pdl)
+            label.set_xy(labelPDL, bar_index, pdl), label.set_text(labelPDL, labelText)
+        array.push(renderedPrices, pdl)
     else if not na(linePDL)
         line.delete(linePDL), linePDL := na, label.delete(labelPDL), labelPDL := na
-
-    // CYH
-    if showCYH and not na(cyh)
-        if not array.includes(renderedPrices, cyhRounded)
-            string combinedLabel = map.contains(priceLabels, cyhRounded) ? map.get(priceLabels, cyhRounded) : "CYH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cyh, format.mintick) + ")" : combinedLabel
-            if na(lineCYH)
-                lineCYH := line.new(startBar, cyh, bar_index, cyh, color=colorCYH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelCYH := label.new(bar_index, cyh, labelText, color=labelBgColor(colorCYH), textcolor=colorCYH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineCYH, startBar, cyh), line.set_xy2(lineCYH, bar_index, cyh)
-                label.set_xy(labelCYH, bar_index, cyh), label.set_text(labelCYH, labelText)
-            array.push(renderedPrices, cyhRounded)
-    else if not na(lineCYH)
-        line.delete(lineCYH), lineCYH := na, label.delete(labelCYH), labelCYH := na
-
-    // CYL
-    if showCYL and not na(cyl)
-        if not array.includes(renderedPrices, cylRounded)
-            string combinedLabel = map.contains(priceLabels, cylRounded) ? map.get(priceLabels, cylRounded) : "CYL"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cyl, format.mintick) + ")" : combinedLabel
-            if na(lineCYL)
-                lineCYL := line.new(startBar, cyl, bar_index, cyl, color=colorCYL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelCYL := label.new(bar_index, cyl, labelText, color=labelBgColor(colorCYL), textcolor=colorCYL, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineCYL, startBar, cyl), line.set_xy2(lineCYL, bar_index, cyl)
-                label.set_xy(labelCYL, bar_index, cyl), label.set_text(labelCYL, labelText)
-            array.push(renderedPrices, cylRounded)
-    else if not na(lineCYL)
-        line.delete(lineCYL), lineCYL := na, label.delete(labelCYL), labelCYL := na
-
-    // CMH
-    if showCMH and not na(cmh)
-        if not array.includes(renderedPrices, cmhRounded)
-            string combinedLabel = map.contains(priceLabels, cmhRounded) ? map.get(priceLabels, cmhRounded) : "CMH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cmh, format.mintick) + ")" : combinedLabel
-            if na(lineCMH)
-                lineCMH := line.new(startBar, cmh, bar_index, cmh, color=colorCMH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelCMH := label.new(bar_index, cmh, labelText, color=labelBgColor(colorCMH), textcolor=colorCMH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineCMH, startBar, cmh), line.set_xy2(lineCMH, bar_index, cmh)
-                label.set_xy(labelCMH, bar_index, cmh), label.set_text(labelCMH, labelText)
-            array.push(renderedPrices, cmhRounded)
-    else if not na(lineCMH)
-        line.delete(lineCMH), lineCMH := na, label.delete(labelCMH), labelCMH := na
-
-    // CML
-    if showCML and not na(cml)
-        if not array.includes(renderedPrices, cmlRounded)
-            string combinedLabel = map.contains(priceLabels, cmlRounded) ? map.get(priceLabels, cmlRounded) : "CML"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cml, format.mintick) + ")" : combinedLabel
-            if na(lineCML)
-                lineCML := line.new(startBar, cml, bar_index, cml, color=colorCML, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelCML := label.new(bar_index, cml, labelText, color=labelBgColor(colorCML), textcolor=colorCML, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineCML, startBar, cml), line.set_xy2(lineCML, bar_index, cml)
-                label.set_xy(labelCML, bar_index, cml), label.set_text(labelCML, labelText)
-            array.push(renderedPrices, cmlRounded)
-    else if not na(lineCML)
-        line.delete(lineCML), lineCML := na, label.delete(labelCML), labelCML := na
-
-    // CWH
-    if showCWH and not na(cwh)
-        if not array.includes(renderedPrices, cwhRounded)
-            string combinedLabel = map.contains(priceLabels, cwhRounded) ? map.get(priceLabels, cwhRounded) : "CWH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cwh, format.mintick) + ")" : combinedLabel
-            if na(lineCWH)
-                lineCWH := line.new(startBar, cwh, bar_index, cwh, color=colorCWH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelCWH := label.new(bar_index, cwh, labelText, color=labelBgColor(colorCWH), textcolor=colorCWH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineCWH, startBar, cwh), line.set_xy2(lineCWH, bar_index, cwh)
-                label.set_xy(labelCWH, bar_index, cwh), label.set_text(labelCWH, labelText)
-            array.push(renderedPrices, cwhRounded)
-    else if not na(lineCWH)
-        line.delete(lineCWH), lineCWH := na, label.delete(labelCWH), labelCWH := na
-
-    // CWL
-    if showCWL and not na(cwl)
-        if not array.includes(renderedPrices, cwlRounded)
-            string combinedLabel = map.contains(priceLabels, cwlRounded) ? map.get(priceLabels, cwlRounded) : "CWL"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cwl, format.mintick) + ")" : combinedLabel
-            if na(lineCWL)
-                lineCWL := line.new(startBar, cwl, bar_index, cwl, color=colorCWL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelCWL := label.new(bar_index, cwl, labelText, color=labelBgColor(colorCWL), textcolor=colorCWL, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineCWL, startBar, cwl), line.set_xy2(lineCWL, bar_index, cwl)
-                label.set_xy(labelCWL, bar_index, cwl), label.set_text(labelCWL, labelText)
-            array.push(renderedPrices, cwlRounded)
-    else if not na(lineCWL)
-        line.delete(lineCWL), lineCWL := na, label.delete(labelCWL), labelCWL := na
-
-    // CDH
-    if showCDH and not na(cdh)
-        if not array.includes(renderedPrices, cdhRounded)
-            string combinedLabel = map.contains(priceLabels, cdhRounded) ? map.get(priceLabels, cdhRounded) : "CDH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cdh, format.mintick) + ")" : combinedLabel
-            if na(lineCDH)
-                lineCDH := line.new(startBar, cdh, bar_index, cdh, color=colorCDH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelCDH := label.new(bar_index, cdh, labelText, color=labelBgColor(colorCDH), textcolor=colorCDH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineCDH, startBar, cdh), line.set_xy2(lineCDH, bar_index, cdh)
-                label.set_xy(labelCDH, bar_index, cdh), label.set_text(labelCDH, labelText)
-            array.push(renderedPrices, cdhRounded)
-    else if not na(lineCDH)
-        line.delete(lineCDH), lineCDH := na, label.delete(labelCDH), labelCDH := na
-
-    // CDL
-    if showCDL and not na(cdl)
-        if not array.includes(renderedPrices, cdlRounded)
-            string combinedLabel = map.contains(priceLabels, cdlRounded) ? map.get(priceLabels, cdlRounded) : "CDL"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cdl, format.mintick) + ")" : combinedLabel
-            if na(lineCDL)
-                lineCDL := line.new(startBar, cdl, bar_index, cdl, color=colorCDL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-                labelCDL := label.new(bar_index, cdl, labelText, color=labelBgColor(colorCDL), textcolor=colorCDL, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineCDL, startBar, cdl), line.set_xy2(lineCDL, bar_index, cdl)
-                label.set_xy(labelCDL, bar_index, cdl), label.set_text(labelCDL, labelText)
-            array.push(renderedPrices, cdlRounded)
-    else if not na(lineCDL)
-        line.delete(lineCDL), lineCDL := na, label.delete(labelCDL), labelCDL := na
-
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // SESSION LEVELS RENDERING (same block to share renderedPrices and priceLabels)
-    // ═══════════════════════════════════════════════════════════════════════════════
-
-    string sessionLineStyleActual = getLineStyle(sessionLevelsLineStyle)
-
-    // Initial Balance High
-    if showSessionLevelsCondition and showInitialBalance and not na(initialBalanceHigh)
-        if not array.includes(renderedPrices, ibhRounded)
-            string combinedLabel = map.contains(priceLabels, ibhRounded) ? map.get(priceLabels, ibhRounded) : "IBH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(initialBalanceHigh, format.mintick) + ")" : combinedLabel
-            if na(lineIBH)
-                lineIBH := line.new(startBar, initialBalanceHigh, bar_index, initialBalanceHigh, color=colorIBH, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
-                labelIBH := label.new(bar_index, initialBalanceHigh, labelText, color=labelBgColor(colorIBH), textcolor=colorIBH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineIBH, startBar, initialBalanceHigh), line.set_xy2(lineIBH, bar_index, initialBalanceHigh)
-                label.set_xy(labelIBH, bar_index, initialBalanceHigh), label.set_text(labelIBH, labelText)
-            array.push(renderedPrices, ibhRounded)
-    else if not na(lineIBH)
-        line.delete(lineIBH), lineIBH := na, label.delete(labelIBH), labelIBH := na
-
-    // Initial Balance Low
-    if showSessionLevelsCondition and showInitialBalance and not na(initialBalanceLow)
-        if not array.includes(renderedPrices, iblRounded)
-            string combinedLabel = map.contains(priceLabels, iblRounded) ? map.get(priceLabels, iblRounded) : "IBL"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(initialBalanceLow, format.mintick) + ")" : combinedLabel
-            if na(lineIBL)
-                lineIBL := line.new(startBar, initialBalanceLow, bar_index, initialBalanceLow, color=colorIBL, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
-                labelIBL := label.new(bar_index, initialBalanceLow, labelText, color=labelBgColor(colorIBL), textcolor=colorIBL, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineIBL, startBar, initialBalanceLow), line.set_xy2(lineIBL, bar_index, initialBalanceLow)
-                label.set_xy(labelIBL, bar_index, initialBalanceLow), label.set_text(labelIBL, labelText)
-            array.push(renderedPrices, iblRounded)
-    else if not na(lineIBL)
-        line.delete(lineIBL), lineIBL := na, label.delete(labelIBL), labelIBL := na
-
-    // Open Range High
-    if showSessionLevelsCondition and showOpenRange and not na(openRangeHigh)
-        if not array.includes(renderedPrices, orhRounded)
-            string combinedLabel = map.contains(priceLabels, orhRounded) ? map.get(priceLabels, orhRounded) : "ORH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(openRangeHigh, format.mintick) + ")" : combinedLabel
-            if na(lineORH)
-                lineORH := line.new(startBar, openRangeHigh, bar_index, openRangeHigh, color=colorORH, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
-                labelORH := label.new(bar_index, openRangeHigh, labelText, color=labelBgColor(colorORH), textcolor=colorORH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineORH, startBar, openRangeHigh), line.set_xy2(lineORH, bar_index, openRangeHigh)
-                label.set_xy(labelORH, bar_index, openRangeHigh), label.set_text(labelORH, labelText)
-            array.push(renderedPrices, orhRounded)
-    else if not na(lineORH)
-        line.delete(lineORH), lineORH := na, label.delete(labelORH), labelORH := na
-
-    // Open Range Low
-    if showSessionLevelsCondition and showOpenRange and not na(openRangeLow)
-        if not array.includes(renderedPrices, orlRounded)
-            string combinedLabel = map.contains(priceLabels, orlRounded) ? map.get(priceLabels, orlRounded) : "ORL"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(openRangeLow, format.mintick) + ")" : combinedLabel
-            if na(lineORL)
-                lineORL := line.new(startBar, openRangeLow, bar_index, openRangeLow, color=colorORL, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
-                labelORL := label.new(bar_index, openRangeLow, labelText, color=labelBgColor(colorORL), textcolor=colorORL, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineORL, startBar, openRangeLow), line.set_xy2(lineORL, bar_index, openRangeLow)
-                label.set_xy(labelORL, bar_index, openRangeLow), label.set_text(labelORL, labelText)
-            array.push(renderedPrices, orlRounded)
-    else if not na(lineORL)
-        line.delete(lineORL), lineORL := na, label.delete(labelORL), labelORL := na
-
-    // Opening Price
-    if showSessionLevelsCondition and showOpenPrice
-        if not array.includes(renderedPrices, openRounded)
-            string combinedLabel = map.contains(priceLabels, openRounded) ? map.get(priceLabels, openRounded) : "Open"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(sessionOpen, format.mintick) + ")" : combinedLabel
-            if na(lineOpenPrice)
-                lineOpenPrice := line.new(startBar, sessionOpen, bar_index, sessionOpen, color=colorOpenPrice, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
-                labelOpenPrice := label.new(bar_index, sessionOpen, labelText, color=labelBgColor(colorOpenPrice), textcolor=colorOpenPrice, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineOpenPrice, startBar, sessionOpen), line.set_xy2(lineOpenPrice, bar_index, sessionOpen)
-                label.set_xy(labelOpenPrice, bar_index, sessionOpen), label.set_text(labelOpenPrice, labelText)
-            array.push(renderedPrices, openRounded)
-    else if not na(lineOpenPrice)
-        line.delete(lineOpenPrice), lineOpenPrice := na, label.delete(labelOpenPrice), labelOpenPrice := na
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // DISPLAY CONDITIONS & SHADING
@@ -1629,12 +1022,11 @@ if showPeriodSeparators
 // ═══════════════════════════════════════════════════════════════════════════════
 
 if showThickBars
-    int keyLevelsCount = showKeyLevelsCondition ? ((showPDH ? 1 : 0) + (showPDL ? 1 : 0) + (showPWH ? 1 : 0) + (showPWL ? 1 : 0) + (showPMH ? 1 : 0) + (showPML ? 1 : 0) + (showPYH ? 1 : 0) + (showPYL ? 1 : 0) + (showATH ? 1 : 0) + (showCDH ? 1 : 0) + (showCDL ? 1 : 0) + (showCWH ? 1 : 0) + (showCWL ? 1 : 0) + (showCMH ? 1 : 0) + (showCML ? 1 : 0) + (showCYH ? 1 : 0) + (showCYL ? 1 : 0)) : 0
-    int sessionLevelsCount = showSessionLevelsCondition ? ((showOpenPrice ? 1 : 0) + (showOpenRange ? 2 : 0) + (showInitialBalance ? 2 : 0)) : 0
+    int keyLevelsCount = showKeyLevels ? ((showPDH ? 1 : 0) + (showPDL ? 1 : 0) + (showPWH ? 1 : 0) + (showPWL ? 1 : 0) + (showPMH ? 1 : 0) + (showPML ? 1 : 0) + (showPYH ? 1 : 0) + (showPYL ? 1 : 0) + (showATH ? 1 : 0)) : 0
     int periodSeparatorEstimate = showPeriodSeparators ? 50 : 0  // Conservative estimate for period separator lines
     int sessionLabelEstimate = (numDailySessions + numWeeklySessions + numMonthlySessions + numYearlySessions)
     int safetyBuffer = 20  // Extra buffer for labels and other small objects
-    int reservedLines = ((show5StartLineInput or show50StartLineInput or show200StartLineInput) ? 3 : 0) + (showPivots ? 7 : 0) + (showSettlements and isFutures ? settlementCount : 0) + keyLevelsCount + sessionLevelsCount + periodSeparatorEstimate + sessionLabelEstimate + safetyBuffer
+    int reservedLines = ((show5StartLineInput or show50StartLineInput or show200StartLineInput) ? 3 : 0) + (showPivots ? 7 : 0) + (showSettlements and isFutures ? settlementCount : 0) + keyLevelsCount + periodSeparatorEstimate + sessionLabelEstimate + safetyBuffer
     int barsFromEnd = last_bar_index - bar_index
 
     if barsFromEnd < (500 - reservedLines)
