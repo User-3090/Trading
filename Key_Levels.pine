@@ -32,7 +32,7 @@ indicator("Key Levels", overlay=true, max_lines_count=500)
 // ─────────────────────────────────────────────────────────────────────────────
 globalLabelSize = input.string("Normal", "Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="Global Settings", tooltip="Label size for all levels")
 globalShowPriceValues = input.bool(false, "Show Prices in Labels", group="Global Settings", tooltip="Show price in labels: 'PDH (4523.50)' vs 'PDH'")
-globalLineLengthBars = input.int(100, "Line Length (Bars)", minval=10, maxval=500, group="Global Settings", tooltip="Bars to extend lines backward from current bar")
+globalLineLengthBars = input.int(50, "Line Length (Bars)", minval=10, maxval=200, group="Global Settings", tooltip="Bars to extend lines backward from current bar (hard limit: 200)")
 
 // ATR Distance Filter
 useATRFilter = input.bool(true, "Hide Distant Levels", group="Global Settings", tooltip="Only show levels within specified ATR distance from current price")
@@ -45,10 +45,28 @@ atrPeriod = input.int(20, "  ATR Period (Days)", minval=1, maxval=500, group="Gl
 showSessionLevels = input.bool(true, "Show Session Levels", group="Session Levels", tooltip="Master toggle: Opening Price, Open Range, Initial Balance")
 sessionLevelsMode = input.string("Only Futures", "Instrument Type", options=["All Instruments", "Only Futures"], group="Session Levels", tooltip="All Instruments: Show on stocks/forex/crypto | Only Futures: Futures only")
 sessionLevelsMaxTimeframe = input.string("15m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="Session Levels", tooltip="Hide on timeframes above this (None = always show)")
-sessionChoice = input.string("New York", "Session", options=["London", "New York", "Sydney", "Tokyo"], group="Session Levels", tooltip="London (0800-1630 GMT) | NY (0930-1600 EST) | Sydney (1000-1600 AEDT) | Tokyo (0900-1500 JST)")
-hideSessionLevelsAfterClose = input.bool(true, "Show During Session Only", group="Session Levels", tooltip="Remove lines when session ends (cleaner charts)")
-sessionLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="Session Levels", tooltip="Session level line width")
-sessionLevelsLineStyle = input.string("Dashed", "Line Style", options=["Solid", "Dashed", "Dotted"], group="Session Levels", tooltip="Session level line style")
+
+// Active Sessions (select which sessions to track)
+enableLondon = input.bool(true, "London", inline="LON", group="Session Levels")
+colorLondon = input.color(#FF9800, "", inline="LON", group="Session Levels", tooltip="0800-1630 GMT | European open")
+enableNewYork = input.bool(true, "New York", inline="NY", group="Session Levels")
+colorNewYork = input.color(#2962FF, "", inline="NY", group="Session Levels", tooltip="0930-1600 EST | US RTH")
+enableSydney = input.bool(false, "Sydney/ETH", inline="SYD", group="Session Levels")
+colorSydney = input.color(#4CAF50, "", inline="SYD", group="Session Levels", tooltip="1000-1600 AEDT | ~1800 ET (US futures ETH open)")
+enableTokyo = input.bool(false, "Tokyo", inline="TKY", group="Session Levels")
+colorTokyo = input.color(#E91E63, "", inline="TKY", group="Session Levels", tooltip="0900-1500 JST | Asian session")
+
+// Session Display Options
+showSessionVWAP = input.bool(true, "Show VWAPs", group="Session Levels", tooltip="Show VWAP for each selected session (persists ~24h)")
+sessionVWAPLineWidth = input.int(4, "VWAP Width", minval=1, maxval=5, group="Session Levels")
+sessionVWAPLineStyleInput = input.string("Solid", "VWAP Style", options=["Solid", "Dashed", "Dotted"], group="Session Levels", tooltip="Volume-weighted average price anchored at session open")
+sessionVWAPLineStyle = sessionVWAPLineStyleInput == "Solid" ? plot.linestyle_solid : sessionVWAPLineStyleInput == "Dashed" ? plot.linestyle_dashed : plot.linestyle_dotted
+showSessionLabels = input.bool(true, "Show Labels", group="Session Levels", tooltip="Show session start labels with date (persists ~24h)")
+
+// Session Level Lines (Open, ORH, ORL, IBH, IBL)
+sessionLevelsLineWidth = input.int(2, "Level Line Width", minval=1, maxval=5, group="Session Levels", tooltip="Width for Open/ORH/ORL/IBH/IBL lines")
+sessionLevelsLineStyle = input.string("Dashed", "Level Line Style", options=["Solid", "Dashed", "Dotted"], group="Session Levels", tooltip="Style for Open/ORH/ORL/IBH/IBL lines")
+sessionLineStartMode = input.string("Level Established", "Level Line Start", options=["Level Established", "Session Open", "Fixed Bars Back"], group="Session Levels", tooltip="Level Established: Line starts where level was created (max 200 bars)\nSession Open: From session start\nFixed Bars Back: Use global Line Length")
 
 // Session Level Types
 showOpenPrice = input.bool(true, "Opening Price", inline="OP", group="Session Levels")
@@ -172,6 +190,13 @@ getSessionSpec(string session) =>
 getSessionTimezone(string session) =>
     session == "London" ? "Europe/London" : session == "New York" ? "America/New_York" : session == "Sydney" ? "Australia/Sydney" : "Asia/Tokyo"
 
+// Calculate today's session start timestamp (handles DST automatically via timezone)
+getSessionStartTimestamp(string session) =>
+    string tz = getSessionTimezone(session)
+    int sessionHour = session == "London" ? 8 : session == "New York" ? 9 : session == "Sydney" ? 10 : 9
+    int sessionMinute = session == "New York" ? 30 : 0
+    timestamp(tz, year(timenow), month(timenow), dayofmonth(timenow), sessionHour, sessionMinute)
+
 // Convert period string to minutes
 periodToMinutes(string period) =>
     period == "1m" ? 1 : period == "2m" ? 2 : period == "3m" ? 3 : period == "5m" ? 5 : period == "15m" ? 15 : period == "30m" ? 30 : period == "1h" ? 60 : period == "65m" ? 65 : period == "2h" ? 120 : period == "4h" ? 240 : 0
@@ -263,17 +288,18 @@ var float cwh = na, var float cwl = na
 var float cmh = na, var float cml = na
 var float cyh = na, var float cyl = na
 
+// Current period levels - update every bar to track developing highs/lows
 if showKeyLevelsCondition and (showCDH or showCDL)
-    [_cdh, _cdl] = request.security(syminfo.tickerid, "D", [high, low], lookahead=barmerge.lookahead_off)
+    [_cdh, _cdl] = request.security(syminfo.tickerid, "D", [high, low], lookahead=barmerge.lookahead_on)
     cdh := _cdh, cdl := _cdl
 if showKeyLevelsCondition and (showCWH or showCWL)
-    [_cwh, _cwl] = request.security(syminfo.tickerid, "W", [high, low], lookahead=barmerge.lookahead_off)
+    [_cwh, _cwl] = request.security(syminfo.tickerid, "W", [high, low], lookahead=barmerge.lookahead_on)
     cwh := _cwh, cwl := _cwl
 if showKeyLevelsCondition and (showCMH or showCML)
-    [_cmh, _cml] = request.security(syminfo.tickerid, "M", [high, low], lookahead=barmerge.lookahead_off)
+    [_cmh, _cml] = request.security(syminfo.tickerid, "M", [high, low], lookahead=barmerge.lookahead_on)
     cmh := _cmh, cml := _cml
 if showKeyLevelsCondition and (showCYH or showCYL)
-    [_cyh, _cyl] = request.security(syminfo.tickerid, "12M", [high, low], lookahead=barmerge.lookahead_off)
+    [_cyh, _cyl] = request.security(syminfo.tickerid, "12M", [high, low], lookahead=barmerge.lookahead_on)
     cyh := _cyh, cyl := _cyl
 
 // All-time high (uses monthly for better performance) - only update on confirmed bars
@@ -324,17 +350,28 @@ var line lineS2 = na, var label labelS2 = na
 var line lineS3 = na, var label labelS3 = na
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// SESSION-BASED LEVELS (Opening Price, Open Range, Initial Balance)
+// MULTI-SESSION INFRASTRUCTURE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-string sessionSpec = getSessionSpec(sessionChoice)
-string sessionTz = getSessionTimezone(sessionChoice)
+// Session arrays (indices: 0=London, 1=NY, 2=Sydney, 3=Tokyo)
+var array<bool> sessionEnabled = array.from(enableLondon, enableNewYork, enableSydney, enableTokyo)
+var array<string> sessionNames = array.from("London", "New York", "Sydney", "Tokyo")
+var array<color> sessionColors = array.from(colorLondon, colorNewYork, colorSydney, colorTokyo)
 
-// Detect session change
-bool inSession = not na(time(timeframe.period, sessionSpec, sessionTz))
-bool sessionChange = inSession and not inSession[1]
+// Per-session tracking
+var array<int> sessionStartBars = array.new<int>(4, na)
+var array<int> sessionStartTimes = array.new<int>(4, na)
+var array<label> sessionLabels = array.new<label>(4, na)
 
-// Track session levels
+// Per-session VWAP accumulators (one set per session)
+var array<float> vwapSumSrc = array.from(0.0, 0.0, 0.0, 0.0)
+var array<float> vwapSumVol = array.from(0.0, 0.0, 0.0, 0.0)
+
+// Active session tracking (for session levels)
+var int activeSessionIndex = na
+var string activeSessionName = na
+
+// Session levels (always track the most recently started selected session)
 var float sessionOpen = na
 var float openRangeHigh = na
 var float openRangeLow = na
@@ -343,31 +380,157 @@ var float initialBalanceLow = na
 var int sessionStartBar = na
 var int sessionStartTime = na
 
+// Track bar indices where each level was established
+var int openPriceBar = na
+var int orhBar = na
+var int orlBar = na
+var int ibhBar = na
+var int iblBar = na
+
 // Calculate elapsed minutes in session
 int openRangeMinutes = periodToMinutes(openRangePeriod)
 int ibMinutes = periodToMinutes(initialBalancePeriod)
 
-if sessionChange
-    sessionOpen := open
-    openRangeHigh := high
-    openRangeLow := low
-    initialBalanceHigh := high
-    initialBalanceLow := low
-    sessionStartBar := bar_index
-    sessionStartTime := time
+// ═══════════════════════════════════════════════════════════════════════════════
+// MULTI-SESSION DETECTION & MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════════
 
-if inSession and not na(sessionStartTime)
-    int elapsedMinutes = math.round((time - sessionStartTime) / 60000)
+// Detect session changes for all 4 sessions
+// Track session state outside loop to avoid scope issues
+var array<bool> inSessionState = array.new<bool>(4, false)
 
-    // Update Open Range
-    if elapsedMinutes <= openRangeMinutes
-        openRangeHigh := math.max(openRangeHigh, high)
-        openRangeLow := math.min(openRangeLow, low)
+for i = 0 to 3
+    if array.get(sessionEnabled, i)
+        string sessionName = array.get(sessionNames, i)
+        string sessionSpec = getSessionSpec(sessionName)
+        string sessionTz = getSessionTimezone(sessionName)
 
-    // Update Initial Balance
-    if elapsedMinutes <= ibMinutes
-        initialBalanceHigh := math.max(initialBalanceHigh, high)
-        initialBalanceLow := math.min(initialBalanceLow, low)
+        bool inThisSession = not na(time(timeframe.period, sessionSpec, sessionTz))
+        bool wasInSession = array.get(inSessionState, i)
+        array.set(inSessionState, i, inThisSession)
+        bool thisSessionChange = inThisSession and not wasInSession
+
+        // When this session starts
+        if thisSessionChange
+            // Delete old label for this session (24h cycle)
+            label oldLabel = array.get(sessionLabels, i)
+            if not na(oldLabel)
+                label.delete(oldLabel)
+
+            // Create new label with session name + date
+            if showSessionLevelsCondition and showSessionLabels
+                string dateStr = str.format("{0,date,d MMM}", time)
+                string labelText = sessionName + " " + dateStr
+                color sessionColor = array.get(sessionColors, i)
+                label newLabel = label.new(bar_index, high, labelText, yloc=yloc.abovebar, color=sessionColor, textcolor=color.white, style=label.style_label_down, size=getLabelSize(globalLabelSize))
+                array.set(sessionLabels, i, newLabel)
+
+            // Update session tracking
+            array.set(sessionStartBars, i, bar_index)
+            array.set(sessionStartTimes, i, time)
+
+            // This session becomes the active session for levels
+            activeSessionIndex := i
+            activeSessionName := sessionName
+
+            // Reset session levels to this session
+            sessionOpen := open
+            openRangeHigh := high
+            openRangeLow := low
+            initialBalanceHigh := high
+            initialBalanceLow := low
+            sessionStartBar := bar_index
+            sessionStartTime := time
+            openPriceBar := bar_index
+            orhBar := bar_index
+            orlBar := bar_index
+            ibhBar := bar_index
+            iblBar := bar_index
+
+// Update session levels (only for active session)
+if not na(activeSessionIndex) and not na(sessionStartTime)
+    string activeSpec = getSessionSpec(activeSessionName)
+    string activeTz = getSessionTimezone(activeSessionName)
+    bool inActiveSession = not na(time(timeframe.period, activeSpec, activeTz))
+
+    if inActiveSession
+        int elapsedMinutes = math.round((time - sessionStartTime) / 60000)
+
+        // Update Open Range
+        if elapsedMinutes <= openRangeMinutes
+            if high > openRangeHigh
+                openRangeHigh := high
+                orhBar := bar_index
+            if low < openRangeLow
+                openRangeLow := low
+                orlBar := bar_index
+
+        // Update Initial Balance
+        if elapsedMinutes <= ibMinutes
+            if high > initialBalanceHigh
+                initialBalanceHigh := high
+                ibhBar := bar_index
+            if low < initialBalanceLow
+                initialBalanceLow := low
+                iblBar := bar_index
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MULTI-SESSION VWAP CALCULATIONS (Time-based anchor pattern)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// Calculate VWAP for each enabled session using time-based anchoring
+var float londonVWAP = na, var float nyVWAP = na, var float sydneyVWAP = na, var float tokyoVWAP = na
+
+for i = 0 to 3
+    if array.get(sessionEnabled, i)
+        string sessionName = array.get(sessionNames, i)
+
+        // Calculate today's session start using timezone-aware function (exact pattern from working version)
+        int todaySessionStart = getSessionStartTimestamp(sessionName)
+
+        // Detect when time crosses into this session (exact pattern from working version)
+        bool vwapAnchor = time >= todaySessionStart and time[1] < todaySessionStart
+
+        // Get current accumulators
+        float currentSumSrc = array.get(vwapSumSrc, i)
+        float currentSumVol = array.get(vwapSumVol, i)
+
+        // Reset on anchor (session start), otherwise accumulate
+        float newSumSrc = vwapAnchor ? (ohlc4 * volume) : (currentSumSrc + ohlc4 * volume)
+        float newSumVol = vwapAnchor ? volume : (currentSumVol + volume)
+
+        // Update accumulators
+        array.set(vwapSumSrc, i, newSumSrc)
+        array.set(vwapSumVol, i, newSumVol)
+
+        // Calculate VWAP
+        float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
+
+        // Only show VWAP for bars after session started (exact pattern from working version)
+        bool isInTargetSession = time >= todaySessionStart
+        float displayVwap = isInTargetSession ? vwap : na
+
+        // Store in appropriate variable for plotting
+        if i == 0
+            londonVWAP := displayVwap
+        else if i == 1
+            nyVWAP := displayVwap
+        else if i == 2
+            sydneyVWAP := displayVwap
+        else if i == 3
+            tokyoVWAP := displayVwap
+
+
+
+// Plot VWAPs (plot na when session not active or disabled)
+plot(showSessionLevelsCondition and showSessionVWAP and enableLondon ? londonVWAP : na, "London VWAP", color=colorLondon, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableNewYork ? nyVWAP : na, "NY VWAP", color=colorNewYork, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableSydney ? sydneyVWAP : na, "Sydney VWAP", color=colorSydney, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableTokyo ? tokyoVWAP : na, "Tokyo VWAP", color=colorTokyo, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// SESSION LEVELS RENDERING (for active session only)
+// ═══════════════════════════════════════════════════════════════════════════════
 
 var line lineOpenPrice = na, var label labelOpenPrice = na
 var line lineORH = na, var line lineORL = na, var label labelORH = na, var label labelORL = na
@@ -383,8 +546,18 @@ var int lastRenderBarIndex = na
 if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarIndex)
     lastRenderBarIndex := bar_index
 
-    // Calculate line start position (always X bars back)
+    // Calculate line start position with hard limit to prevent lines getting too long
     int startBar = math.max(0, bar_index - globalLineLengthBars)
+    int maxLineDistance = 200  // Safe hard limit: lines can't go back more than 200 bars (prevents crashes on high-frequency charts)
+
+    // Determine session line start based on user preference, but enforce max distance
+    int sessionOpenBar = not na(sessionStartBar) ? math.max(sessionStartBar, bar_index - maxLineDistance) : startBar
+    int openPriceStartBar = sessionLineStartMode == "Level Established" and not na(openPriceBar) ? math.max(openPriceBar, bar_index - maxLineDistance) : (sessionLineStartMode == "Session Open" ? sessionOpenBar : startBar)
+    int orhStartBar = sessionLineStartMode == "Level Established" and not na(orhBar) ? math.max(orhBar, bar_index - maxLineDistance) : (sessionLineStartMode == "Session Open" ? sessionOpenBar : startBar)
+    int orlStartBar = sessionLineStartMode == "Level Established" and not na(orlBar) ? math.max(orlBar, bar_index - maxLineDistance) : (sessionLineStartMode == "Session Open" ? sessionOpenBar : startBar)
+    int ibhStartBar = sessionLineStartMode == "Level Established" and not na(ibhBar) ? math.max(ibhBar, bar_index - maxLineDistance) : (sessionLineStartMode == "Session Open" ? sessionOpenBar : startBar)
+    int iblStartBar = sessionLineStartMode == "Level Established" and not na(iblBar) ? math.max(iblBar, bar_index - maxLineDistance) : (sessionLineStartMode == "Session Open" ? sessionOpenBar : startBar)
+
     string keyLevelsLineStyleActual = getLineStyle(keyLevelsLineStyle)
     string labelSizeActual = getLabelSize(globalLabelSize)
 
@@ -429,7 +602,7 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
     map.clear(priceLabels)
 
     // Session levels first (highest priority)
-    bool shouldAddSessionToMap = showSessionLevelsCondition and not na(sessionOpen) and (hideSessionLevelsAfterClose ? inSession : true)
+    bool shouldAddSessionToMap = showSessionLevelsCondition and not na(sessionOpen)
     if shouldAddSessionToMap
         if showOpenPrice
             addToMap(priceLabels, sessionOpen, "Open")
@@ -504,7 +677,8 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
     // ═══════════════════════════════════════════════════════════════════════════════
 
     string sessionLineStyleActual = getLineStyle(sessionLevelsLineStyle)
-    bool shouldShowSessionLevels = showSessionLevelsCondition and (hideSessionLevelsAfterClose ? inSession : true)
+    // Only show session levels if we have an active session
+    bool shouldShowSessionLevels = showSessionLevelsCondition and not na(activeSessionIndex) and not na(sessionOpen)
 
     // Opening Price
     if shouldShowSessionLevels and showOpenPrice and isWithinATR(sessionOpen, close, atrThreshold, useATRFilter)
@@ -512,10 +686,10 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
             string combinedLabel = map.contains(priceLabels, openRounded) ? map.get(priceLabels, openRounded) : "Open"
             string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(sessionOpen, format.mintick) + ")" : combinedLabel
             if na(lineOpenPrice)
-                lineOpenPrice := line.new(startBar, sessionOpen, bar_index, sessionOpen, color=colorOpenPrice, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
+                lineOpenPrice := line.new(openPriceStartBar, sessionOpen, bar_index, sessionOpen, color=colorOpenPrice, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
                 labelOpenPrice := label.new(bar_index, sessionOpen, labelText, color=labelBgColor(colorOpenPrice), textcolor=colorOpenPrice, style=label.style_label_left, size=labelSizeActual)
             else
-                line.set_xy1(lineOpenPrice, startBar, sessionOpen), line.set_xy2(lineOpenPrice, bar_index, sessionOpen)
+                line.set_xy1(lineOpenPrice, openPriceStartBar, sessionOpen), line.set_xy2(lineOpenPrice, bar_index, sessionOpen)
                 label.set_xy(labelOpenPrice, bar_index, sessionOpen), label.set_text(labelOpenPrice, labelText)
             array.push(renderedPrices, openRounded)
     else if not na(lineOpenPrice)
@@ -527,10 +701,10 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
             string combinedLabel = map.contains(priceLabels, orhRounded) ? map.get(priceLabels, orhRounded) : "ORH"
             string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(openRangeHigh, format.mintick) + ")" : combinedLabel
             if na(lineORH)
-                lineORH := line.new(startBar, openRangeHigh, bar_index, openRangeHigh, color=colorORH, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
+                lineORH := line.new(orhStartBar, openRangeHigh, bar_index, openRangeHigh, color=colorORH, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
                 labelORH := label.new(bar_index, openRangeHigh, labelText, color=labelBgColor(colorORH), textcolor=colorORH, style=label.style_label_left, size=labelSizeActual)
             else
-                line.set_xy1(lineORH, startBar, openRangeHigh), line.set_xy2(lineORH, bar_index, openRangeHigh)
+                line.set_xy1(lineORH, orhStartBar, openRangeHigh), line.set_xy2(lineORH, bar_index, openRangeHigh)
                 label.set_xy(labelORH, bar_index, openRangeHigh), label.set_text(labelORH, labelText)
             array.push(renderedPrices, orhRounded)
     else if not na(lineORH)
@@ -542,10 +716,10 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
             string combinedLabel = map.contains(priceLabels, orlRounded) ? map.get(priceLabels, orlRounded) : "ORL"
             string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(openRangeLow, format.mintick) + ")" : combinedLabel
             if na(lineORL)
-                lineORL := line.new(startBar, openRangeLow, bar_index, openRangeLow, color=colorORL, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
+                lineORL := line.new(orlStartBar, openRangeLow, bar_index, openRangeLow, color=colorORL, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
                 labelORL := label.new(bar_index, openRangeLow, labelText, color=labelBgColor(colorORL), textcolor=colorORL, style=label.style_label_left, size=labelSizeActual)
             else
-                line.set_xy1(lineORL, startBar, openRangeLow), line.set_xy2(lineORL, bar_index, openRangeLow)
+                line.set_xy1(lineORL, orlStartBar, openRangeLow), line.set_xy2(lineORL, bar_index, openRangeLow)
                 label.set_xy(labelORL, bar_index, openRangeLow), label.set_text(labelORL, labelText)
             array.push(renderedPrices, orlRounded)
     else if not na(lineORL)
@@ -557,10 +731,10 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
             string combinedLabel = map.contains(priceLabels, ibhRounded) ? map.get(priceLabels, ibhRounded) : "IBH"
             string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(initialBalanceHigh, format.mintick) + ")" : combinedLabel
             if na(lineIBH)
-                lineIBH := line.new(startBar, initialBalanceHigh, bar_index, initialBalanceHigh, color=colorIBH, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
+                lineIBH := line.new(ibhStartBar, initialBalanceHigh, bar_index, initialBalanceHigh, color=colorIBH, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
                 labelIBH := label.new(bar_index, initialBalanceHigh, labelText, color=labelBgColor(colorIBH), textcolor=colorIBH, style=label.style_label_left, size=labelSizeActual)
             else
-                line.set_xy1(lineIBH, startBar, initialBalanceHigh), line.set_xy2(lineIBH, bar_index, initialBalanceHigh)
+                line.set_xy1(lineIBH, ibhStartBar, initialBalanceHigh), line.set_xy2(lineIBH, bar_index, initialBalanceHigh)
                 label.set_xy(labelIBH, bar_index, initialBalanceHigh), label.set_text(labelIBH, labelText)
             array.push(renderedPrices, ibhRounded)
     else if not na(lineIBH)
@@ -572,10 +746,10 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
             string combinedLabel = map.contains(priceLabels, iblRounded) ? map.get(priceLabels, iblRounded) : "IBL"
             string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(initialBalanceLow, format.mintick) + ")" : combinedLabel
             if na(lineIBL)
-                lineIBL := line.new(startBar, initialBalanceLow, bar_index, initialBalanceLow, color=colorIBL, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
+                lineIBL := line.new(iblStartBar, initialBalanceLow, bar_index, initialBalanceLow, color=colorIBL, width=sessionLevelsLineWidth, style=sessionLineStyleActual)
                 labelIBL := label.new(bar_index, initialBalanceLow, labelText, color=labelBgColor(colorIBL), textcolor=colorIBL, style=label.style_label_left, size=labelSizeActual)
             else
-                line.set_xy1(lineIBL, startBar, initialBalanceLow), line.set_xy2(lineIBL, bar_index, initialBalanceLow)
+                line.set_xy1(lineIBL, iblStartBar, initialBalanceLow), line.set_xy2(lineIBL, bar_index, initialBalanceLow)
                 label.set_xy(labelIBL, bar_index, initialBalanceLow), label.set_text(labelIBL, labelText)
             array.push(renderedPrices, iblRounded)
     else if not na(lineIBL)
