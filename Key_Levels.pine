@@ -36,7 +36,7 @@ globalLineLengthBars = input.int(50, "Line Length (Bars)", minval=10, maxval=200
 
 useATRFilter = input.bool(true, "Hide Distant Levels", group="🌐 Global Settings", tooltip="Only show levels within specified ATR distance from current price")
 atrMultiplier = input.float(1.0, "  Distance (ATR)", minval=1.0, maxval=10.0, step=0.5, group="🌐 Global Settings", tooltip="Hide levels beyond this many ATRs from current price")
-atrPeriod = input.int(20, "  ATR Period (Days)", minval=1, maxval=500, group="🌐 Global Settings", tooltip="Number of days for Average True Range calculation")
+atrPeriod = input.int(20, "  ATR Period (Days)", minval=1, maxval=500, group="🌐 Global Settings", tooltip="ATR calculated from daily bars (last N days), regardless of chart timeframe")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🕐 SESSION SELECTION
@@ -315,7 +315,7 @@ getVWAPColor(color baseColor, int positionInHistory, bool useDifferentiation, in
 // Session time definitions in session's local timezone
 // LSE: 8:00 AM - 4:30 PM GMT
 // NYSE/CME: 9:30 AM - 4:00 PM EST
-// CME Globex: 6:00 PM - 5:00 PM EST (next day, spans 2 calendar days)
+// CME Globex: 6:00 PM - 5:00 PM ET (next day, spans 2 calendar days)
 // ASX: 10:00 AM - 4:00 PM AEDT
 // TSE: 9:00 AM - 3:00 PM JST
 
@@ -374,11 +374,14 @@ getSessionStartsArray(string session, int daysBack) =>
 
     // Step 2: Calculate today's session start time
     int todaySessionStart = na
+    int todaySessionEnd = na
     if session == "Globex (ETH)"
         // Globex session active during day D starts evening of day D-1
         todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD - 1)
+        todaySessionEnd := getSessionEndForDate(session, currentY, currentM, currentD - 1)
     else
         todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD)
+        todaySessionEnd := getSessionEndForDate(session, currentY, currentM, currentD)
 
     // Step 3: Check if today's session has started yet
     // If not, we need to start from yesterday's session
@@ -392,6 +395,7 @@ getSessionStartsArray(string session, int daysBack) =>
         mostRecentY := year(yesterdayMidnight, tz)
         mostRecentM := month(yesterdayMidnight, tz)
         mostRecentD := dayofmonth(yesterdayMidnight, tz)
+    // else: today's session is active or we're between sessions - use currentD as reference
 
     // Step 4: Walk backwards N days from most recent started session
     // Fill array from oldest to newest, so most recent is at highest index
@@ -430,11 +434,14 @@ getSessionEndsArray(string session, int daysBack) =>
 
     // Step 2: Calculate today's session start time
     int todaySessionStart = na
+    int todaySessionEnd = na
     if session == "Globex (ETH)"
         // Globex session active during day D starts evening of day D-1
         todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD - 1)
+        todaySessionEnd := getSessionEndForDate(session, currentY, currentM, currentD - 1)
     else
         todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD)
+        todaySessionEnd := getSessionEndForDate(session, currentY, currentM, currentD)
 
     // Step 3: Check if today's session has started yet
     // If not, we need to start from yesterday's session
@@ -448,6 +455,7 @@ getSessionEndsArray(string session, int daysBack) =>
         mostRecentY := year(yesterdayMidnight, tz)
         mostRecentM := month(yesterdayMidnight, tz)
         mostRecentD := dayofmonth(yesterdayMidnight, tz)
+    // else: today's session is active or we're between sessions - use currentD as reference
 
     // Step 4: Walk backwards N days from most recent started session
     // Fill array from oldest to newest, so most recent is at highest index
@@ -471,7 +479,7 @@ getSessionEndsArray(string session, int daysBack) =>
 
 // Convert period string to minutes
 periodToMinutes(string period) =>
-    period == "1m" ? 1 : period == "2m" ? 2 : period == "3m" ? 3 : period == "5m" ? 5 : period == "15m" ? 15 : period == "30m" ? 30 : period == "1h" ? 60 : period == "65m" ? 65 : period == "2h" ? 120 : period == "4h" ? 240 : 0
+    period == "1m" ? 1 : period == "2m" ? 2 : period == "3m" ? 3 : period == "5m" ? 5 : period == "15m" ? 15 : period == "30m" ? 30 : period == "1h" ? 60 : period == "65m" ? 65 : period == "2h" ? 120 : period == "4h" ? 240 : 99999
 
 // Get timeframe in minutes for comparison
 getTimeframeMinutes() =>
@@ -745,7 +753,7 @@ for i = 0 to 4
             iblBar := bar_index
 
 // Update session levels (only for active session, using calendar-based timestamps)
-if not na(activeSessionIndex) and not na(sessionStartTime)
+if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTime)
     // Get session end time to check if session has closed
     array<int> activeSessionEnds = activeSessionIndex == 0 ? londonEnds : activeSessionIndex == 1 ? nyEnds : activeSessionIndex == 2 ? globexEnds : activeSessionIndex == 3 ? sydneyEnds : tokyoEnds
     int currentSessionEnd = array.get(activeSessionEnds, MAX_VWAP_HISTORY - 1)
@@ -936,7 +944,7 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
 
     // Calculate line start position with hard limit to prevent lines getting too long
     int startBar = math.max(0, bar_index - globalLineLengthBars)
-    int maxLineDistance = 200  // Safe hard limit: lines can't go back more than 200 bars (prevents crashes on high-frequency charts)
+    int maxLineDistance = 200  // Safe hard limit: must match max value of globalLineLengthBars input (prevents crashes on high-frequency charts)
 
     // Determine session line start based on user preference, but reset to configured length if beyond hard limit
     int sessionOpenBar = not na(sessionStartBar) ? (bar_index - sessionStartBar > maxLineDistance ? startBar : sessionStartBar) : startBar
