@@ -47,23 +47,23 @@ sessionLevelsMaxTimeframe = input.string("15m", "Max Timeframe", options=["None"
 
 enableLondon = input.bool(true, "London", inline="LON", group="🕐 Session Selection")
 colorLondon = input.color(#FF9800, "", inline="LON", group="🕐 Session Selection")
-londonVWAPCount = input.int(1, "History", inline="LON", minval=1, maxval=5, group="🕐 Session Selection", tooltip="London (0800-1630 GMT): How many past sessions to display (includes VWAPs, levels, and labels)")
+londonVWAPCount = input.int(1, "History", inline="LON", minval=1, maxval=5, group="🕐 Session Selection", tooltip="London (0800-1630 GMT): Number of sessions to display (1=most recent only, 2=last 2 sessions, etc). Includes VWAPs, levels, and labels")
 
 enableNewYork = input.bool(true, "New York", inline="NY", group="🕐 Session Selection")
 colorNewYork = input.color(#2962FF, "", inline="NY", group="🕐 Session Selection")
-nyVWAPCount = input.int(2, "History", inline="NY", minval=1, maxval=5, group="🕐 Session Selection", tooltip="New York (0930-1600 EST): How many past sessions to display (includes VWAPs, levels, and labels)")
+nyVWAPCount = input.int(2, "History", inline="NY", minval=1, maxval=5, group="🕐 Session Selection", tooltip="New York (0930-1600 EST): Number of sessions to display (1=most recent only, 2=last 2 sessions, etc). Includes VWAPs, levels, and labels")
 
 enableGlobex = input.bool(true, "Globex (ETH)", inline="GLX", group="🕐 Session Selection")
 colorGlobex = input.color(#4CAF50, "", inline="GLX", group="🕐 Session Selection")
-globexVWAPCount = input.int(5, "History", inline="GLX", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Globex (1800-1700 ET): How many past sessions to display (includes VWAPs, levels, and labels)")
+globexVWAPCount = input.int(5, "History", inline="GLX", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Globex (1800-1700 ET): Number of sessions to display (1=most recent only, 2=last 2 sessions, etc). Includes VWAPs, levels, and labels")
 
 enableSydney = input.bool(false, "Sydney", inline="SYD", group="🕐 Session Selection")
 colorSydney = input.color(#9C27B0, "", inline="SYD", group="🕐 Session Selection")
-sydneyVWAPCount = input.int(1, "History", inline="SYD", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Sydney (1000-1600 AEDT): How many past sessions to display (includes VWAPs, levels, and labels)")
+sydneyVWAPCount = input.int(1, "History", inline="SYD", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Sydney (1000-1600 AEDT): Number of sessions to display (1=most recent only, 2=last 2 sessions, etc). Includes VWAPs, levels, and labels")
 
 enableTokyo = input.bool(false, "Tokyo", inline="TKY", group="🕐 Session Selection")
 colorTokyo = input.color(#E91E63, "", inline="TKY", group="🕐 Session Selection")
-tokyoVWAPCount = input.int(1, "History", inline="TKY", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Tokyo (0900-1500 JST): How many past sessions to display (includes VWAPs, levels, and labels)")
+tokyoVWAPCount = input.int(1, "History", inline="TKY", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Tokyo (0900-1500 JST): Number of sessions to display (1=most recent only, 2=last 2 sessions, etc). Includes VWAPs, levels, and labels")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 📊 SESSION VWAP
@@ -349,8 +349,9 @@ getSessionEndForDate(string session, int y, int m, int d) =>
     int sessionMinute = getSessionEndMinute(session)
     // Globex spans two days: starts evening, ends next afternoon
     if session == "Globex (ETH)"
-        // Add one day to end timestamp
-        timestamp(tz, y, m, d + 1, sessionHour, sessionMinute)
+        // Add 24 hours in milliseconds to base timestamp instead of incrementing day
+        int baseTimestamp = timestamp(tz, y, m, d, sessionHour, sessionMinute)
+        baseTimestamp + 86400000  // Add 1 day in milliseconds
     else
         timestamp(tz, y, m, d, sessionHour, sessionMinute)
 
@@ -363,18 +364,47 @@ getSessionStartsArray(string session, int daysBack) =>
     // Get session timezone to ensure date calculations are consistent
     string tz = getSessionTimezone(session)
 
-    // Pre-calculate session starts for last N days using SESSION timezone
+    // FINAL ROBUST SOLUTION: Find most recent started session, then walk backwards
+    // This works for ANY user timezone and ANY exchange timezone
+
+    // Step 1: Get current date in exchange timezone
+    int currentY = year(timenow, tz)
+    int currentM = month(timenow, tz)
+    int currentD = dayofmonth(timenow, tz)
+
+    // Step 2: Calculate today's session start time
+    int todaySessionStart = na
+    if session == "Globex (ETH)"
+        // Globex session active during day D starts evening of day D-1
+        todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD - 1)
+    else
+        todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD)
+
+    // Step 3: Check if today's session has started yet
+    // If not, we need to start from yesterday's session
+    int mostRecentY = currentY
+    int mostRecentM = currentM
+    int mostRecentD = currentD
+
+    if timenow < todaySessionStart
+        // Today's session hasn't started yet, use yesterday as most recent
+        int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+        mostRecentY := year(yesterdayMidnight, tz)
+        mostRecentM := month(yesterdayMidnight, tz)
+        mostRecentD := dayofmonth(yesterdayMidnight, tz)
+
+    // Step 4: Walk backwards N days from most recent started session
+    // Fill array from oldest to newest, so most recent is at highest index
     for i = 0 to daysBack - 1
         int daysAgo = daysBack - 1 - i
-        int timestamp_ms = timenow - (daysAgo * 86400000)  // 86400000 ms = 1 day
-        int y = year(timestamp_ms, tz)  // Extract date in SESSION timezone
-        int m = month(timestamp_ms, tz)
-        int d = dayofmonth(timestamp_ms, tz)
+        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysAgo * 86400000)
+        int y = year(targetMidnight, tz)
+        int m = month(targetMidnight, tz)
+        int d = dayofmonth(targetMidnight, tz)
 
         // For Globex: Get session active DURING this day (started previous evening)
         int sessionStart = na
         if session == "Globex (ETH)"
-            // Globex active during day d started on evening of day d-1
             sessionStart := getSessionStartForDate(session, y, m, d - 1)
         else
             sessionStart := getSessionStartForDate(session, y, m, d)
@@ -390,12 +420,43 @@ getSessionEndsArray(string session, int daysBack) =>
 
     string tz = getSessionTimezone(session)
 
+    // FINAL ROBUST SOLUTION: Find most recent started session, then walk backwards
+    // This works for ANY user timezone and ANY exchange timezone
+
+    // Step 1: Get current date in exchange timezone
+    int currentY = year(timenow, tz)
+    int currentM = month(timenow, tz)
+    int currentD = dayofmonth(timenow, tz)
+
+    // Step 2: Calculate today's session start time
+    int todaySessionStart = na
+    if session == "Globex (ETH)"
+        // Globex session active during day D starts evening of day D-1
+        todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD - 1)
+    else
+        todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD)
+
+    // Step 3: Check if today's session has started yet
+    // If not, we need to start from yesterday's session
+    int mostRecentY = currentY
+    int mostRecentM = currentM
+    int mostRecentD = currentD
+
+    if timenow < todaySessionStart
+        // Today's session hasn't started yet, use yesterday as most recent
+        int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+        mostRecentY := year(yesterdayMidnight, tz)
+        mostRecentM := month(yesterdayMidnight, tz)
+        mostRecentD := dayofmonth(yesterdayMidnight, tz)
+
+    // Step 4: Walk backwards N days from most recent started session
+    // Fill array from oldest to newest, so most recent is at highest index
     for i = 0 to daysBack - 1
         int daysAgo = daysBack - 1 - i
-        int timestamp_ms = timenow - (daysAgo * 86400000)
-        int y = year(timestamp_ms, tz)
-        int m = month(timestamp_ms, tz)
-        int d = dayofmonth(timestamp_ms, tz)
+        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysAgo * 86400000)
+        int y = year(targetMidnight, tz)
+        int m = month(targetMidnight, tz)
+        int d = dayofmonth(targetMidnight, tz)
 
         // For Globex: Session active during day d started evening d-1, so use d-1 for end calc
         int sessionEnd = na
@@ -439,8 +500,8 @@ isWithinATR(float levelPrice, float currentPrice, float threshold, bool filterEn
 // ATR CALCULATION (for distance filtering)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Use daily ATR with offset [1] and lookahead_on for non-repainting historical data
-float atrValue = request.security(syminfo.tickerid, "D", ta.atr(atrPeriod)[1], lookahead=barmerge.lookahead_on)
+// Use daily ATR calculated from last N daily bars (no offset needed for smoothed ATR indicator)
+float atrValue = request.security(syminfo.tickerid, "D", ta.atr(atrPeriod), lookahead=barmerge.lookahead_off)
 float atrThreshold = atrValue * atrMultiplier
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -493,30 +554,26 @@ if barstate.isconfirmed and showKeyLevelsCondition and (showPYH or showPYL or sh
     [_pyh, _pyl] = request.security(syminfo.tickerid, "12M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
     pyh := _pyh, pyl := _pyl
 
-// Current period levels (developing periods) - calculated directly for real-time tick-by-tick updates
+// Current period levels (developing periods)
 var float cdh = na, var float cdl = na
 var float cwh = na, var float cwl = na
 var float cmh = na, var float cml = na
 var float cyh = na, var float cyl = na
 
-// Detect period boundaries - respects TradingView's session/exchange rules for each symbol type
-bool newDay = ta.change(time("D")) != 0
-bool newWeek = ta.change(time("W")) != 0
-bool newMonth = ta.change(time("M")) != 0
-bool newYear = ta.change(time("12M")) != 0
-
-// Update current period highs/lows (resets on period boundary, otherwise tracks highest/lowest)
-cdh := newDay ? high : (na(cdh) ? high : math.max(cdh, high))
-cdl := newDay ? low : (na(cdl) ? low : math.min(cdl, low))
-
-cwh := newWeek ? high : (na(cwh) ? high : math.max(cwh, high))
-cwl := newWeek ? low : (na(cwl) ? low : math.min(cwl, low))
-
-cmh := newMonth ? high : (na(cmh) ? high : math.max(cmh, high))
-cml := newMonth ? low : (na(cml) ? low : math.min(cml, low))
-
-cyh := newYear ? high : (na(cyh) ? high : math.max(cyh, high))
-cyl := newYear ? low : (na(cyl) ? low : math.min(cyl, low))
+// Current period levels - use request.security() for consistency with previous periods
+// All use exchange's official daily/weekly/monthly bars for consistency
+if showKeyLevelsCondition and (showCDH or showCDL)
+    [_cdh, _cdl] = request.security(syminfo.tickerid, "D", [high, low], lookahead=barmerge.lookahead_on)
+    cdh := _cdh, cdl := _cdl
+if showKeyLevelsCondition and (showCWH or showCWL)
+    [_cwh, _cwl] = request.security(syminfo.tickerid, "W", [high, low], lookahead=barmerge.lookahead_on)
+    cwh := _cwh, cwl := _cwl
+if showKeyLevelsCondition and (showCMH or showCML)
+    [_cmh, _cml] = request.security(syminfo.tickerid, "M", [high, low], lookahead=barmerge.lookahead_on)
+    cmh := _cmh, cml := _cml
+if showKeyLevelsCondition and (showCYH or showCYL)
+    [_cyh, _cyl] = request.security(syminfo.tickerid, "12M", [high, low], lookahead=barmerge.lookahead_on)
+    cyh := _cyh, cyl := _cyl
 
 // All-time high (uses monthly for better performance) - only update on confirmed bars
 var float ath = na
@@ -759,6 +816,10 @@ for i = 0 to 4
             bool isSessionStart = time >= sessionStart and time[1] < sessionStart
 
             // Check if this VWAP is within the configured history count
+            // Array layout: [0=oldest ... 9=newest] with MAX_VWAP_HISTORY=10
+            // If historyCount=1: only arrayIdx=9 is visible (sessionIndexInHistory >= 0)
+            // If historyCount=2: arrayIdx=8,9 are visible
+            // If historyCount=5: arrayIdx=5,6,7,8,9 are visible
             int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - historyCount)
             bool isInConfiguredRange = sessionIndexInHistory >= 0
 
