@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 //@version=6
-indicator("Key Levels", overlay=true, max_lines_count=500)
+indicator("Key Levels", overlay=true, max_lines_count=500, max_boxes_count=100)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // INPUTS
@@ -46,21 +46,37 @@ sessionLevelsMode = input.string("Only Futures", "Instrument Filter", options=["
 sessionLevelsMaxTimeframe = input.string("15m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🕐 Session Selection", tooltip="Hide session levels on timeframes above this")
 
 enableLondon = input.bool(true, "London", inline="LON", group="🕐 Session Selection")
-colorLondon = input.color(#FF9800, "", inline="LON", group="🕐 Session Selection", tooltip="0800-1630 GMT | European open")
+colorLondon = input.color(#FF9800, "", inline="LON", group="🕐 Session Selection")
+londonVWAPCount = input.int(1, "History", inline="LON", minval=1, maxval=5, group="🕐 Session Selection", tooltip="London (0800-1630 GMT): How many past sessions to display (includes VWAPs, levels, and labels)")
+
 enableNewYork = input.bool(true, "New York", inline="NY", group="🕐 Session Selection")
-colorNewYork = input.color(#2962FF, "", inline="NY", group="🕐 Session Selection", tooltip="0930-1600 EST | US RTH")
-enableSydney = input.bool(false, "Sydney/ETH", inline="SYD", group="🕐 Session Selection")
-colorSydney = input.color(#4CAF50, "", inline="SYD", group="🕐 Session Selection", tooltip="1000-1600 AEDT | ~1800 ET (US futures ETH open)")
+colorNewYork = input.color(#2962FF, "", inline="NY", group="🕐 Session Selection")
+nyVWAPCount = input.int(2, "History", inline="NY", minval=1, maxval=5, group="🕐 Session Selection", tooltip="New York (0930-1600 EST): How many past sessions to display (includes VWAPs, levels, and labels)")
+
+enableGlobex = input.bool(true, "Globex (ETH)", inline="GLX", group="🕐 Session Selection")
+colorGlobex = input.color(#4CAF50, "", inline="GLX", group="🕐 Session Selection")
+globexVWAPCount = input.int(5, "History", inline="GLX", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Globex (1800-1700 ET): How many past sessions to display (includes VWAPs, levels, and labels)")
+
+enableSydney = input.bool(false, "Sydney", inline="SYD", group="🕐 Session Selection")
+colorSydney = input.color(#9C27B0, "", inline="SYD", group="🕐 Session Selection")
+sydneyVWAPCount = input.int(1, "History", inline="SYD", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Sydney (1000-1600 AEDT): How many past sessions to display (includes VWAPs, levels, and labels)")
+
 enableTokyo = input.bool(false, "Tokyo", inline="TKY", group="🕐 Session Selection")
-colorTokyo = input.color(#E91E63, "", inline="TKY", group="🕐 Session Selection", tooltip="0900-1500 JST | Asian session")
+colorTokyo = input.color(#E91E63, "", inline="TKY", group="🕐 Session Selection")
+tokyoVWAPCount = input.int(1, "History", inline="TKY", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Tokyo (0900-1500 JST): How many past sessions to display (includes VWAPs, levels, and labels)")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 📊 SESSION VWAP
 // ─────────────────────────────────────────────────────────────────────────────
-showSessionVWAP = input.bool(true, "Show VWAP", group="📊 Session VWAP", tooltip="Volume-weighted average price for each session")
-sessionVWAPLineWidth = input.int(4, "Line Width", minval=1, maxval=5, group="📊 Session VWAP")
-sessionVWAPLineStyleInput = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📊 Session VWAP")
+showSessionVWAP = input.bool(true, "Show VWAP", group="📊 Session VWAP", tooltip="Display volume-weighted average price line for each session")
+sessionVWAPLineWidth = input.int(4, "Line Width", minval=1, maxval=5, group="📊 Session VWAP", tooltip="How thick to draw VWAP lines")
+sessionVWAPLineStyleInput = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📊 Session VWAP", tooltip="Line appearance: solid, dashed, or dotted")
 sessionVWAPLineStyle = sessionVWAPLineStyleInput == "Solid" ? plot.linestyle_solid : sessionVWAPLineStyleInput == "Dashed" ? plot.linestyle_dashed : plot.linestyle_dotted
+
+vwapColorDifferentiation = input.bool(true, "Fade Older Sessions", group="📊 Session VWAP", tooltip="Make older session VWAPs visually distinct from the most recent one")
+vwapMaxTransparency = input.int(0, "Transparency", minval=0, maxval=95, group="📊 Session VWAP", tooltip="How transparent to make the oldest VWAP: 0=fully opaque, 95=nearly invisible")
+vwapHueShift = input.int(-10, "Hue Shift", minval=-50, maxval=50, group="📊 Session VWAP", tooltip="Shift older VWAPs around the color wheel: negative=cooler (blue), positive=warmer (red), 0=no change")
+vwapDesaturation = input.int(20, "Desaturation", minval=0, maxval=100, group="📊 Session VWAP", tooltip="Make older VWAPs less colorful: 0=keep vibrant, 100=turn gray")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🏷️ SESSION LABELS
@@ -208,23 +224,189 @@ labelBgColor(color c) => color.new(c, 100)
 roundToTick(float price) =>
     syminfo.mintick > 0 ? math.round(price / syminfo.mintick) * syminfo.mintick : price
 
-// Session time definitions (in exchange local timezone)
+// RGB to HSL conversion
+rgbToHsl(float r, float g, float b) =>
+    float rNorm = r / 255.0
+    float gNorm = g / 255.0
+    float bNorm = b / 255.0
+
+    float maxVal = math.max(rNorm, math.max(gNorm, bNorm))
+    float minVal = math.min(rNorm, math.min(gNorm, bNorm))
+    float delta = maxVal - minVal
+
+    float h = 0.0
+    float s = 0.0
+    float l = (maxVal + minVal) / 2.0
+
+    if delta != 0
+        s := l > 0.5 ? delta / (2.0 - maxVal - minVal) : delta / (maxVal + minVal)
+
+        if maxVal == rNorm
+            h := ((gNorm - bNorm) / delta + (gNorm < bNorm ? 6.0 : 0.0)) / 6.0
+        else if maxVal == gNorm
+            h := ((bNorm - rNorm) / delta + 2.0) / 6.0
+        else
+            h := ((rNorm - gNorm) / delta + 4.0) / 6.0
+
+    [h, s, l]
+
+// HSL to RGB conversion helper
+hueToRgb(float p, float q, float t) =>
+    float tAdj = t < 0.0 ? t + 1.0 : (t > 1.0 ? t - 1.0 : t)
+    float result = tAdj < 1.0/6.0 ? p + (q - p) * 6.0 * tAdj :
+                  (tAdj < 1.0/2.0 ? q :
+                  (tAdj < 2.0/3.0 ? p + (q - p) * (2.0/3.0 - tAdj) * 6.0 : p))
+    result
+
+// HSL to RGB conversion
+hslToRgb(float h, float s, float l) =>
+    float r = 0.0
+    float g = 0.0
+    float b = 0.0
+
+    if s == 0
+        r := l
+        g := l
+        b := l
+    else
+        float q = l < 0.5 ? l * (1.0 + s) : l + s - l * s
+        float p = 2.0 * l - q
+
+        r := hueToRgb(p, q, h + 1.0/3.0)
+        g := hueToRgb(p, q, h)
+        b := hueToRgb(p, q, h - 1.0/3.0)
+
+    [int(r * 255.0), int(g * 255.0), int(b * 255.0)]
+
+// Calculate color with transparency, hue shift, and desaturation based on VWAP position in history (0 = most recent)
+getVWAPColor(color baseColor, int positionInHistory, bool useDifferentiation, int maxTransp, int hueShift, int desat) =>
+    if not useDifferentiation or positionInHistory == 0
+        baseColor
+    else
+        // Linear gradient for transparency
+        float normalizedPos = positionInHistory / 4.0  // Normalize to 0-1 range (assuming max 5 visible)
+        int transparency = int(normalizedPos * maxTransp)
+
+        // Extract RGB components
+        float origR = color.r(baseColor)
+        float origG = color.g(baseColor)
+        float origB = color.b(baseColor)
+
+        // Convert to HSL for proper hue rotation
+        [h, s, l] = rgbToHsl(origR, origG, origB)
+
+        // Apply hue shift (rotate around color wheel)
+        if hueShift != 0
+            float hueShiftAmount = (normalizedPos * hueShift) / 50.0  // -1.0 to +1.0 range
+            h := h + hueShiftAmount
+            h := h < 0.0 ? h + 1.0 : (h > 1.0 ? h - 1.0 : h)  // Wrap around
+
+        // Apply desaturation
+        if desat > 0
+            float desatFactor = (normalizedPos * desat) / 100.0
+            s := s * (1.0 - desatFactor)
+
+        // Convert back to RGB
+        [newR, newG, newB] = hslToRgb(h, s, l)
+
+        // Apply transparency
+        color.rgb(newR, newG, newB, math.min(transparency, maxTransp))
+
+// Session time definitions in session's local timezone
 // LSE: 8:00 AM - 4:30 PM GMT
 // NYSE/CME: 9:30 AM - 4:00 PM EST
+// CME Globex: 6:00 PM - 5:00 PM EST (next day, spans 2 calendar days)
 // ASX: 10:00 AM - 4:00 PM AEDT
 // TSE: 9:00 AM - 3:00 PM JST
-getSessionSpec(string session) =>
-    session == "London" ? "0800-1630" : session == "New York" ? "0930-1600" : session == "Sydney" ? "1000-1600" : "0900-1500"
 
 getSessionTimezone(string session) =>
-    session == "London" ? "Europe/London" : session == "New York" ? "America/New_York" : session == "Sydney" ? "Australia/Sydney" : "Asia/Tokyo"
+    session == "London" ? "Europe/London" : session == "New York" ? "America/New_York" : session == "Globex (ETH)" ? "America/New_York" : session == "Sydney" ? "Australia/Sydney" : "Asia/Tokyo"
 
-// Calculate today's session start timestamp (handles DST automatically via timezone)
-getSessionStartTimestamp(string session) =>
+getSessionStartHour(string session) =>
+    session == "London" ? 8 : session == "New York" ? 9 : session == "Globex (ETH)" ? 18 : session == "Sydney" ? 10 : 9
+
+getSessionStartMinute(string session) =>
+    session == "New York" ? 30 : 0
+
+getSessionEndHour(string session) =>
+    session == "London" ? 16 : session == "New York" ? 16 : session == "Globex (ETH)" ? 17 : session == "Sydney" ? 16 : 15
+
+getSessionEndMinute(string session) =>
+    session == "London" ? 30 : 0
+
+// Calculate session start timestamp for a specific date (calendar-based, pre-calculated)
+getSessionStartForDate(string session, int y, int m, int d) =>
     string tz = getSessionTimezone(session)
-    int sessionHour = session == "London" ? 8 : session == "New York" ? 9 : session == "Sydney" ? 10 : 9
-    int sessionMinute = session == "New York" ? 30 : 0
-    timestamp(tz, year(timenow), month(timenow), dayofmonth(timenow), sessionHour, sessionMinute)
+    int sessionHour = getSessionStartHour(session)
+    int sessionMinute = getSessionStartMinute(session)
+    timestamp(tz, y, m, d, sessionHour, sessionMinute)
+
+// Calculate session end timestamp for a specific date
+// Note: For Globex, end is on NEXT calendar day (starts 6 PM, ends 5 PM next day)
+getSessionEndForDate(string session, int y, int m, int d) =>
+    string tz = getSessionTimezone(session)
+    int sessionHour = getSessionEndHour(session)
+    int sessionMinute = getSessionEndMinute(session)
+    // Globex spans two days: starts evening, ends next afternoon
+    if session == "Globex (ETH)"
+        // Add one day to end timestamp
+        timestamp(tz, y, m, d + 1, sessionHour, sessionMinute)
+    else
+        timestamp(tz, y, m, d, sessionHour, sessionMinute)
+
+// Get array of session start timestamps for last N days (calendar-based pre-calculation)
+// For Globex: Returns sessions that are ACTIVE during each day (started previous evening)
+getSessionStartsArray(string session, int daysBack) =>
+    var array<int> starts = array.new<int>()
+    array.clear(starts)
+
+    // Get session timezone to ensure date calculations are consistent
+    string tz = getSessionTimezone(session)
+
+    // Pre-calculate session starts for last N days using SESSION timezone
+    for i = 0 to daysBack - 1
+        int daysAgo = daysBack - 1 - i
+        int timestamp_ms = timenow - (daysAgo * 86400000)  // 86400000 ms = 1 day
+        int y = year(timestamp_ms, tz)  // Extract date in SESSION timezone
+        int m = month(timestamp_ms, tz)
+        int d = dayofmonth(timestamp_ms, tz)
+
+        // For Globex: Get session active DURING this day (started previous evening)
+        int sessionStart = na
+        if session == "Globex (ETH)"
+            // Globex active during day d started on evening of day d-1
+            sessionStart := getSessionStartForDate(session, y, m, d - 1)
+        else
+            sessionStart := getSessionStartForDate(session, y, m, d)
+
+        array.push(starts, sessionStart)
+
+    starts
+
+// Get array of session end timestamps (matches start array indices)
+getSessionEndsArray(string session, int daysBack) =>
+    var array<int> ends = array.new<int>()
+    array.clear(ends)
+
+    string tz = getSessionTimezone(session)
+
+    for i = 0 to daysBack - 1
+        int daysAgo = daysBack - 1 - i
+        int timestamp_ms = timenow - (daysAgo * 86400000)
+        int y = year(timestamp_ms, tz)
+        int m = month(timestamp_ms, tz)
+        int d = dayofmonth(timestamp_ms, tz)
+
+        // For Globex: Session active during day d started evening d-1, so use d-1 for end calc
+        int sessionEnd = na
+        if session == "Globex (ETH)"
+            sessionEnd := getSessionEndForDate(session, y, m, d - 1)
+        else
+            sessionEnd := getSessionEndForDate(session, y, m, d)
+
+        array.push(ends, sessionEnd)
+
+    ends
 
 // Convert period string to minutes
 periodToMinutes(string period) =>
@@ -311,25 +493,30 @@ if barstate.isconfirmed and showKeyLevelsCondition and (showPYH or showPYL or sh
     [_pyh, _pyl] = request.security(syminfo.tickerid, "12M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
     pyh := _pyh, pyl := _pyl
 
-// Current period levels (developing periods)
+// Current period levels (developing periods) - calculated directly for real-time tick-by-tick updates
 var float cdh = na, var float cdl = na
 var float cwh = na, var float cwl = na
 var float cmh = na, var float cml = na
 var float cyh = na, var float cyl = na
 
-// Current period levels - update every bar to track developing highs/lows
-if showKeyLevelsCondition and (showCDH or showCDL)
-    [_cdh, _cdl] = request.security(syminfo.tickerid, "D", [high, low], lookahead=barmerge.lookahead_on)
-    cdh := _cdh, cdl := _cdl
-if showKeyLevelsCondition and (showCWH or showCWL)
-    [_cwh, _cwl] = request.security(syminfo.tickerid, "W", [high, low], lookahead=barmerge.lookahead_on)
-    cwh := _cwh, cwl := _cwl
-if showKeyLevelsCondition and (showCMH or showCML)
-    [_cmh, _cml] = request.security(syminfo.tickerid, "M", [high, low], lookahead=barmerge.lookahead_on)
-    cmh := _cmh, cml := _cml
-if showKeyLevelsCondition and (showCYH or showCYL)
-    [_cyh, _cyl] = request.security(syminfo.tickerid, "12M", [high, low], lookahead=barmerge.lookahead_on)
-    cyh := _cyh, cyl := _cyl
+// Detect period boundaries - respects TradingView's session/exchange rules for each symbol type
+bool newDay = ta.change(time("D")) != 0
+bool newWeek = ta.change(time("W")) != 0
+bool newMonth = ta.change(time("M")) != 0
+bool newYear = ta.change(time("12M")) != 0
+
+// Update current period highs/lows (resets on period boundary, otherwise tracks highest/lowest)
+cdh := newDay ? high : (na(cdh) ? high : math.max(cdh, high))
+cdl := newDay ? low : (na(cdl) ? low : math.min(cdl, low))
+
+cwh := newWeek ? high : (na(cwh) ? high : math.max(cwh, high))
+cwl := newWeek ? low : (na(cwl) ? low : math.min(cwl, low))
+
+cmh := newMonth ? high : (na(cmh) ? high : math.max(cmh, high))
+cml := newMonth ? low : (na(cml) ? low : math.min(cml, low))
+
+cyh := newYear ? high : (na(cyh) ? high : math.max(cyh, high))
+cyl := newYear ? low : (na(cyl) ? low : math.min(cyl, low))
 
 // All-time high (uses monthly for better performance) - only update on confirmed bars
 var float ath = na
@@ -382,19 +569,57 @@ var line lineS3 = na, var label labelS3 = na
 // MULTI-SESSION INFRASTRUCTURE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Session arrays (indices: 0=London, 1=NY, 2=Sydney, 3=Tokyo)
-var array<bool> sessionEnabled = array.from(enableLondon, enableNewYork, enableSydney, enableTokyo)
-var array<string> sessionNames = array.from("London", "New York", "Sydney", "Tokyo")
-var array<color> sessionColors = array.from(colorLondon, colorNewYork, colorSydney, colorTokyo)
+// Configuration: Maximum VWAP history to track (must be >= max user input)
+const int MAX_VWAP_HISTORY = 10  // Track VWAPs for last 10 sessions of each type (matches max input)
 
-// Per-session tracking
-var array<int> sessionStartBars = array.new<int>(4, na)
-var array<int> sessionStartTimes = array.new<int>(4, na)
-var array<label> sessionLabels = array.new<label>(4, na)
+// Session arrays (indices: 0=London, 1=NY, 2=Globex, 3=Sydney, 4=Tokyo)
+var array<bool> sessionEnabled = array.from(enableLondon, enableNewYork, enableGlobex, enableSydney, enableTokyo)
+var array<string> sessionNames = array.from("London", "New York", "Globex (ETH)", "Sydney", "Tokyo")
+var array<color> sessionColors = array.from(colorLondon, colorNewYork, colorGlobex, colorSydney, colorTokyo)
 
-// Per-session VWAP accumulators (one set per session)
-var array<float> vwapSumSrc = array.from(0.0, 0.0, 0.0, 0.0)
-var array<float> vwapSumVol = array.from(0.0, 0.0, 0.0, 0.0)
+// Pre-calculate session start and end timestamps for each session type (calendar-based)
+var array<int> londonStarts = array.new<int>()
+var array<int> nyStarts = array.new<int>()
+var array<int> globexStarts = array.new<int>()
+var array<int> sydneyStarts = array.new<int>()
+var array<int> tokyoStarts = array.new<int>()
+
+var array<int> londonEnds = array.new<int>()
+var array<int> nyEnds = array.new<int>()
+var array<int> globexEnds = array.new<int>()
+var array<int> sydneyEnds = array.new<int>()
+var array<int> tokyoEnds = array.new<int>()
+
+// Initialize session start and end arrays on first bar
+if barstate.isfirst
+    londonStarts := getSessionStartsArray("London", MAX_VWAP_HISTORY)
+    nyStarts := getSessionStartsArray("New York", MAX_VWAP_HISTORY)
+    globexStarts := getSessionStartsArray("Globex (ETH)", MAX_VWAP_HISTORY)
+    sydneyStarts := getSessionStartsArray("Sydney", MAX_VWAP_HISTORY)
+    tokyoStarts := getSessionStartsArray("Tokyo", MAX_VWAP_HISTORY)
+
+    londonEnds := getSessionEndsArray("London", MAX_VWAP_HISTORY)
+    nyEnds := getSessionEndsArray("New York", MAX_VWAP_HISTORY)
+    globexEnds := getSessionEndsArray("Globex (ETH)", MAX_VWAP_HISTORY)
+    sydneyEnds := getSessionEndsArray("Sydney", MAX_VWAP_HISTORY)
+    tokyoEnds := getSessionEndsArray("Tokyo", MAX_VWAP_HISTORY)
+
+// VWAP accumulators: Separate arrays per session type, each containing accumulators for multiple days
+var array<float> londonSumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
+var array<float> londonSumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
+var array<float> nySumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
+var array<float> nySumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
+var array<float> globexSumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
+var array<float> globexSumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
+var array<float> sydneySumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
+var array<float> sydneySumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
+var array<float> tokyoSumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
+var array<float> tokyoSumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
+
+// Per-session tracking (unified with calendar-based approach)
+var array<int> sessionStartBars = array.new<int>(5, na)
+var array<int> sessionStartTimes = array.new<int>(5, na)
+var array<label> sessionLabels = array.new<label>(5, na)
 
 // Active session tracking (for session levels)
 var int activeSessionIndex = na
@@ -421,42 +646,28 @@ int openRangeMinutes = periodToMinutes(openRangePeriod)
 int ibMinutes = periodToMinutes(initialBalancePeriod)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MULTI-SESSION DETECTION & MANAGEMENT
+// UNIFIED SESSION DETECTION (Calendar-based for labels, levels, and VWAPs)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Detect session changes for all 4 sessions
-// Track session state outside loop to avoid scope issues
-var array<bool> inSessionState = array.new<bool>(4, false)
-
-for i = 0 to 3
+// Detect session changes using pre-calculated session start timestamps
+for i = 0 to 4
     if array.get(sessionEnabled, i)
         string sessionName = array.get(sessionNames, i)
-        string sessionSpec = getSessionSpec(sessionName)
-        string sessionTz = getSessionTimezone(sessionName)
 
-        bool inThisSession = not na(time(timeframe.period, sessionSpec, sessionTz))
-        bool wasInSession = array.get(inSessionState, i)
-        array.set(inSessionState, i, inThisSession)
-        bool thisSessionChange = inThisSession and not wasInSession
+        // Get pre-calculated session starts for this session type (most recent session only)
+        array<int> sessionStartsArray = i == 0 ? londonStarts : i == 1 ? nyStarts : i == 2 ? globexStarts : i == 3 ? sydneyStarts : tokyoStarts
+        int mostRecentSessionStart = array.get(sessionStartsArray, MAX_VWAP_HISTORY - 1)
+
+        // Detect session change: current bar crossed into this session
+        bool thisSessionChange = time >= mostRecentSessionStart and time[1] < mostRecentSessionStart
 
         // When this session starts
         if thisSessionChange
-            // Delete old label for this session (24h cycle)
-            label oldLabel = array.get(sessionLabels, i)
-            if not na(oldLabel)
-                label.delete(oldLabel)
+            // Note: Labels are now created in the VWAP calculation loop below
 
-            // Create new label with session name + date
-            if showSessionLevelsCondition and showSessionLabels
-                string dateStr = str.format("{0,date,d MMM}", time)
-                string labelText = sessionName + " " + dateStr
-                color sessionColor = array.get(sessionColors, i)
-                label newLabel = label.new(bar_index, high, labelText, yloc=yloc.abovebar, color=sessionColor, textcolor=color.white, style=label.style_label_down, size=getLabelSize(globalLabelSize))
-                array.set(sessionLabels, i, newLabel)
-
-            // Update session tracking
+            // Update session tracking (using calendar-based timestamp)
             array.set(sessionStartBars, i, bar_index)
-            array.set(sessionStartTimes, i, time)
+            array.set(sessionStartTimes, i, mostRecentSessionStart)
 
             // This session becomes the active session for levels
             activeSessionIndex := i
@@ -469,22 +680,25 @@ for i = 0 to 3
             initialBalanceHigh := high
             initialBalanceLow := low
             sessionStartBar := bar_index
-            sessionStartTime := time
+            sessionStartTime := mostRecentSessionStart
             openPriceBar := bar_index
             orhBar := bar_index
             orlBar := bar_index
             ibhBar := bar_index
             iblBar := bar_index
 
-// Update session levels (only for active session)
+// Update session levels (only for active session, using calendar-based timestamps)
 if not na(activeSessionIndex) and not na(sessionStartTime)
-    string activeSpec = getSessionSpec(activeSessionName)
-    string activeTz = getSessionTimezone(activeSessionName)
-    bool inActiveSession = not na(time(timeframe.period, activeSpec, activeTz))
+    // Get session end time to check if session has closed
+    array<int> activeSessionEnds = activeSessionIndex == 0 ? londonEnds : activeSessionIndex == 1 ? nyEnds : activeSessionIndex == 2 ? globexEnds : activeSessionIndex == 3 ? sydneyEnds : tokyoEnds
+    int currentSessionEnd = array.get(activeSessionEnds, MAX_VWAP_HISTORY - 1)
 
-    if inActiveSession
+    // Check if we're still in the current session (after start, before end)
+    bool stillInSession = time >= sessionStartTime and time < currentSessionEnd
+
+    if stillInSession
+        // Calculate elapsed time since session start (calendar-based)
         int elapsedMinutes = math.round((time - sessionStartTime) / 60000)
-
         // Update Open Range
         if elapsedMinutes <= openRangeMinutes
             if high > openRangeHigh
@@ -504,58 +718,139 @@ if not na(activeSessionIndex) and not na(sessionStartTime)
                 iblBar := bar_index
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// MULTI-SESSION VWAP CALCULATIONS (Time-based anchor pattern)
+// MULTI-SESSION VWAP CALCULATIONS (Calendar-based pre-calculated anchors)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Calculate VWAP for each enabled session using time-based anchoring
-var float londonVWAP = na, var float nyVWAP = na, var float sydneyVWAP = na, var float tokyoVWAP = na
+// VWAP arrays to store calculated values for plotting (up to MAX_VWAP_HISTORY per session)
+var array<float> londonVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
+var array<float> nyVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
+var array<float> globexVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
+var array<float> sydneyVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
+var array<float> tokyoVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
 
-for i = 0 to 3
+// Arrays to store label IDs for each historical VWAP
+var array<label> londonLabels = array.new<label>(MAX_VWAP_HISTORY, na)
+var array<label> nyLabels = array.new<label>(MAX_VWAP_HISTORY, na)
+var array<label> globexLabels = array.new<label>(MAX_VWAP_HISTORY, na)
+var array<label> sydneyLabels = array.new<label>(MAX_VWAP_HISTORY, na)
+var array<label> tokyoLabels = array.new<label>(MAX_VWAP_HISTORY, na)
+
+// Calculate VWAP for each enabled session using calendar-based pre-calculated session starts
+for i = 0 to 4
     if array.get(sessionEnabled, i)
-        string sessionName = array.get(sessionNames, i)
+        // Get configuration for this session type
+        int historyCount = i == 0 ? londonVWAPCount : i == 1 ? nyVWAPCount : i == 2 ? globexVWAPCount : i == 3 ? sydneyVWAPCount : tokyoVWAPCount
+        array<int> sessionStartsArray = i == 0 ? londonStarts : i == 1 ? nyStarts : i == 2 ? globexStarts : i == 3 ? sydneyStarts : tokyoStarts
+        array<float> sumSrcArray = i == 0 ? londonSumSrc : i == 1 ? nySumSrc : i == 2 ? globexSumSrc : i == 3 ? sydneySumSrc : tokyoSumSrc
+        array<float> sumVolArray = i == 0 ? londonSumVol : i == 1 ? nySumVol : i == 2 ? globexSumVol : i == 3 ? sydneySumVol : tokyoSumVol
+        array<float> vwapArray = i == 0 ? londonVWAPs : i == 1 ? nyVWAPs : i == 2 ? globexVWAPs : i == 3 ? sydneyVWAPs : tokyoVWAPs
+        array<label> labelArray = i == 0 ? londonLabels : i == 1 ? nyLabels : i == 2 ? globexLabels : i == 3 ? sydneyLabels : tokyoLabels
+        color sessionColor = i == 0 ? colorLondon : i == 1 ? colorNewYork : i == 2 ? colorGlobex : i == 3 ? colorSydney : colorTokyo
+        string sessionName = i == 0 ? "London" : i == 1 ? "New York" : i == 2 ? "Globex (ETH)" : i == 3 ? "Sydney" : "Tokyo"
 
-        // Calculate today's session start using timezone-aware function (exact pattern from working version)
-        int todaySessionStart = getSessionStartTimestamp(sessionName)
+        // Loop through all tracked sessions (MAX_VWAP_HISTORY)
+        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
+            int sessionStart = array.get(sessionStartsArray, arrayIdx)
 
-        // Detect when time crosses into this session (exact pattern from working version)
-        bool vwapAnchor = time >= todaySessionStart and time[1] < todaySessionStart
+            // Get the next session start (to know when to stop calculating this VWAP)
+            int nextSessionStart = arrayIdx < MAX_VWAP_HISTORY - 1 ? array.get(sessionStartsArray, arrayIdx + 1) : int(na)
 
-        // Get current accumulators
-        float currentSumSrc = array.get(vwapSumSrc, i)
-        float currentSumVol = array.get(vwapSumVol, i)
+            // Check if we're at the start of this session
+            bool isSessionStart = time >= sessionStart and time[1] < sessionStart
 
-        // Reset on anchor (session start), otherwise accumulate
-        float newSumSrc = vwapAnchor ? (ohlc4 * volume) : (currentSumSrc + ohlc4 * volume)
-        float newSumVol = vwapAnchor ? volume : (currentSumVol + volume)
+            // Check if this VWAP is within the configured history count
+            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - historyCount)
+            bool isInConfiguredRange = sessionIndexInHistory >= 0
 
-        // Update accumulators
-        array.set(vwapSumSrc, i, newSumSrc)
-        array.set(vwapSumVol, i, newSumVol)
+            // VWAPs should calculate as long as they're in the configured range AND after their session started
+            // They continue calculating even after the next session starts (unlike the old logic)
+            bool shouldCalculate = time >= sessionStart and isInConfiguredRange
 
-        // Calculate VWAP
-        float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
+            if shouldCalculate
+                // Get current accumulators for this session
+                float currentSumSrc = array.get(sumSrcArray, arrayIdx)
+                float currentSumVol = array.get(sumVolArray, arrayIdx)
 
-        // Only show VWAP for bars after session started (exact pattern from working version)
-        bool isInTargetSession = time >= todaySessionStart
-        float displayVwap = isInTargetSession ? vwap : na
+                // Reset accumulators on new session start, otherwise accumulate continuously
+                float newSumSrc = isSessionStart ? (ohlc4 * volume) : (currentSumSrc + ohlc4 * volume)
+                float newSumVol = isSessionStart ? volume : (currentSumVol + volume)
 
-        // Store in appropriate variable for plotting
-        if i == 0
-            londonVWAP := displayVwap
-        else if i == 1
-            nyVWAP := displayVwap
-        else if i == 2
-            sydneyVWAP := displayVwap
-        else if i == 3
-            tokyoVWAP := displayVwap
+                // Update accumulators
+                array.set(sumSrcArray, arrayIdx, newSumSrc)
+                array.set(sumVolArray, arrayIdx, newSumVol)
 
+                // Calculate VWAP and store in array
+                float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
+                array.set(vwapArray, arrayIdx, vwap)
 
+                // Create session label at session start ONLY if within configured history count
+                if isSessionStart and showSessionLevelsCondition and showSessionLabels and isInConfiguredRange
+                    // Delete old label for this specific VWAP session
+                    label oldLabel = array.get(labelArray, arrayIdx)
+                    if not na(oldLabel)
+                        label.delete(oldLabel)
 
-// Plot VWAPs (plot na when session not active or disabled)
-plot(showSessionLevelsCondition and showSessionVWAP and enableLondon ? londonVWAP : na, "London VWAP", color=colorLondon, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(showSessionLevelsCondition and showSessionVWAP and enableNewYork ? nyVWAP : na, "NY VWAP", color=colorNewYork, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(showSessionLevelsCondition and showSessionVWAP and enableSydney ? sydneyVWAP : na, "Sydney VWAP", color=colorSydney, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(showSessionLevelsCondition and showSessionVWAP and enableTokyo ? tokyoVWAP : na, "Tokyo VWAP", color=colorTokyo, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+                    // Calculate position in history for color matching
+                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
+
+                    // Get matching VWAP color
+                    color labelColor = getVWAPColor(sessionColor, positionInHistory, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation)
+
+                    // Create new label with session name + date
+                    string labelSizeActual = getLabelSize(globalLabelSize)
+                    string tz = getSessionTimezone(sessionName)
+                    string sessionDate = str.format_time(sessionStart, "d MMM", tz)
+                    string labelText = sessionName + " " + sessionDate
+
+                    label newLabel = label.new(bar_index, high, labelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=labelSizeActual, style=label.style_label_down)
+                    array.set(labelArray, arrayIdx, newLabel)
+
+                    // Also update the main sessionLabels array for the most recent session (for backwards compatibility)
+                    if arrayIdx == MAX_VWAP_HISTORY - 1
+                        array.set(sessionLabels, i, newLabel)
+
+            // Clean up labels that are outside the configured history count
+            if not isInConfiguredRange
+                label oldLabel = array.get(labelArray, arrayIdx)
+                if not na(oldLabel)
+                    label.delete(oldLabel)
+                    array.set(labelArray, arrayIdx, na)
+
+// Plot VWAPs - up to 10 historical sessions per type
+// London VWAPs (position 0 = most recent, position 1 = 2nd most recent, etc.)
+plot(showSessionLevelsCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 1 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 1) : na, "London VWAP 1", color=getVWAPColor(colorLondon, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 2 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 2) : na, "London VWAP 2", color=getVWAPColor(colorLondon, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 3 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 3) : na, "London VWAP 3", color=getVWAPColor(colorLondon, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 4 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 4) : na, "London VWAP 4", color=getVWAPColor(colorLondon, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 5 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 5) : na, "London VWAP 5", color=getVWAPColor(colorLondon, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+
+// NY VWAPs
+plot(showSessionLevelsCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 1 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 1) : na, "NY VWAP 1", color=getVWAPColor(colorNewYork, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 2 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 2) : na, "NY VWAP 2", color=getVWAPColor(colorNewYork, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 3 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 3) : na, "NY VWAP 3", color=getVWAPColor(colorNewYork, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 4 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 4) : na, "NY VWAP 4", color=getVWAPColor(colorNewYork, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 5 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 5) : na, "NY VWAP 5", color=getVWAPColor(colorNewYork, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+
+// Globex VWAPs
+plot(showSessionLevelsCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 1 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 1) : na, "Globex VWAP 1", color=getVWAPColor(colorGlobex, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 2 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 2) : na, "Globex VWAP 2", color=getVWAPColor(colorGlobex, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 3 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 3) : na, "Globex VWAP 3", color=getVWAPColor(colorGlobex, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 4 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 4) : na, "Globex VWAP 4", color=getVWAPColor(colorGlobex, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 5 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 5) : na, "Globex VWAP 5", color=getVWAPColor(colorGlobex, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+
+// Sydney VWAPs
+plot(showSessionLevelsCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 1 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 1) : na, "Sydney VWAP 1", color=getVWAPColor(colorSydney, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 2 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 2) : na, "Sydney VWAP 2", color=getVWAPColor(colorSydney, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 3 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 3) : na, "Sydney VWAP 3", color=getVWAPColor(colorSydney, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 4 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 4) : na, "Sydney VWAP 4", color=getVWAPColor(colorSydney, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 5 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 5) : na, "Sydney VWAP 5", color=getVWAPColor(colorSydney, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+
+// Tokyo VWAPs
+plot(showSessionLevelsCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 1 ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 1) : na, "Tokyo VWAP 1", color=getVWAPColor(colorTokyo, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 2 ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 2) : na, "Tokyo VWAP 2", color=getVWAPColor(colorTokyo, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 3 ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 3) : na, "Tokyo VWAP 3", color=getVWAPColor(colorTokyo, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 4 ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 4) : na, "Tokyo VWAP 4", color=getVWAPColor(colorTokyo, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(showSessionLevelsCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 5 ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 5) : na, "Tokyo VWAP 5", color=getVWAPColor(colorTokyo, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SESSION LEVELS RENDERING (for active session only)
@@ -759,8 +1054,11 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
 
     // Open Range Background Shading (boxes represent time periods, always start from session start)
     if shouldShowSessionLevels and showOpenRange and shadeOpenRange and not na(openRangeHigh) and not na(openRangeLow)
-        // Box always starts from session start (represents first X minutes as a time period)
+        // Box always starts from session start but truncate if beyond hard limit
         int boxORStartBar = not na(sessionStartBar) ? sessionStartBar : startBar
+        // Apply hard limit: if box would be too long, truncate to configured length
+        if bar_index - boxORStartBar > maxLineDistance
+            boxORStartBar := startBar
         if na(boxOpenRange)
             boxOpenRange := box.new(boxORStartBar, openRangeHigh, bar_index, openRangeLow, border_color=na, bgcolor=colorOpenRangeShade)
         else
@@ -799,8 +1097,11 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
 
     // Initial Balance Background Shading (boxes represent time periods, always start from session start)
     if shouldShowSessionLevels and showInitialBalance and shadeInitialBalance and not na(initialBalanceHigh) and not na(initialBalanceLow)
-        // Box always starts from session start (represents first 30m-1h as a time period)
+        // Box always starts from session start but truncate if beyond hard limit
         int boxIBStartBar = not na(sessionStartBar) ? sessionStartBar : startBar
+        // Apply hard limit: if box would be too long, truncate to configured length
+        if bar_index - boxIBStartBar > maxLineDistance
+            boxIBStartBar := startBar
 
         // If both OR and IB boxes enabled, split IB into upper/lower to avoid overlap
         bool splitIBBox = showOpenRange and shadeOpenRange and not na(openRangeHigh) and not na(openRangeLow)
