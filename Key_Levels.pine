@@ -35,7 +35,7 @@ globalShowPriceValues = input.bool(false, "Show Prices in Labels", group="🌐 G
 globalLineLengthBars = input.int(50, "Line Length (Bars)", minval=10, maxval=200, group="🌐 Global Settings", tooltip="Bars to extend lines backward from current bar (hard limit for lines: 200)")
 
 useATRFilter = input.bool(true, "Hide Distant Levels", group="🌐 Global Settings", tooltip="Only show levels within specified ATR distance from current price")
-atrMultiplier = input.float(1.0, "  Distance (ATR)", minval=1.0, maxval=10.0, step=0.5, group="🌐 Global Settings", tooltip="Hide levels beyond this many ATRs from current price")
+atrMultiplier = input.float(1.5, "  Distance (ATR)", minval=1.0, maxval=10.0, step=0.5, group="🌐 Global Settings", tooltip="Hide levels beyond this many ATRs from current price")
 atrPeriod = input.int(20, "  ATR Period (Days)", minval=1, maxval=500, group="🌐 Global Settings", tooltip="ATR calculated from daily bars (last N days), regardless of chart timeframe")
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ atrPeriod = input.int(20, "  ATR Period (Days)", minval=1, maxval=500, group="�
 // ─────────────────────────────────────────────────────────────────────────────
 showSessionLevels = input.bool(true, "Enable Session Levels", group="🕐 Session Selection", tooltip="Master toggle: Show session-based levels (Open, Open Range, Initial Balance, VWAP)")
 sessionLevelsMode = input.string("Only Futures", "Instrument Filter", options=["All Instruments", "Only Futures"], group="🕐 Session Selection", tooltip="All Instruments: Show on all markets | Only Futures: Futures only")
-sessionLevelsMaxTimeframe = input.string("15m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🕐 Session Selection", tooltip="Hide session levels on timeframes above this")
+sessionLevelsMaxTimeframe = input.string("30m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🕐 Session Selection", tooltip="Hide session levels on timeframes above this")
 
 enableLondon = input.bool(true, "London", inline="LON", group="🕐 Session Selection")
 colorLondon = input.color(#FF9800, "", inline="LON", group="🕐 Session Selection")
@@ -55,28 +55,28 @@ nyVWAPCount = input.int(2, "Count", inline="NY", minval=1, maxval=5, group="🕐
 
 enableGlobex = input.bool(true, "Globex (ETH)", inline="GLX", group="🕐 Session Selection")
 colorGlobex = input.color(#4CAF50, "", inline="GLX", group="🕐 Session Selection")
-globexVWAPCount = input.int(2, "Count", inline="GLX", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
+globexVWAPCount = input.int(5, "Count", inline="GLX", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
 
 enableSydney = input.bool(false, "Sydney", inline="SYD", group="🕐 Session Selection")
 colorSydney = input.color(#9C27B0, "", inline="SYD", group="🕐 Session Selection")
-sydneyVWAPCount = input.int(1, "Count", inline="SYD", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
+sydneyVWAPCount = input.int(2, "Count", inline="SYD", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
 
 enableTokyo = input.bool(false, "Tokyo", inline="TKY", group="🕐 Session Selection")
 colorTokyo = input.color(#E91E63, "", inline="TKY", group="🕐 Session Selection")
-tokyoVWAPCount = input.int(1, "Count", inline="TKY", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
+tokyoVWAPCount = input.int(2, "Count", inline="TKY", minval=1, maxval=5, group="🕐 Session Selection", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 📊 SESSION VWAP
 // ─────────────────────────────────────────────────────────────────────────────
 showSessionVWAP = input.bool(true, "Show VWAP", group="📊 Session VWAP", tooltip="Display volume-weighted average price per session")
-sessionVWAPLineWidth = input.int(4, "Line Width", minval=1, maxval=5, group="📊 Session VWAP", tooltip="Thickness of VWAP lines")
-sessionVWAPLineStyleInput = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📊 Session VWAP", tooltip="VWAP line appearance")
+sessionVWAPLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📊 Session VWAP", tooltip="Thickness of VWAP lines")
+sessionVWAPLineStyleInput = input.string("Dotted", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📊 Session VWAP", tooltip="VWAP line appearance")
 sessionVWAPLineStyle = sessionVWAPLineStyleInput == "Solid" ? plot.linestyle_solid : sessionVWAPLineStyleInput == "Dashed" ? plot.linestyle_dashed : plot.linestyle_dotted
 
 vwapColorDifferentiation = input.bool(true, "Fade Older Sessions", group="📊 Session VWAP", tooltip="Make older VWAPs visually distinct")
 vwapMaxTransparency = input.int(0, "Transparency", minval=0, maxval=95, group="📊 Session VWAP", tooltip="Transparency for oldest VWAP (0=opaque, 95=invisible)")
-vwapHueShift = input.int(-10, "Hue Shift", minval=-50, maxval=50, group="📊 Session VWAP", tooltip="Color shift for older VWAPs (-=cooler, +=warmer)")
-vwapDesaturation = input.int(20, "Desaturation", minval=0, maxval=100, group="📊 Session VWAP", tooltip="Reduce color vibrancy for older VWAPs (0=vibrant, 100=gray)")
+vwapHueShift = input.int(-17, "Hue Shift", minval=-50, maxval=50, group="📊 Session VWAP", tooltip="Color shift for older VWAPs (-=cooler, +=warmer)")
+vwapDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="📊 Session VWAP", tooltip="Reduce color vibrancy for older VWAPs (0=vibrant, 100=gray)")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🗓️ WEEKLY ANCHOR VWAP
@@ -93,8 +93,8 @@ showSessionLabels = input.bool(true, "Show Session Labels", group="🏷️ Sessi
 // ─────────────────────────────────────────────────────────────────────────────
 // 📏 SESSION LEVEL LINES
 // ─────────────────────────────────────────────────────────────────────────────
-sessionLevelsLineWidth = input.int(3, "Line Width", minval=1, maxval=5, group="📏 Session Level Lines", tooltip="Width for Open/ORH/ORL/IBH/IBL lines")
-sessionLevelsLineStyle = input.string("Dotted", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📏 Session Level Lines")
+sessionLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📏 Session Level Lines", tooltip="Width for Open/ORH/ORL/IBH/IBL lines")
+sessionLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📏 Session Level Lines")
 sessionLineStartMode = input.string("Level Established", "Line Start Mode", options=["Level Established", "Session Open", "Fixed Bars Back"], group="📏 Session Level Lines", tooltip="Level Established: From where level was created\nSession Open: From session start\nFixed Bars Back: Use global line length")
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -111,17 +111,17 @@ openRangePeriod = input.string("30m", "Period", options=["15m", "30m"], group="�
 colorORH = input.color(#4682b4, "High Color", group="📦 Open Range")
 colorORL = input.color(#cd5c5c, "Low Color", group="📦 Open Range")
 shadeOpenRange = input.bool(true, "Shade Background", group="📦 Open Range")
-colorOpenRangeShade = input.color(color.new(color.gray, 95), "Shade Color", group="📦 Open Range", tooltip="Background fill between ORH and ORL")
+colorOpenRangeShade = input.color(color.new(color.black, 99), "Shade Color", group="📦 Open Range", tooltip="Background fill between ORH and ORL")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🎯 INITIAL BALANCE
 // ─────────────────────────────────────────────────────────────────────────────
-showInitialBalance = input.bool(true, "Show Initial Balance", group="🎯 Initial Balance", tooltip="High/Low of first 30m-1h (institutional reference)")
+showInitialBalance = input.bool(false, "Show Initial Balance", group="🎯 Initial Balance", tooltip="High/Low of first 30m-1h (institutional reference)")
 initialBalancePeriod = input.string("1h", "Period", options=["30m", "1h"], group="🎯 Initial Balance")
 colorIBH = input.color(#81ce6f, "High Color", group="🎯 Initial Balance")
 colorIBL = input.color(#e43b38, "Low Color", group="🎯 Initial Balance")
 shadeInitialBalance = input.bool(true, "Shade Background", group="🎯 Initial Balance")
-colorInitialBalanceShade = input.color(color.new(color.gray, 95), "Shade Color", group="🎯 Initial Balance", tooltip="Background fill between IBH and IBL")
+colorInitialBalanceShade = input.color(color.new(color.gray, 96), "Shade Color", group="🎯 Initial Balance", tooltip="Background fill between IBH and IBL")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 🔄 PIVOT POINTS
@@ -378,8 +378,24 @@ getSessionStartsArray(string session, int daysBack) =>
     int currentY = year(timenow, tz)
     int currentM = month(timenow, tz)
     int currentD = dayofmonth(timenow, tz)
+    int currentDayOfWeek = dayofweek(timenow, tz)
 
-    // Step 2: Calculate today's session start time
+    // Step 2: Skip weekends - if it's Saturday or Sunday, use Friday as reference
+    // Saturday = 7, Sunday = 1 in Pine Script
+    if currentDayOfWeek == dayofweek.saturday
+        // Go back 1 day to Friday
+        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+        currentY := year(fridayMidnight, tz)
+        currentM := month(fridayMidnight, tz)
+        currentD := dayofmonth(fridayMidnight, tz)
+    else if currentDayOfWeek == dayofweek.sunday
+        // Go back 2 days to Friday
+        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
+        currentY := year(fridayMidnight, tz)
+        currentM := month(fridayMidnight, tz)
+        currentD := dayofmonth(fridayMidnight, tz)
+
+    // Step 3: Calculate today's (or Friday's if weekend) session start time
     int todaySessionStart = na
     int todaySessionEnd = na
     if session == "Globex (ETH)"
@@ -390,7 +406,7 @@ getSessionStartsArray(string session, int daysBack) =>
         todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD)
         todaySessionEnd := getSessionEndForDate(session, currentY, currentM, currentD)
 
-    // Step 3: Check if today's session has started yet
+    // Step 4: Check if today's session has started yet
     // If not, we need to start from yesterday's session
     int mostRecentY = currentY
     int mostRecentM = currentM
@@ -404,23 +420,39 @@ getSessionStartsArray(string session, int daysBack) =>
         mostRecentD := dayofmonth(yesterdayMidnight, tz)
     // else: today's session is active or we're between sessions - use currentD as reference
 
-    // Step 4: Walk backwards N days from most recent started session
+    // Step 5: Walk backwards N TRADING days from most recent started session
     // Fill array from oldest to newest, so most recent is at highest index
-    for i = 0 to daysBack - 1
-        int daysAgo = daysBack - 1 - i
-        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysAgo * 86400000)
+    // Skip weekends to ensure we only get actual trading sessions
+    int tradingSessions = 0
+    int calendarDaysBack = 0
+
+    while tradingSessions < daysBack
+        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (calendarDaysBack * 86400000)
         int y = year(targetMidnight, tz)
         int m = month(targetMidnight, tz)
         int d = dayofmonth(targetMidnight, tz)
+        int dow = dayofweek(targetMidnight, tz)
 
-        // For Globex: Get session active DURING this day (started previous evening)
-        int sessionStart = na
-        if session == "Globex (ETH)"
-            sessionStart := getSessionStartForDate(session, y, m, d - 1)
-        else
-            sessionStart := getSessionStartForDate(session, y, m, d)
+        // Check if this is a trading day
+        bool isWeekend = dow == dayofweek.saturday or dow == dayofweek.sunday
+        bool isTradingDay = not isWeekend
 
-        array.push(starts, sessionStart)
+        // Special case: Globex trades Sunday evening (session starts Sunday 6 PM)
+        if session == "Globex (ETH)" and dow == dayofweek.sunday
+            isTradingDay := true
+
+        if isTradingDay
+            // This is a trading day, add the session
+            int sessionStart = na
+            if session == "Globex (ETH)"
+                sessionStart := getSessionStartForDate(session, y, m, d - 1)
+            else
+                sessionStart := getSessionStartForDate(session, y, m, d)
+
+            array.unshift(starts, sessionStart)
+            tradingSessions := tradingSessions + 1
+
+        calendarDaysBack := calendarDaysBack + 1
 
     starts
 
@@ -438,8 +470,24 @@ getSessionEndsArray(string session, int daysBack) =>
     int currentY = year(timenow, tz)
     int currentM = month(timenow, tz)
     int currentD = dayofmonth(timenow, tz)
+    int currentDayOfWeek = dayofweek(timenow, tz)
 
-    // Step 2: Calculate today's session start time
+    // Step 2: Skip weekends - if it's Saturday or Sunday, use Friday as reference
+    // Saturday = 7, Sunday = 1 in Pine Script
+    if currentDayOfWeek == dayofweek.saturday
+        // Go back 1 day to Friday
+        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+        currentY := year(fridayMidnight, tz)
+        currentM := month(fridayMidnight, tz)
+        currentD := dayofmonth(fridayMidnight, tz)
+    else if currentDayOfWeek == dayofweek.sunday
+        // Go back 2 days to Friday
+        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
+        currentY := year(fridayMidnight, tz)
+        currentM := month(fridayMidnight, tz)
+        currentD := dayofmonth(fridayMidnight, tz)
+
+    // Step 3: Calculate today's (or Friday's if weekend) session start time
     int todaySessionStart = na
     int todaySessionEnd = na
     if session == "Globex (ETH)"
@@ -450,7 +498,7 @@ getSessionEndsArray(string session, int daysBack) =>
         todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD)
         todaySessionEnd := getSessionEndForDate(session, currentY, currentM, currentD)
 
-    // Step 3: Check if today's session has started yet
+    // Step 4: Check if today's session has started yet
     // If not, we need to start from yesterday's session
     int mostRecentY = currentY
     int mostRecentM = currentM
@@ -464,23 +512,39 @@ getSessionEndsArray(string session, int daysBack) =>
         mostRecentD := dayofmonth(yesterdayMidnight, tz)
     // else: today's session is active or we're between sessions - use currentD as reference
 
-    // Step 4: Walk backwards N days from most recent started session
+    // Step 5: Walk backwards N TRADING days from most recent started session
     // Fill array from oldest to newest, so most recent is at highest index
-    for i = 0 to daysBack - 1
-        int daysAgo = daysBack - 1 - i
-        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysAgo * 86400000)
+    // Skip weekends to ensure we only get actual trading sessions
+    int tradingSessions = 0
+    int calendarDaysBack = 0
+
+    while tradingSessions < daysBack
+        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (calendarDaysBack * 86400000)
         int y = year(targetMidnight, tz)
         int m = month(targetMidnight, tz)
         int d = dayofmonth(targetMidnight, tz)
+        int dow = dayofweek(targetMidnight, tz)
 
-        // For Globex: Session active during day d started evening d-1, so use d-1 for end calc
-        int sessionEnd = na
-        if session == "Globex (ETH)"
-            sessionEnd := getSessionEndForDate(session, y, m, d - 1)
-        else
-            sessionEnd := getSessionEndForDate(session, y, m, d)
+        // Check if this is a trading day
+        bool isWeekend = dow == dayofweek.saturday or dow == dayofweek.sunday
+        bool isTradingDay = not isWeekend
 
-        array.push(ends, sessionEnd)
+        // Special case: Globex trades Sunday evening (session starts Sunday 6 PM)
+        if session == "Globex (ETH)" and dow == dayofweek.sunday
+            isTradingDay := true
+
+        if isTradingDay
+            // This is a trading day, add the session
+            int sessionEnd = na
+            if session == "Globex (ETH)"
+                sessionEnd := getSessionEndForDate(session, y, m, d - 1)
+            else
+                sessionEnd := getSessionEndForDate(session, y, m, d)
+
+            array.unshift(ends, sessionEnd)
+            tradingSessions := tradingSessions + 1
+
+        calendarDaysBack := calendarDaysBack + 1
 
     ends
 
