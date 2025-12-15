@@ -63,6 +63,7 @@ weeklyAnchorSession = input.string("Auto", "Long Term Anchor Session", options=[
 
 showWeeklyAnchorVWAP = input.bool(true, "Weekly", inline="WEEKLY", group="📅 Long Term Anchors", tooltip="VWAP anchored to first session of trading week")
 colorWeeklyAnchor = input.color(#b51b00, "", inline="WEEKLY", group="📅 Long Term Anchors")
+weeklyAnchorCount = input.int(1, "Count", inline="WEEKLY", minval=1, maxval=5, group="📅 Long Term Anchors", tooltip="Number of weeks to show (1=current only, 2=current+previous)")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 📆 DAILY SESSIONS
@@ -525,6 +526,66 @@ getSessionEndsArray(string session, int sessionsBack) =>
 
     ends
 
+// Get array of weekly anchor start timestamps
+// Collects N week-start sessions (Monday for most, Sunday for Globex)
+getWeeklyAnchorStartsArray(string session, int weeksBack) =>
+    var array<int> starts = array.new<int>()
+    array.clear(starts)
+
+    string tz = getSessionTimezone(session)
+
+    // Step 1: Get current date in exchange timezone
+    int currentY = year(timenow, tz)
+    int currentM = month(timenow, tz)
+    int currentD = dayofmonth(timenow, tz)
+    int currentDayOfWeek = dayofweek(timenow, tz)
+
+    // Step 2: Adjust weekend to Friday (same as daily sessions)
+    if currentDayOfWeek == dayofweek.saturday
+        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+        currentY := year(fridayMidnight, tz)
+        currentM := month(fridayMidnight, tz)
+        currentD := dayofmonth(fridayMidnight, tz)
+    else if currentDayOfWeek == dayofweek.sunday and session != "Globex"
+        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
+        currentY := year(fridayMidnight, tz)
+        currentM := month(fridayMidnight, tz)
+        currentD := dayofmonth(fridayMidnight, tz)
+
+    // Step 3: Check if today's session has started
+    int todaySessionStart = getSessionStartForDate(session, currentY, currentM, currentD)
+    int mostRecentY = currentY
+    int mostRecentM = currentM
+    int mostRecentD = currentD
+
+    if timenow < todaySessionStart
+        int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+        mostRecentY := year(yesterdayMidnight, tz)
+        mostRecentM := month(yesterdayMidnight, tz)
+        mostRecentD := dayofmonth(yesterdayMidnight, tz)
+
+    // Step 4: Walk backwards collecting only week-start days (Monday or Sunday)
+    int targetDayOfWeek = session == "Globex" ? dayofweek.sunday : dayofweek.monday
+    int weeksCollected = 0
+    int daysBackOffset = 0
+
+    while weeksCollected < weeksBack
+        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBackOffset * 86400000)
+        int y = year(targetMidnight, tz)
+        int m = month(targetMidnight, tz)
+        int d = dayofmonth(targetMidnight, tz)
+        int dow = dayofweek(targetMidnight, tz)
+
+        if dow == targetDayOfWeek
+            // This is a week-start day - add the session start
+            int weekStart = getSessionStartForDate(session, y, m, d)
+            array.unshift(starts, weekStart)
+            weeksCollected := weeksCollected + 1
+
+        daysBackOffset := daysBackOffset + 1
+
+    starts
+
 // Convert period string to minutes
 periodToMinutes(string period) =>
     period == "1m" ? 1 : period == "2m" ? 2 : period == "3m" ? 3 : period == "5m" ? 5 : period == "15m" ? 15 : period == "30m" ? 30 : period == "1h" ? 60 : period == "65m" ? 65 : period == "2h" ? 120 : period == "4h" ? 240 : 99999
@@ -685,8 +746,11 @@ var line lineS3 = na, var label labelS3 = na
 // Configuration: Maximum VWAP history to track (must be >= max user input)
 const int MAX_VWAP_HISTORY = 10  // Track VWAPs for last 10 sessions of each type (matches max input)
 
-// Determine which session to use for weekly anchors
+// Determine which session to use for weekly/long-term anchors
 string weeklyAnchorSessionName = weeklyAnchorSession == "Auto" ? (syminfo.type == "stock" ? "New York" : "Globex") : weeklyAnchorSession
+
+// Maximum weekly anchor history to track
+const int MAX_WEEKLY_HISTORY = 5
 
 // Session arrays (indices: 0=London, 1=NY, 2=Globex, 3=Sydney, 4=Tokyo)
 var array<bool> sessionEnabled = array.from(enableLondon, enableNewYork, enableGlobex, enableSydney, enableTokyo)
@@ -737,13 +801,17 @@ var array<int> sessionStartBars = array.new<int>(5, na)
 var array<int> sessionStartTimes = array.new<int>(5, na)
 var array<label> sessionLabels = array.new<label>(5, na)
 
-// Weekly anchor VWAP tracking
-var int weeklyAnchorStartTime = na
-var float weeklyAnchorSumSrc = 0.0
-var float weeklyAnchorSumVol = 0.0
-var float weeklyAnchorVWAP = na
-var label weeklyAnchorLabel = na
+// Weekly anchor VWAP tracking (array-based for multiple weeks)
+var array<int> weeklyAnchorStartsArray = array.new<int>(MAX_WEEKLY_HISTORY, na)
+var array<float> weeklyAnchorSumSrc = array.new<float>(MAX_WEEKLY_HISTORY, 0.0)
+var array<float> weeklyAnchorSumVol = array.new<float>(MAX_WEEKLY_HISTORY, 0.0)
+var array<float> weeklyAnchorVWAPs = array.new<float>(MAX_WEEKLY_HISTORY, na)
+var array<label> weeklyAnchorLabels = array.new<label>(MAX_WEEKLY_HISTORY, na)
 var bool currentSessionIsWeeklyAnchor = false
+
+// Initialize weekly anchor start times on first bar
+if barstate.isfirst
+    weeklyAnchorStartsArray := getWeeklyAnchorStartsArray(weeklyAnchorSessionName, MAX_WEEKLY_HISTORY)
 
 // Active session tracking (for session levels)
 var int activeSessionIndex = na
@@ -987,62 +1055,68 @@ plot(showSessionMarkersCondition and showSessionVWAP and enableTokyo and tokyoVW
 plot(showSessionMarkersCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 5 ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 5) : na, "Tokyo VWAP 5", color=getVWAPColor(colorTokyo, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// WEEKLY ANCHOR VWAP CALCULATION
+// WEEKLY ANCHOR VWAP CALCULATION (Multi-week support)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Get the session arrays for the anchor session type
+// Get the session arrays for the anchor session type (for skip logic)
 array<int> anchorSessionStarts = weeklyAnchorSessionName == "London" ? londonStarts : weeklyAnchorSessionName == "New York" ? nyStarts : weeklyAnchorSessionName == "Globex" ? globexStarts : weeklyAnchorSessionName == "Sydney" ? sydneyStarts : tokyoStarts
 
-// Detect first session of the week for anchor session type using pre-calculated arrays
-// Find the most recent Monday/Sunday session (from arrays) that current bar is at or past
 if showWeeklyAnchorVWAP and showSessionMarkersCondition
     string anchorTZ = getSessionTimezone(weeklyAnchorSessionName)
 
-    // Find THE most recent Monday/Sunday session from the array (regardless of current bar time)
-    // This ensures we only anchor to the current trading week, not historical weeks
-    int mostRecentWeekStartSession = na
-    for i = MAX_VWAP_HISTORY - 1 to 0
-        int sessionStart = array.get(anchorSessionStarts, i)
-        if not na(sessionStart)
-            int sessionDayOfWeek = dayofweek(sessionStart, anchorTZ)
+    // Process each week in the array
+    for weekIdx = 0 to MAX_WEEKLY_HISTORY - 1
+        int weekStart = array.get(weeklyAnchorStartsArray, weekIdx)
 
-            // Check if this is a week-start day
-            bool isWeekStartDay = false
-            if weeklyAnchorSessionName == "Globex"
-                isWeekStartDay := sessionDayOfWeek == dayofweek.sunday
-            else
-                isWeekStartDay := sessionDayOfWeek == dayofweek.monday
+        if not na(weekStart)
+            // Detect when we cross into this week's start
+            bool atWeekStart = time >= weekStart and time[1] < weekStart
 
-            if isWeekStartDay
-                mostRecentWeekStartSession := sessionStart
-                break  // Take only the FIRST (most recent) week-start found
+            if atWeekStart
+                // Reset accumulators for this week
+                array.set(weeklyAnchorSumSrc, weekIdx, 0.0)
+                array.set(weeklyAnchorSumVol, weekIdx, 0.0)
 
-    // Detect when we're at the week-start bar (not just after it)
-    bool atWeekStart = not na(mostRecentWeekStartSession) and time >= mostRecentWeekStartSession and time[1] < mostRecentWeekStartSession
+                // Check if this is the most recent week and matches the most recent daily session
+                if weekIdx == MAX_WEEKLY_HISTORY - 1
+                    currentSessionIsWeeklyAnchor := (weekStart == array.get(anchorSessionStarts, MAX_VWAP_HISTORY - 1))
 
-    // Reset anchor at week start
-    if atWeekStart
-        weeklyAnchorStartTime := mostRecentWeekStartSession
-        weeklyAnchorSumSrc := 0.0
-        weeklyAnchorSumVol := 0.0
-        currentSessionIsWeeklyAnchor := (mostRecentWeekStartSession == array.get(anchorSessionStarts, MAX_VWAP_HISTORY - 1))
+                // Create label at week start (only if within count)
+                bool shouldShowLabel = weekIdx >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
+                if showSessionLabels and shouldShowLabel
+                    label oldLabel = array.get(weeklyAnchorLabels, weekIdx)
+                    if not na(oldLabel)
+                        label.delete(oldLabel)
+                    int weekNumber = weekofyear(weekStart, anchorTZ)
+                    string labelText = "Week " + str.tostring(weekNumber) + " (" + weeklyAnchorSessionName + ")"
+                    label newLabel = label.new(bar_index, high, labelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=colorWeeklyAnchor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                    array.set(weeklyAnchorLabels, weekIdx, newLabel)
 
-    // Accumulate VWAP only if we have an anchor AND we're at or after it
-    if not na(weeklyAnchorStartTime) and time >= weeklyAnchorStartTime
-        weeklyAnchorSumSrc := weeklyAnchorSumSrc + (ohlc4 * volume)
-        weeklyAnchorSumVol := weeklyAnchorSumVol + volume
-        weeklyAnchorVWAP := weeklyAnchorSumVol > 0 ? weeklyAnchorSumSrc / weeklyAnchorSumVol : na
+            // Accumulate if we're at or after this week's start
+            if time >= weekStart
+                float currentSumSrc = array.get(weeklyAnchorSumSrc, weekIdx)
+                float currentSumVol = array.get(weeklyAnchorSumVol, weekIdx)
+                array.set(weeklyAnchorSumSrc, weekIdx, currentSumSrc + (ohlc4 * volume))
+                array.set(weeklyAnchorSumVol, weekIdx, currentSumVol + volume)
 
-    // Create label at week start
-    if showSessionLabels and atWeekStart
-        if not na(weeklyAnchorLabel)
-            label.delete(weeklyAnchorLabel)
-        int weekNumber = weekofyear(mostRecentWeekStartSession, anchorTZ)
-        string labelText = "Week " + str.tostring(weekNumber) + " (" + weeklyAnchorSessionName + ")"
-        weeklyAnchorLabel := label.new(bar_index, high, labelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=colorWeeklyAnchor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                float newSumSrc = array.get(weeklyAnchorSumSrc, weekIdx)
+                float newSumVol = array.get(weeklyAnchorSumVol, weekIdx)
+                float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
+                array.set(weeklyAnchorVWAPs, weekIdx, vwap)
 
-// Plot weekly anchor VWAP
-plot(showWeeklyAnchorVWAP and showSessionMarkersCondition and not na(weeklyAnchorVWAP) ? weeklyAnchorVWAP : na, "Weekly Anchor VWAP", color=colorWeeklyAnchor, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+// Plot weekly anchor VWAPs (only plot the number specified by count)
+// Index 4 = most recent (when MAX=5), Index 3 = 2nd most recent, etc.
+bool shouldPlot0 = 0 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
+bool shouldPlot1 = 1 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
+bool shouldPlot2 = 2 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
+bool shouldPlot3 = 3 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
+bool shouldPlot4 = 4 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
+
+plot(shouldPlot0 and showWeeklyAnchorVWAP and showSessionMarkersCondition ? array.get(weeklyAnchorVWAPs, 0) : na, "Weekly Anchor 1", color=colorWeeklyAnchor, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlot1 and showWeeklyAnchorVWAP and showSessionMarkersCondition ? array.get(weeklyAnchorVWAPs, 1) : na, "Weekly Anchor 2", color=colorWeeklyAnchor, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlot2 and showWeeklyAnchorVWAP and showSessionMarkersCondition ? array.get(weeklyAnchorVWAPs, 2) : na, "Weekly Anchor 3", color=colorWeeklyAnchor, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlot3 and showWeeklyAnchorVWAP and showSessionMarkersCondition ? array.get(weeklyAnchorVWAPs, 3) : na, "Weekly Anchor 4", color=colorWeeklyAnchor, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlot4 and showWeeklyAnchorVWAP and showSessionMarkersCondition ? array.get(weeklyAnchorVWAPs, 4) : na, "Weekly Anchor 5", color=colorWeeklyAnchor, linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SESSION LEVELS RENDERING (for active session only)
