@@ -39,10 +39,22 @@ atrMultiplier = input.float(1.5, "  Distance (ATR)", minval=1.0, maxval=10.0, st
 atrPeriod = input.int(20, "  ATR Period (Days)", minval=1, maxval=500, group="🌐 Global Settings", tooltip="ATR calculated from daily bars (last N days), regardless of chart timeframe")
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ⚙️ GLOBAL SESSION CONFIGURATION
+// ⚙️ GLOBAL
 // ─────────────────────────────────────────────────────────────────────────────
-showSessionMarkers = input.bool(true, "Enable Sessions", group="⚙️ Global Session Configuration", tooltip="Master switch for all session features (anchors, VWAPs, levels, labels)")
-sessionMarkersMode = input.string("Only Futures", "Instrument Filter", options=["Always", "Only Futures"], group="⚙️ Global Session Configuration", tooltip="Always = show on all instruments | Only Futures = show only on futures contracts")
+showSessionMarkers = input.bool(true, "Enable Sessions", group="⚙️ Global", tooltip="Master switch for all session features (anchors, VWAPs, levels, labels)")
+sessionMarkersMode = input.string("Only Futures", "Instrument Filter", options=["Always", "Only Futures"], group="⚙️ Global", tooltip="Always = show on all instruments | Only Futures = show only on futures contracts")
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 🎨 VWAP APPEARANCE
+// ─────────────────────────────────────────────────────────────────────────────
+sessionVWAPLineWidth = input.int(3, "Line Width", minval=1, maxval=5, group="🎨 VWAP Appearance", tooltip="Thickness of VWAP lines")
+sessionVWAPLineStyleInput = input.string("Dotted", "Line Style", options=["Solid", "Dashed", "Dotted"], group="🎨 VWAP Appearance", tooltip="VWAP line appearance")
+sessionVWAPLineStyle = sessionVWAPLineStyleInput == "Solid" ? plot.linestyle_solid : sessionVWAPLineStyleInput == "Dashed" ? plot.linestyle_dashed : plot.linestyle_dotted
+
+vwapColorDifferentiation = input.bool(true, "Fade Older Sessions", group="🎨 VWAP Appearance", tooltip="Make older sessions visually distinct")
+vwapMaxTransparency = input.int(0, "Transparency", minval=0, maxval=95, group="🎨 VWAP Appearance", tooltip="Transparency for oldest session (0=opaque)")
+vwapHueShift = input.int(-18, "Hue Shift", minval=-50, maxval=50, group="🎨 VWAP Appearance", tooltip="Color shift for older sessions (-=cooler, +=warmer)")
+vwapDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🎨 VWAP Appearance", tooltip="Reduce color vibrancy (0=vibrant, 100=gray)")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 📅 LONG TERM ANCHORS
@@ -53,42 +65,33 @@ showWeeklyAnchorVWAP = input.bool(true, "Weekly", inline="WEEKLY", group="📅 L
 colorWeeklyAnchor = input.color(#b51b00, "", inline="WEEKLY", group="📅 Long Term Anchors")
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 🕐 SESSION ANCHORS
+// 📆 DAILY SESSIONS
 // ─────────────────────────────────────────────────────────────────────────────
-sessionMarkersMaxTimeframe = input.string("2h", "Session Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🕐 Session Anchors", tooltip="Hide session features on timeframes above this")
+sessionMarkersMaxTimeframe = input.string("2h", "Session Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📆 Daily Sessions", tooltip="Hide session features on timeframes above this")
 
-showSessionVWAP = input.bool(true, "Show Session VWAP", group="🕐 Session Anchors", tooltip="Display volume-weighted average price per session")
-showSessionLevels = input.bool(true, "Show Session Levels", group="🕐 Session Anchors", tooltip="Display session high/low/open lines")
-showSessionLabels = input.bool(true, "Show Session Labels", group="🕐 Session Anchors", tooltip="Show session start labels with date")
+showSessionVWAP = input.bool(true, "Show Session VWAP", group="📆 Daily Sessions", tooltip="Display volume-weighted average price per session")
+showSessionLevels = input.bool(true, "Show Session Levels", group="📆 Daily Sessions", tooltip="Display session high/low/open lines")
+showSessionLabels = input.bool(true, "Show Session Labels", group="📆 Daily Sessions", tooltip="Show session start labels with date")
 
-enableLondon = input.bool(true, "London", inline="LON", group="🕐 Session Anchors")
-colorLondon = input.color(#FF9800, "", inline="LON", group="🕐 Session Anchors")
-londonVWAPCount = input.int(1, "Count", inline="LON", minval=1, maxval=5, group="🕐 Session Anchors", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
+enableLondon = input.bool(true, "London", inline="LON", group="📆 Daily Sessions")
+colorLondon = input.color(#FF9800, "", inline="LON", group="📆 Daily Sessions")
+londonVWAPCount = input.int(1, "Count", inline="LON", minval=1, maxval=5, group="📆 Daily Sessions", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
 
-enableNewYork = input.bool(true, "New York", inline="NY", group="🕐 Session Anchors")
-colorNewYork = input.color(#2962FF, "", inline="NY", group="🕐 Session Anchors")
-nyVWAPCount = input.int(2, "Count", inline="NY", minval=1, maxval=5, group="🕐 Session Anchors", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
+enableNewYork = input.bool(true, "New York", inline="NY", group="📆 Daily Sessions")
+colorNewYork = input.color(#2962FF, "", inline="NY", group="📆 Daily Sessions")
+nyVWAPCount = input.int(2, "Count", inline="NY", minval=1, maxval=5, group="📆 Daily Sessions", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
 
-enableGlobex = input.bool(true, "Globex", inline="GLX", group="🕐 Session Anchors")
-colorGlobex = input.color(#4CAF50, "", inline="GLX", group="🕐 Session Anchors")
-globexVWAPCount = input.int(4, "Count", inline="GLX", minval=1, maxval=5, group="🕐 Session Anchors", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
+enableGlobex = input.bool(true, "Globex", inline="GLX", group="📆 Daily Sessions")
+colorGlobex = input.color(#4CAF50, "", inline="GLX", group="📆 Daily Sessions")
+globexVWAPCount = input.int(4, "Count", inline="GLX", minval=1, maxval=5, group="📆 Daily Sessions", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
 
-enableSydney = input.bool(false, "Sydney", inline="SYD", group="🕐 Session Anchors")
-colorSydney = input.color(#9C27B0, "", inline="SYD", group="🕐 Session Anchors")
-sydneyVWAPCount = input.int(2, "Count", inline="SYD", minval=1, maxval=5, group="🕐 Session Anchors", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
+enableSydney = input.bool(false, "Sydney", inline="SYD", group="📆 Daily Sessions")
+colorSydney = input.color(#9C27B0, "", inline="SYD", group="📆 Daily Sessions")
+sydneyVWAPCount = input.int(2, "Count", inline="SYD", minval=1, maxval=5, group="📆 Daily Sessions", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
 
-enableTokyo = input.bool(false, "Tokyo", inline="TKY", group="🕐 Session Anchors")
-colorTokyo = input.color(#E91E63, "", inline="TKY", group="🕐 Session Anchors")
-tokyoVWAPCount = input.int(2, "Count", inline="TKY", minval=1, maxval=5, group="🕐 Session Anchors", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
-
-sessionVWAPLineWidth = input.int(3, "VWAP Line Width", minval=1, maxval=5, group="🕐 Session Anchors", tooltip="Thickness of VWAP lines")
-sessionVWAPLineStyleInput = input.string("Dotted", "VWAP Line Style", options=["Solid", "Dashed", "Dotted"], group="🕐 Session Anchors", tooltip="VWAP line appearance")
-sessionVWAPLineStyle = sessionVWAPLineStyleInput == "Solid" ? plot.linestyle_solid : sessionVWAPLineStyleInput == "Dashed" ? plot.linestyle_dashed : plot.linestyle_dotted
-
-vwapColorDifferentiation = input.bool(true, "Fade Older Sessions", group="🕐 Session Anchors", tooltip="Make older sessions visually distinct")
-vwapMaxTransparency = input.int(0, "Transparency", minval=0, maxval=95, group="🕐 Session Anchors", tooltip="Transparency for oldest session (0=opaque)")
-vwapHueShift = input.int(-18, "Hue Shift", minval=-50, maxval=50, group="🕐 Session Anchors", tooltip="Color shift for older sessions (-=cooler, +=warmer)")
-vwapDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🕐 Session Anchors", tooltip="Reduce color vibrancy (0=vibrant, 100=gray)")
+enableTokyo = input.bool(false, "Tokyo", inline="TKY", group="📆 Daily Sessions")
+colorTokyo = input.color(#E91E63, "", inline="TKY", group="📆 Daily Sessions")
+tokyoVWAPCount = input.int(2, "Count", inline="TKY", minval=1, maxval=5, group="📆 Daily Sessions", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 📏 INTRADAY LEVELS
@@ -339,52 +342,40 @@ getSessionEndForDate(string session, int y, int m, int d) =>
     else
         timestamp(tz, y, m, d, sessionHour, sessionMinute)
 
-// Get array of session start timestamps for last N days (calendar-based pre-calculation)
-// For Globex: Returns sessions that are ACTIVE during each day (started previous evening)
-getSessionStartsArray(string session, int daysBack) =>
+// Get array of session start timestamps for last N sessions (calendar-based pre-calculation)
+// CRITICAL: Collects trading days but avoids duplicate timestamps
+// - Tracks each day's session start
+// - For Globex: Mon-Fri all map to same Sunday start, so we deduplicate
+getSessionStartsArray(string session, int sessionsBack) =>
     var array<int> starts = array.new<int>()
     array.clear(starts)
 
     // Get session timezone to ensure date calculations are consistent
     string tz = getSessionTimezone(session)
 
-    // FINAL ROBUST SOLUTION: Find most recent started session, then walk backwards
-    // This works for ANY user timezone and ANY exchange timezone
-
     // Step 1: Get current date in exchange timezone
     int currentY = year(timenow, tz)
     int currentM = month(timenow, tz)
     int currentD = dayofmonth(timenow, tz)
     int currentDayOfWeek = dayofweek(timenow, tz)
 
-    // Step 2: Skip weekends - if it's Saturday or Sunday, use Friday as reference
-    // Saturday = 7, Sunday = 1 in Pine Script
+    // Step 2: Adjust weekend to Friday (for starting point calculation)
+    // Exception: Globex trades Sunday evening, so don't adjust Sunday for Globex
     if currentDayOfWeek == dayofweek.saturday
         // Go back 1 day to Friday
         int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
         currentY := year(fridayMidnight, tz)
         currentM := month(fridayMidnight, tz)
         currentD := dayofmonth(fridayMidnight, tz)
-    else if currentDayOfWeek == dayofweek.sunday
-        // Go back 2 days to Friday
+    else if currentDayOfWeek == dayofweek.sunday and session != "Globex"
+        // Go back 2 days to Friday (but not for Globex - it trades Sunday)
         int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
         currentY := year(fridayMidnight, tz)
         currentM := month(fridayMidnight, tz)
         currentD := dayofmonth(fridayMidnight, tz)
 
-    // Step 3: Calculate today's (or Friday's if weekend) session start time
-    int todaySessionStart = na
-    int todaySessionEnd = na
-    if session == "Globex"
-        // Globex session active during day D starts evening of day D-1
-        todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD - 1)
-        todaySessionEnd := getSessionEndForDate(session, currentY, currentM, currentD - 1)
-    else
-        todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD)
-        todaySessionEnd := getSessionEndForDate(session, currentY, currentM, currentD)
-
-    // Step 4: Check if today's session has started yet
-    // If not, we need to start from yesterday's session
+    // Step 3: Check if today's session has started yet
+    int todaySessionStart = getSessionStartForDate(session, currentY, currentM, currentD)
     int mostRecentY = currentY
     int mostRecentM = currentM
     int mostRecentD = currentD
@@ -395,88 +386,86 @@ getSessionStartsArray(string session, int daysBack) =>
         mostRecentY := year(yesterdayMidnight, tz)
         mostRecentM := month(yesterdayMidnight, tz)
         mostRecentD := dayofmonth(yesterdayMidnight, tz)
-    // else: today's session is active or we're between sessions - use currentD as reference
 
-    // Step 5: Walk backwards N TRADING days from most recent started session
-    // Fill array from oldest to newest, so most recent is at highest index
-    // Skip weekends to ensure we only get actual trading sessions
-    int tradingSessions = 0
-    int calendarDaysBack = 0
+    // Step 4: Walk backwards collecting trading days, deduplicating session starts
+    int sessionsCollected = 0
+    int daysBackOffset = 0
+    int lastSessionStart = na  // Track last session start to avoid duplicates
 
-    while tradingSessions < daysBack
-        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (calendarDaysBack * 86400000)
+    while sessionsCollected < sessionsBack
+        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBackOffset * 86400000)
         int y = year(targetMidnight, tz)
         int m = month(targetMidnight, tz)
         int d = dayofmonth(targetMidnight, tz)
         int dow = dayofweek(targetMidnight, tz)
 
         // Check if this is a trading day
-        bool isWeekend = dow == dayofweek.saturday or dow == dayofweek.sunday
-        bool isTradingDay = not isWeekend
-
-        // Special case: Globex trades Sunday evening (session starts Sunday 6 PM)
-        if session == "Globex" and dow == dayofweek.sunday
-            isTradingDay := true
+        bool isTradingDay = false
+        if session == "Globex"
+            // Globex trades Sun-Fri
+            isTradingDay := dow == dayofweek.sunday or (dow >= dayofweek.monday and dow <= dayofweek.friday)
+        else
+            // Others trade Mon-Fri
+            isTradingDay := dow >= dayofweek.monday and dow <= dayofweek.friday
 
         if isTradingDay
-            // This is a trading day, add the session
+            // Calculate session start for this trading day
+            // For Globex: session active on day D starts evening of day D-1, EXCEPT Sunday (starts Sunday evening)
             int sessionStart = na
             if session == "Globex"
-                sessionStart := getSessionStartForDate(session, y, m, d - 1)
+                if dow == dayofweek.sunday
+                    sessionStart := getSessionStartForDate(session, y, m, d)
+                else
+                    // Use proper date arithmetic for d-1 to handle month boundaries
+                    int prevDayMidnight = timestamp(tz, y, m, d, 0, 0) - 86400000
+                    int prevY = year(prevDayMidnight, tz)
+                    int prevM = month(prevDayMidnight, tz)
+                    int prevD = dayofmonth(prevDayMidnight, tz)
+                    sessionStart := getSessionStartForDate(session, prevY, prevM, prevD)
             else
                 sessionStart := getSessionStartForDate(session, y, m, d)
 
-            array.unshift(starts, sessionStart)
-            tradingSessions := tradingSessions + 1
+            // Only add if different from last (avoids duplicates)
+            if na(lastSessionStart) or sessionStart != lastSessionStart
+                array.unshift(starts, sessionStart)
+                lastSessionStart := sessionStart
+                sessionsCollected := sessionsCollected + 1
 
-        calendarDaysBack := calendarDaysBack + 1
+        daysBackOffset := daysBackOffset + 1
 
     starts
 
 // Get array of session end timestamps (matches start array indices)
-getSessionEndsArray(string session, int daysBack) =>
+// CRITICAL: Must use same logic as getSessionStartsArray to maintain alignment
+getSessionEndsArray(string session, int sessionsBack) =>
     var array<int> ends = array.new<int>()
     array.clear(ends)
 
     string tz = getSessionTimezone(session)
 
-    // FINAL ROBUST SOLUTION: Find most recent started session, then walk backwards
-    // This works for ANY user timezone and ANY exchange timezone
-
     // Step 1: Get current date in exchange timezone
     int currentY = year(timenow, tz)
     int currentM = month(timenow, tz)
     int currentD = dayofmonth(timenow, tz)
     int currentDayOfWeek = dayofweek(timenow, tz)
 
-    // Step 2: Skip weekends - if it's Saturday or Sunday, use Friday as reference
-    // Saturday = 7, Sunday = 1 in Pine Script
+    // Step 2: Adjust weekend to Friday (for starting point calculation)
+    // Exception: Globex trades Sunday evening, so don't adjust Sunday for Globex
     if currentDayOfWeek == dayofweek.saturday
         // Go back 1 day to Friday
         int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
         currentY := year(fridayMidnight, tz)
         currentM := month(fridayMidnight, tz)
         currentD := dayofmonth(fridayMidnight, tz)
-    else if currentDayOfWeek == dayofweek.sunday
-        // Go back 2 days to Friday
+    else if currentDayOfWeek == dayofweek.sunday and session != "Globex"
+        // Go back 2 days to Friday (but not for Globex - it trades Sunday)
         int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
         currentY := year(fridayMidnight, tz)
         currentM := month(fridayMidnight, tz)
         currentD := dayofmonth(fridayMidnight, tz)
 
-    // Step 3: Calculate today's (or Friday's if weekend) session start time
-    int todaySessionStart = na
-    int todaySessionEnd = na
-    if session == "Globex"
-        // Globex session active during day D starts evening of day D-1
-        todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD - 1)
-        todaySessionEnd := getSessionEndForDate(session, currentY, currentM, currentD - 1)
-    else
-        todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD)
-        todaySessionEnd := getSessionEndForDate(session, currentY, currentM, currentD)
-
-    // Step 4: Check if today's session has started yet
-    // If not, we need to start from yesterday's session
+    // Step 3: Check if today's session has started yet
+    int todaySessionStart = getSessionStartForDate(session, currentY, currentM, currentD)
     int mostRecentY = currentY
     int mostRecentM = currentM
     int mostRecentD = currentD
@@ -487,41 +476,52 @@ getSessionEndsArray(string session, int daysBack) =>
         mostRecentY := year(yesterdayMidnight, tz)
         mostRecentM := month(yesterdayMidnight, tz)
         mostRecentD := dayofmonth(yesterdayMidnight, tz)
-    // else: today's session is active or we're between sessions - use currentD as reference
 
-    // Step 5: Walk backwards N TRADING days from most recent started session
-    // Fill array from oldest to newest, so most recent is at highest index
-    // Skip weekends to ensure we only get actual trading sessions
-    int tradingSessions = 0
-    int calendarDaysBack = 0
+    // Step 4: Walk backwards collecting trading days, deduplicating session ends
+    int sessionsCollected = 0
+    int daysBackOffset = 0
+    int lastSessionEnd = na  // Track last session end to avoid duplicates
 
-    while tradingSessions < daysBack
-        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (calendarDaysBack * 86400000)
+    while sessionsCollected < sessionsBack
+        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBackOffset * 86400000)
         int y = year(targetMidnight, tz)
         int m = month(targetMidnight, tz)
         int d = dayofmonth(targetMidnight, tz)
         int dow = dayofweek(targetMidnight, tz)
 
         // Check if this is a trading day
-        bool isWeekend = dow == dayofweek.saturday or dow == dayofweek.sunday
-        bool isTradingDay = not isWeekend
-
-        // Special case: Globex trades Sunday evening (session starts Sunday 6 PM)
-        if session == "Globex" and dow == dayofweek.sunday
-            isTradingDay := true
+        bool isTradingDay = false
+        if session == "Globex"
+            // Globex trades Sun-Fri
+            isTradingDay := dow == dayofweek.sunday or (dow >= dayofweek.monday and dow <= dayofweek.friday)
+        else
+            // Others trade Mon-Fri
+            isTradingDay := dow >= dayofweek.monday and dow <= dayofweek.friday
 
         if isTradingDay
-            // This is a trading day, add the session
+            // Calculate session end for this trading day
+            // For Globex: session active on day D starts evening of day D-1, EXCEPT Sunday (starts Sunday evening)
             int sessionEnd = na
             if session == "Globex"
-                sessionEnd := getSessionEndForDate(session, y, m, d - 1)
+                if dow == dayofweek.sunday
+                    sessionEnd := getSessionEndForDate(session, y, m, d)
+                else
+                    // Use proper date arithmetic for d-1 to handle month boundaries
+                    int prevDayMidnight = timestamp(tz, y, m, d, 0, 0) - 86400000
+                    int prevY = year(prevDayMidnight, tz)
+                    int prevM = month(prevDayMidnight, tz)
+                    int prevD = dayofmonth(prevDayMidnight, tz)
+                    sessionEnd := getSessionEndForDate(session, prevY, prevM, prevD)
             else
                 sessionEnd := getSessionEndForDate(session, y, m, d)
 
-            array.unshift(ends, sessionEnd)
-            tradingSessions := tradingSessions + 1
+            // Only add if different from last (avoids duplicates)
+            if na(lastSessionEnd) or sessionEnd != lastSessionEnd
+                array.unshift(ends, sessionEnd)
+                lastSessionEnd := sessionEnd
+                sessionsCollected := sessionsCollected + 1
 
-        calendarDaysBack := calendarDaysBack + 1
+        daysBackOffset := daysBackOffset + 1
 
     ends
 
@@ -946,8 +946,8 @@ for i = 0 to 4
 
 // Plot VWAPs - up to 10 historical sessions per type
 // London VWAPs (position 0 = most recent, position 1 = 2nd most recent, etc.)
-// Skip plotting most recent if it's the weekly anchor
-bool skipLondonMostRecent = weeklyAnchorSessionName == "London" and currentSessionIsWeeklyAnchor
+// Skip plotting most recent if it's the weekly anchor AND weekly anchor is enabled
+bool skipLondonMostRecent = showWeeklyAnchorVWAP and weeklyAnchorSessionName == "London" and currentSessionIsWeeklyAnchor
 plot(showSessionMarkersCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 1 and not skipLondonMostRecent ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 1) : na, "London VWAP 1", color=getVWAPColor(colorLondon, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 2 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 2) : na, "London VWAP 2", color=getVWAPColor(colorLondon, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 3 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 3) : na, "London VWAP 3", color=getVWAPColor(colorLondon, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
@@ -955,7 +955,7 @@ plot(showSessionMarkersCondition and showSessionVWAP and enableLondon and london
 plot(showSessionMarkersCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 5 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 5) : na, "London VWAP 5", color=getVWAPColor(colorLondon, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // NY VWAPs
-bool skipNYMostRecent = weeklyAnchorSessionName == "New York" and currentSessionIsWeeklyAnchor
+bool skipNYMostRecent = showWeeklyAnchorVWAP and weeklyAnchorSessionName == "New York" and currentSessionIsWeeklyAnchor
 plot(showSessionMarkersCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 1 and not skipNYMostRecent ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 1) : na, "NY VWAP 1", color=getVWAPColor(colorNewYork, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 2 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 2) : na, "NY VWAP 2", color=getVWAPColor(colorNewYork, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 3 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 3) : na, "NY VWAP 3", color=getVWAPColor(colorNewYork, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
@@ -963,7 +963,7 @@ plot(showSessionMarkersCondition and showSessionVWAP and enableNewYork and nyVWA
 plot(showSessionMarkersCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 5 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 5) : na, "NY VWAP 5", color=getVWAPColor(colorNewYork, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // Globex VWAPs
-bool skipGlobexMostRecent = weeklyAnchorSessionName == "Globex" and currentSessionIsWeeklyAnchor
+bool skipGlobexMostRecent = showWeeklyAnchorVWAP and weeklyAnchorSessionName == "Globex" and currentSessionIsWeeklyAnchor
 plot(showSessionMarkersCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 1 and not skipGlobexMostRecent ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 1) : na, "Globex VWAP 1", color=getVWAPColor(colorGlobex, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 2 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 2) : na, "Globex VWAP 2", color=getVWAPColor(colorGlobex, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 3 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 3) : na, "Globex VWAP 3", color=getVWAPColor(colorGlobex, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
@@ -971,7 +971,7 @@ plot(showSessionMarkersCondition and showSessionVWAP and enableGlobex and globex
 plot(showSessionMarkersCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 5 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 5) : na, "Globex VWAP 5", color=getVWAPColor(colorGlobex, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // Sydney VWAPs
-bool skipSydneyMostRecent = weeklyAnchorSessionName == "Sydney" and currentSessionIsWeeklyAnchor
+bool skipSydneyMostRecent = showWeeklyAnchorVWAP and weeklyAnchorSessionName == "Sydney" and currentSessionIsWeeklyAnchor
 plot(showSessionMarkersCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 1 and not skipSydneyMostRecent ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 1) : na, "Sydney VWAP 1", color=getVWAPColor(colorSydney, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 2 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 2) : na, "Sydney VWAP 2", color=getVWAPColor(colorSydney, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 3 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 3) : na, "Sydney VWAP 3", color=getVWAPColor(colorSydney, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
@@ -979,7 +979,7 @@ plot(showSessionMarkersCondition and showSessionVWAP and enableSydney and sydney
 plot(showSessionMarkersCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 5 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 5) : na, "Sydney VWAP 5", color=getVWAPColor(colorSydney, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // Tokyo VWAPs
-bool skipTokyoMostRecent = weeklyAnchorSessionName == "Tokyo" and currentSessionIsWeeklyAnchor
+bool skipTokyoMostRecent = showWeeklyAnchorVWAP and weeklyAnchorSessionName == "Tokyo" and currentSessionIsWeeklyAnchor
 plot(showSessionMarkersCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 1 and not skipTokyoMostRecent ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 1) : na, "Tokyo VWAP 1", color=getVWAPColor(colorTokyo, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 2 ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 2) : na, "Tokyo VWAP 2", color=getVWAPColor(colorTokyo, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 3 ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 3) : na, "Tokyo VWAP 3", color=getVWAPColor(colorTokyo, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
