@@ -23,13 +23,7 @@
 //@version=6
 indicator("Key Levels", overlay=true, max_lines_count=500, max_boxes_count=100)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// INPUTS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// ─────────────────────────────────────────────────────────────────────────────
-// 🌐 GLOBAL SETTINGS
-// ─────────────────────────────────────────────────────────────────────────────
+// INPUTS - GLOBAL SETTINGS
 globalLabelSize = input.string("Normal", "Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="🌐 Global Settings", tooltip="Label size for all levels")
 globalShowPriceValues = input.bool(false, "Show Prices in Labels", group="🌐 Global Settings", tooltip="Show price in labels: 'PDH (4523.50)' vs 'PDH'")
 globalLineLengthBars = input.int(50, "Line Length (Bars)", minval=10, maxval=200, group="🌐 Global Settings", tooltip="Bars to extend lines backward from current bar (hard limit for lines: 200)")
@@ -38,15 +32,11 @@ useATRFilter = input.bool(true, "Hide Distant Levels", group="🌐 Global Settin
 atrMultiplier = input.float(1.5, "  Distance (ATR)", minval=1.0, maxval=10.0, step=0.5, group="🌐 Global Settings", tooltip="Hide levels beyond this many ATRs from current price")
 atrPeriod = input.int(20, "  ATR Period (Days)", minval=1, maxval=500, group="🌐 Global Settings", tooltip="ATR calculated from daily bars (last N days), regardless of chart timeframe")
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ⚙️ GLOBAL
-// ─────────────────────────────────────────────────────────────────────────────
+
 showSessionMarkers = input.bool(true, "Enable Sessions", group="⚙️ Global", tooltip="Master switch for all session features (anchors, VWAPs, levels, labels)")
 sessionMarkersMode = input.string("Only Futures", "Instrument Filter", options=["Always", "Only Futures"], group="⚙️ Global", tooltip="Always = show on all instruments | Only Futures = show only on futures contracts")
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 🎨 VWAP APPEARANCE
-// ─────────────────────────────────────────────────────────────────────────────
+// VWAP APPEARANCE
 sessionVWAPLineWidth = input.int(3, "Line Width", minval=1, maxval=5, group="🎨 VWAP Appearance", tooltip="Thickness of VWAP lines")
 sessionVWAPLineStyleInput = input.string("Dotted", "Line Style", options=["Solid", "Dashed", "Dotted"], group="🎨 VWAP Appearance", tooltip="VWAP line appearance")
 sessionVWAPLineStyle = sessionVWAPLineStyleInput == "Solid" ? plot.linestyle_solid : sessionVWAPLineStyleInput == "Dashed" ? plot.linestyle_dashed : plot.linestyle_dotted
@@ -56,18 +46,14 @@ vwapMaxTransparency = input.int(0, "Transparency", minval=0, maxval=95, group="�
 vwapHueShift = input.int(-18, "Hue Shift", minval=-50, maxval=50, group="🎨 VWAP Appearance", tooltip="Color shift for older sessions (-=cooler, +=warmer)")
 vwapDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🎨 VWAP Appearance", tooltip="Reduce color vibrancy (0=vibrant, 100=gray)")
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 📅 LONG TERM ANCHORS
-// ─────────────────────────────────────────────────────────────────────────────
+// LONG TERM ANCHORS
 weeklyAnchorSession = input.string("Auto", "Long Term Anchor Session", options=["Auto", "London", "New York", "Globex", "Sydney", "Tokyo"], group="📅 Long Term Anchors", tooltip="Session to anchor all long-term VWAPs. Auto = NY for stocks, Globex for futures")
 
 showWeeklyAnchorVWAP = input.bool(true, "Weekly", inline="WEEKLY", group="📅 Long Term Anchors", tooltip="VWAP anchored to first session of trading week")
 colorWeeklyAnchor = input.color(#b51b00, "", inline="WEEKLY", group="📅 Long Term Anchors")
 weeklyAnchorCount = input.int(1, "Count", inline="WEEKLY", minval=1, maxval=5, group="📅 Long Term Anchors", tooltip="Number of weeks to show (1=current only, 2=current+previous)")
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 📆 DAILY SESSIONS
-// ─────────────────────────────────────────────────────────────────────────────
+// DAILY SESSIONS
 sessionMarkersMaxTimeframe = input.string("2h", "Session Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📆 Daily Sessions", tooltip="Hide session features on timeframes above this")
 
 showSessionVWAP = input.bool(true, "Show Session VWAP", group="📆 Daily Sessions", tooltip="Display volume-weighted average price per session")
@@ -94,9 +80,7 @@ enableTokyo = input.bool(false, "Tokyo", inline="TKY", group="📆 Daily Session
 colorTokyo = input.color(#E91E63, "", inline="TKY", group="📆 Daily Sessions")
 tokyoVWAPCount = input.int(2, "Count", inline="TKY", minval=1, maxval=5, group="📆 Daily Sessions", tooltip="Number of sessions to show (1=current only, 2=current+previous)")
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 📏 INTRADAY LEVELS
-// ─────────────────────────────────────────────────────────────────────────────
+// INTRADAY LEVELS
 showIntradayLevels = input.bool(true, "Enable Intraday Levels", group="📏 Intraday Levels", tooltip="Master toggle for Open/OR/IB levels")
 intradayLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📏 Intraday Levels", tooltip="Width for Open/ORH/ORL/IBH/IBL lines")
 intradayLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📏 Intraday Levels")
@@ -119,9 +103,7 @@ colorIBL = input.color(#e43b38, "IBL", inline="IB", group="📏 Intraday Levels"
 shadeInitialBalance = input.bool(true, "Shade IB", group="📏 Intraday Levels")
 colorInitialBalanceShade = input.color(color.new(color.green, 98), "IB Shade", group="📏 Intraday Levels", tooltip="Fill between IBH/IBL")
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 🔄 PIVOT POINTS
-// ─────────────────────────────────────────────────────────────────────────────
+// PIVOT POINTS
 showPivots = input.bool(true, "Enable Pivot Points", group="🔄 Pivot Points", tooltip="Traditional pivots from previous day H/L/C")
 pivotMaxTimeframe = input.string("4h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🔄 Pivot Points", tooltip="Hide on timeframes above this")
 pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="🔄 Pivot Points")
@@ -144,9 +126,7 @@ pivotColorS2 = input.color(#b51b00, "", inline="pivotS2", group="🔄 Pivot Poin
 showPivotS3 = input.bool(true, "Show S3", inline="pivotS3", group="🔄 Pivot Points")
 pivotColorS3 = input.color(#d37666, "", inline="pivotS3", group="🔄 Pivot Points", tooltip="Third support")
 
-// ─────────────────────────────────────────────────────────────────────────────
-// 📈 KEY LEVELS
-// ─────────────────────────────────────────────────────────────────────────────
+// KEY LEVELS
 showKeyLevels = input.bool(true, "Enable Key Levels", group="📈 Key Levels", tooltip="Master toggle for ATH/Year/Month/Week/Day levels")
 keyLevelsMode = input.string("Only Futures", "Instrument Filter", options=["All Instruments", "Only Futures"], group="📈 Key Levels", tooltip="Show on all markets or futures only")
 keyLevelsMaxTimeframe = input.string("30m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📈 Key Levels", tooltip="Hide on larger timeframes")
@@ -196,9 +176,8 @@ colorCDH = input.color(#a8e6a1, "", inline="CD", group="📈 Key Levels")
 showCDL = input.bool(true, "DL", inline="CD", group="📈 Key Levels")
 colorCDL = input.color(#e8a090, "", inline="CD", group="📈 Key Levels", tooltip="Current day high/low")
 
-// ═══════════════════════════════════════════════════════════════════════════════
 // HELPER FUNCTIONS
-// ═══════════════════════════════════════════════════════════════════════════════
+
 
 getLabelSize(string sizeStr) =>
     sizeStr == "Tiny" ? size.tiny : sizeStr == "Small" ? size.small : sizeStr == "Large" ? size.large : sizeStr == "Huge" ? size.huge : size.normal
@@ -208,9 +187,16 @@ getLineStyle(string styleStr) =>
 
 labelBgColor(color c) => color.new(c, 100)
 
-// Round price to mintick precision for consistent map keys
 roundToTick(float price) =>
     syminfo.mintick > 0 ? math.round(price / syminfo.mintick) * syminfo.mintick : price
+
+updateBox(box boxRef, int x1, float y1, int x2, float y2, color bg) =>
+    if na(boxRef)
+        box.new(x1, y1, x2, y2, border_color=na, bgcolor=bg)
+    else
+        box.set_lefttop(boxRef, x1, y1)
+        box.set_rightbottom(boxRef, x2, y2)
+        boxRef
 
 // RGB to HSL conversion
 rgbToHsl(float r, float g, float b) =>
@@ -265,6 +251,67 @@ hslToRgb(float h, float s, float l) =>
         b := hueToRgb(p, q, h - 1.0/3.0)
 
     [int(r * 255.0), int(g * 255.0), int(b * 255.0)]
+
+// Check if level price is within ATR distance from current price
+isWithinATR(float levelPrice, float currentPrice, float threshold, bool filterEnabled) =>
+    not filterEnabled or na(levelPrice) or math.abs(levelPrice - currentPrice) <= threshold
+
+// LEVEL RENDERER UDT
+
+
+type LevelRenderer
+    string name
+    bool enabled
+    float price
+    float priceRounded
+    int startBar
+    color levelColor
+    int lineWidth
+    string lineStyle
+    line lineRef
+    label labelRef
+
+// Render method for a single level with deduplication support
+method render(LevelRenderer this, bool groupCondition, bool checkDuplicate, map<float, string> priceLabels, array<float> renderedPrices, bool globalShowPriceValues, string labelSizeActual, float atrThreshold, bool useATRFilter) =>
+    if groupCondition and this.enabled and not na(this.price) and isWithinATR(this.price, close, atrThreshold, useATRFilter) and (not checkDuplicate or not array.includes(renderedPrices, this.priceRounded))
+        string combinedLabel = map.contains(priceLabels, this.priceRounded) ? map.get(priceLabels, this.priceRounded) : this.name
+        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(this.price, format.mintick) + ")" : combinedLabel
+        if na(this.lineRef)
+            line tempLine = line.new(this.startBar, this.price, bar_index, this.price, color=this.levelColor, width=this.lineWidth, style=getLineStyle(this.lineStyle))
+            label tempLabel = label.new(bar_index, this.price, labelText, color=labelBgColor(this.levelColor), textcolor=this.levelColor, style=label.style_label_left, size=labelSizeActual)
+            this.lineRef := tempLine
+            this.labelRef := tempLabel
+            true
+        else
+            line.set_xy1(this.lineRef, this.startBar, this.price)
+            line.set_xy2(this.lineRef, bar_index, this.price)
+            label.set_xy(this.labelRef, bar_index, this.price)
+            label.set_text(this.labelRef, labelText)
+            true
+        array.push(renderedPrices, this.priceRounded)
+        true
+    else if not na(this.lineRef)
+        line.delete(this.lineRef)
+        this.lineRef := na
+        label.delete(this.labelRef)
+        this.labelRef := na
+        true
+    else
+        true
+
+method update(LevelRenderer this, bool enabled, float price, float priceRounded, int startBar) =>
+    this.enabled := enabled
+    this.price := price
+    this.priceRounded := priceRounded
+    this.startBar := startBar
+    true
+
+deleteLabel(array<label> labelArray, int idx) =>
+    label oldLabel = array.get(labelArray, idx)
+    if not na(oldLabel)
+        label.delete(oldLabel)
+
+
 
 // Calculate color with transparency, hue shift, and desaturation based on VWAP position in history (0 = most recent)
 getVWAPColor(color baseColor, int positionInHistory, bool useDifferentiation, int maxTransp, int hueShift, int desat) =>
@@ -343,55 +390,48 @@ getSessionEndForDate(string session, int y, int m, int d) =>
     else
         timestamp(tz, y, m, d, sessionHour, sessionMinute)
 
-// Get array of session start timestamps for last N sessions (calendar-based pre-calculation)
+// Common helper to collect session timestamps (start or end) for last N sessions
 // CRITICAL: Collects trading days but avoids duplicate timestamps
-// - Tracks each day's session start
+// - Tracks each day's session timestamp
 // - For Globex: Mon-Fri all map to same Sunday start, so we deduplicate
-getSessionStartsArray(string session, int sessionsBack) =>
-    var array<int> starts = array.new<int>()
-    array.clear(starts)
+getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
+    var array<int> timestamps = array.new<int>()
+    array.clear(timestamps)
 
     // Get session timezone to ensure date calculations are consistent
     string tz = getSessionTimezone(session)
 
-    // Step 1: Get current date in exchange timezone
     int currentY = year(timenow, tz)
     int currentM = month(timenow, tz)
     int currentD = dayofmonth(timenow, tz)
     int currentDayOfWeek = dayofweek(timenow, tz)
 
-    // Step 2: Adjust weekend to Friday (for starting point calculation)
-    // Exception: Globex trades Sunday evening, so don't adjust Sunday for Globex
+    // Adjust weekend to Friday; Globex trades Sunday so don't adjust Sunday for Globex
     if currentDayOfWeek == dayofweek.saturday
-        // Go back 1 day to Friday
         int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
         currentY := year(fridayMidnight, tz)
         currentM := month(fridayMidnight, tz)
         currentD := dayofmonth(fridayMidnight, tz)
     else if currentDayOfWeek == dayofweek.sunday and session != "Globex"
-        // Go back 2 days to Friday (but not for Globex - it trades Sunday)
         int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
         currentY := year(fridayMidnight, tz)
         currentM := month(fridayMidnight, tz)
         currentD := dayofmonth(fridayMidnight, tz)
 
-    // Step 3: Check if today's session has started yet
     int todaySessionStart = getSessionStartForDate(session, currentY, currentM, currentD)
     int mostRecentY = currentY
     int mostRecentM = currentM
     int mostRecentD = currentD
 
     if timenow < todaySessionStart
-        // Today's session hasn't started yet, use yesterday as most recent
         int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
         mostRecentY := year(yesterdayMidnight, tz)
         mostRecentM := month(yesterdayMidnight, tz)
         mostRecentD := dayofmonth(yesterdayMidnight, tz)
 
-    // Step 4: Walk backwards collecting trading days, deduplicating session starts
     int sessionsCollected = 0
     int daysBackOffset = 0
-    int lastSessionStart = na  // Track last session start to avoid duplicates
+    int lastTimestamp = na
 
     while sessionsCollected < sessionsBack
         int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBackOffset * 86400000)
@@ -400,141 +440,50 @@ getSessionStartsArray(string session, int sessionsBack) =>
         int d = dayofmonth(targetMidnight, tz)
         int dow = dayofweek(targetMidnight, tz)
 
-        // Check if this is a trading day
         bool isTradingDay = false
         if session == "Globex"
-            // Globex trades Sun-Fri
             isTradingDay := dow == dayofweek.sunday or (dow >= dayofweek.monday and dow <= dayofweek.friday)
         else
-            // Others trade Mon-Fri
             isTradingDay := dow >= dayofweek.monday and dow <= dayofweek.friday
 
         if isTradingDay
-            // Calculate session start for this trading day
-            // For Globex: session active on day D starts evening of day D-1, EXCEPT Sunday (starts Sunday evening)
-            int sessionStart = na
+            // For Globex: session active on day D starts evening of day D-1, EXCEPT Sunday
+            int ts = na
             if session == "Globex"
                 if dow == dayofweek.sunday
-                    sessionStart := getSessionStartForDate(session, y, m, d)
+                    ts := isStart ? getSessionStartForDate(session, y, m, d) : getSessionEndForDate(session, y, m, d)
                 else
-                    // Use proper date arithmetic for d-1 to handle month boundaries
                     int prevDayMidnight = timestamp(tz, y, m, d, 0, 0) - 86400000
                     int prevY = year(prevDayMidnight, tz)
                     int prevM = month(prevDayMidnight, tz)
                     int prevD = dayofmonth(prevDayMidnight, tz)
-                    sessionStart := getSessionStartForDate(session, prevY, prevM, prevD)
+                    ts := isStart ? getSessionStartForDate(session, prevY, prevM, prevD) : getSessionEndForDate(session, prevY, prevM, prevD)
             else
-                sessionStart := getSessionStartForDate(session, y, m, d)
+                ts := isStart ? getSessionStartForDate(session, y, m, d) : getSessionEndForDate(session, y, m, d)
 
-            // Only add if different from last (avoids duplicates)
-            if na(lastSessionStart) or sessionStart != lastSessionStart
-                array.unshift(starts, sessionStart)
-                lastSessionStart := sessionStart
+            if na(lastTimestamp) or ts != lastTimestamp
+                array.unshift(timestamps, ts)
+                lastTimestamp := ts
                 sessionsCollected := sessionsCollected + 1
 
         daysBackOffset := daysBackOffset + 1
 
-    starts
+    timestamps
 
-// Get array of session end timestamps (matches start array indices)
-// CRITICAL: Must use same logic as getSessionStartsArray to maintain alignment
+getSessionStartsArray(string session, int sessionsBack) =>
+    getSessionTimestampsArray(session, sessionsBack, true)
+
 getSessionEndsArray(string session, int sessionsBack) =>
-    var array<int> ends = array.new<int>()
-    array.clear(ends)
+    getSessionTimestampsArray(session, sessionsBack, false)
 
-    string tz = getSessionTimezone(session)
 
-    // Step 1: Get current date in exchange timezone
-    int currentY = year(timenow, tz)
-    int currentM = month(timenow, tz)
-    int currentD = dayofmonth(timenow, tz)
-    int currentDayOfWeek = dayofweek(timenow, tz)
-
-    // Step 2: Adjust weekend to Friday (for starting point calculation)
-    // Exception: Globex trades Sunday evening, so don't adjust Sunday for Globex
-    if currentDayOfWeek == dayofweek.saturday
-        // Go back 1 day to Friday
-        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
-        currentY := year(fridayMidnight, tz)
-        currentM := month(fridayMidnight, tz)
-        currentD := dayofmonth(fridayMidnight, tz)
-    else if currentDayOfWeek == dayofweek.sunday and session != "Globex"
-        // Go back 2 days to Friday (but not for Globex - it trades Sunday)
-        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
-        currentY := year(fridayMidnight, tz)
-        currentM := month(fridayMidnight, tz)
-        currentD := dayofmonth(fridayMidnight, tz)
-
-    // Step 3: Check if today's session has started yet
-    int todaySessionStart = getSessionStartForDate(session, currentY, currentM, currentD)
-    int mostRecentY = currentY
-    int mostRecentM = currentM
-    int mostRecentD = currentD
-
-    if timenow < todaySessionStart
-        // Today's session hasn't started yet, use yesterday as most recent
-        int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
-        mostRecentY := year(yesterdayMidnight, tz)
-        mostRecentM := month(yesterdayMidnight, tz)
-        mostRecentD := dayofmonth(yesterdayMidnight, tz)
-
-    // Step 4: Walk backwards collecting trading days, deduplicating session ends
-    int sessionsCollected = 0
-    int daysBackOffset = 0
-    int lastSessionEnd = na  // Track last session end to avoid duplicates
-
-    while sessionsCollected < sessionsBack
-        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBackOffset * 86400000)
-        int y = year(targetMidnight, tz)
-        int m = month(targetMidnight, tz)
-        int d = dayofmonth(targetMidnight, tz)
-        int dow = dayofweek(targetMidnight, tz)
-
-        // Check if this is a trading day
-        bool isTradingDay = false
-        if session == "Globex"
-            // Globex trades Sun-Fri
-            isTradingDay := dow == dayofweek.sunday or (dow >= dayofweek.monday and dow <= dayofweek.friday)
-        else
-            // Others trade Mon-Fri
-            isTradingDay := dow >= dayofweek.monday and dow <= dayofweek.friday
-
-        if isTradingDay
-            // Calculate session end for this trading day
-            // For Globex: session active on day D starts evening of day D-1, EXCEPT Sunday (starts Sunday evening)
-            int sessionEnd = na
-            if session == "Globex"
-                if dow == dayofweek.sunday
-                    sessionEnd := getSessionEndForDate(session, y, m, d)
-                else
-                    // Use proper date arithmetic for d-1 to handle month boundaries
-                    int prevDayMidnight = timestamp(tz, y, m, d, 0, 0) - 86400000
-                    int prevY = year(prevDayMidnight, tz)
-                    int prevM = month(prevDayMidnight, tz)
-                    int prevD = dayofmonth(prevDayMidnight, tz)
-                    sessionEnd := getSessionEndForDate(session, prevY, prevM, prevD)
-            else
-                sessionEnd := getSessionEndForDate(session, y, m, d)
-
-            // Only add if different from last (avoids duplicates)
-            if na(lastSessionEnd) or sessionEnd != lastSessionEnd
-                array.unshift(ends, sessionEnd)
-                lastSessionEnd := sessionEnd
-                sessionsCollected := sessionsCollected + 1
-
-        daysBackOffset := daysBackOffset + 1
-
-    ends
-
-// Get array of weekly anchor start timestamps
-// Collects N week-start sessions (Monday for most, Sunday for Globex)
+// Weekly anchor start timestamps (Monday for most, Sunday for Globex)
 getWeeklyAnchorStartsArray(string session, int weeksBack) =>
     var array<int> starts = array.new<int>()
     array.clear(starts)
 
     string tz = getSessionTimezone(session)
 
-    // Step 1: Get current date in exchange timezone
     int currentY = year(timenow, tz)
     int currentM = month(timenow, tz)
     int currentD = dayofmonth(timenow, tz)
@@ -605,27 +554,11 @@ addToMap(map<float, string> priceMap, float price, string label) =>
     else
         map.put(priceMap, key, label)
 
-// Check if level price is within ATR distance from current price
-isWithinATR(float levelPrice, float currentPrice, float threshold, bool filterEnabled) =>
-    not filterEnabled or na(levelPrice) or math.abs(levelPrice - currentPrice) <= threshold
+// DISPLAY CONDITIONS & ATR FILTERING
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DISPLAY CONDITIONS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// ATR CALCULATION (for distance filtering)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Use daily ATR calculated from last N daily bars (no offset needed for smoothed ATR indicator)
-float atrValue = request.security(syminfo.tickerid, "D", ta.atr(atrPeriod), lookahead=barmerge.lookahead_off)
+float atrValue = request.security(syminfo.tickerid, "D", ta.atr(atrPeriod), lookahead=barmerge.lookahead_on)
 float atrThreshold = atrValue * atrMultiplier
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// DISPLAY CONDITIONS
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Check instrument type
 bool isFutures = syminfo.type == "futures"
 
 // Check timeframe conditions
@@ -646,12 +579,7 @@ int pivotMaxTfMinutes = periodToMinutes(pivotMaxTimeframe)
 bool meetsPivotMaxTimeframe = pivotMaxTimeframe == "None" or currentTfMinutes <= pivotMaxTfMinutes
 bool showPivotsCondition = showPivots and meetsPivotMaxTimeframe
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// KEY LEVELS DATA - Works on any timeframe (10s to monthly)
-// Conditional requests for performance (only fetch enabled levels)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Previous period levels (completed periods)
+// KEY LEVELS DATA - Conditional requests for performance
 var float pdh = na, var float pdl = na
 var float pwh = na, var float pwl = na
 var float pmh = na, var float pml = na
@@ -677,8 +605,6 @@ var float cwh = na, var float cwl = na
 var float cmh = na, var float cml = na
 var float cyh = na, var float cyl = na
 
-// Current period levels - use request.security() for consistency with previous periods
-// All use exchange's official daily/weekly/monthly bars for consistency
 if showKeyLevelsCondition and (showCDH or showCDL)
     [_cdh, _cdl] = request.security(syminfo.tickerid, "D", [high, low], lookahead=barmerge.lookahead_on)
     cdh := _cdh, cdl := _cdl
@@ -692,17 +618,12 @@ if showKeyLevelsCondition and (showCYH or showCYL)
     [_cyh, _cyl] = request.security(syminfo.tickerid, "12M", [high, low], lookahead=barmerge.lookahead_on)
     cyh := _cyh, cyl := _cyl
 
-// All-time high (uses monthly for better performance) - only update on confirmed bars
 var float ath = na
 float _ath = ta.highest(high, bar_index + 1)
 if barstate.isconfirmed
     ath := showKeyLevelsCondition and showATH ? request.security(syminfo.tickerid, "M", _ath, lookahead=barmerge.lookahead_on) : na
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// PIVOT POINTS CALCULATIONS (from previous day's HLC)
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Fetch previous day's high, low, close for pivot calculations - only update on confirmed bars
+// PIVOT POINTS (from previous day's HLC)
 var float dailyHigh = na, var float dailyLow = na, var float dailyClose = na
 if barstate.isconfirmed
     [_dailyHigh, _dailyLow, _dailyClose] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_on)
@@ -710,7 +631,6 @@ if barstate.isconfirmed
     dailyLow := _dailyLow
     dailyClose := _dailyClose
 
-// Traditional pivot point calculations
 float dailyRange = dailyHigh - dailyLow
 float pivotP = (dailyHigh + dailyLow + dailyClose) / 3
 float pivotR1 = 2 * pivotP - dailyLow
@@ -720,44 +640,22 @@ float pivotS2 = pivotP - dailyRange
 float pivotR3 = dailyHigh + 2 * (pivotP - dailyLow)
 float pivotS3 = dailyLow - 2 * (dailyHigh - pivotP)
 
-var line linePDH = na, var line linePDL = na, var label labelPDH = na, var label labelPDL = na
-var line linePWH = na, var line linePWL = na, var label labelPWH = na, var label labelPWL = na
-var line linePMH = na, var line linePML = na, var label labelPMH = na, var label labelPML = na
-var line linePYH = na, var line linePYL = na, var label labelPYH = na, var label labelPYL = na
-var line lineATH = na, var label labelATH = na
-var line lineCDH = na, var line lineCDL = na, var label labelCDH = na, var label labelCDL = na
-var line lineCWH = na, var line lineCWL = na, var label labelCWH = na, var label labelCWL = na
-var line lineCMH = na, var line lineCML = na, var label labelCMH = na, var label labelCML = na
-var line lineCYH = na, var line lineCYL = na, var label labelCYH = na, var label labelCYL = na
+var array<LevelRenderer> keyLevels = array.new<LevelRenderer>()
+var array<LevelRenderer> pivotLevels = array.new<LevelRenderer>()
+var array<LevelRenderer> sessionLevels = array.new<LevelRenderer>()
 
-// Pivot point line and label variables
-var line lineP = na, var label labelP = na
-var line lineR1 = na, var label labelR1 = na
-var line lineR2 = na, var label labelR2 = na
-var line lineR3 = na, var label labelR3 = na
-var line lineS1 = na, var label labelS1 = na
-var line lineS2 = na, var label labelS2 = na
-var line lineS3 = na, var label labelS3 = na
-
-// ═══════════════════════════════════════════════════════════════════════════════
 // MULTI-SESSION INFRASTRUCTURE
-// ═══════════════════════════════════════════════════════════════════════════════
 
-// Configuration: Maximum VWAP history to track (must be >= max user input)
-const int MAX_VWAP_HISTORY = 10  // Track VWAPs for last 10 sessions of each type (matches max input)
+const int MAX_VWAP_HISTORY = 10
 
-// Determine which session to use for weekly/long-term anchors
 string weeklyAnchorSessionName = weeklyAnchorSession == "Auto" ? (syminfo.type == "stock" ? "New York" : "Globex") : weeklyAnchorSession
 
-// Maximum weekly anchor history to track
 const int MAX_WEEKLY_HISTORY = 5
 
-// Session arrays (indices: 0=London, 1=NY, 2=Globex, 3=Sydney, 4=Tokyo)
 var array<bool> sessionEnabled = array.from(enableLondon, enableNewYork, enableGlobex, enableSydney, enableTokyo)
 var array<string> sessionNames = array.from("London", "New York", "Globex", "Sydney", "Tokyo")
 var array<color> sessionColors = array.from(colorLondon, colorNewYork, colorGlobex, colorSydney, colorTokyo)
 
-// Pre-calculate session start and end timestamps for each session type (calendar-based)
 var array<int> londonStarts = array.new<int>()
 var array<int> nyStarts = array.new<int>()
 var array<int> globexStarts = array.new<int>()
@@ -770,7 +668,6 @@ var array<int> globexEnds = array.new<int>()
 var array<int> sydneyEnds = array.new<int>()
 var array<int> tokyoEnds = array.new<int>()
 
-// Initialize session start and end arrays on first bar
 if barstate.isfirst
     londonStarts := getSessionStartsArray("London", MAX_VWAP_HISTORY)
     nyStarts := getSessionStartsArray("New York", MAX_VWAP_HISTORY)
@@ -784,7 +681,6 @@ if barstate.isfirst
     sydneyEnds := getSessionEndsArray("Sydney", MAX_VWAP_HISTORY)
     tokyoEnds := getSessionEndsArray("Tokyo", MAX_VWAP_HISTORY)
 
-// VWAP accumulators: Separate arrays per session type, each containing accumulators for multiple days
 var array<float> londonSumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
 var array<float> londonSumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
 var array<float> nySumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
@@ -796,12 +692,10 @@ var array<float> sydneySumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
 var array<float> tokyoSumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
 var array<float> tokyoSumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
 
-// Per-session tracking (unified with calendar-based approach)
 var array<int> sessionStartBars = array.new<int>(5, na)
 var array<int> sessionStartTimes = array.new<int>(5, na)
 var array<label> sessionLabels = array.new<label>(5, na)
 
-// Weekly anchor VWAP tracking (array-based for multiple weeks)
 var array<int> weeklyAnchorStartsArray = array.new<int>(MAX_WEEKLY_HISTORY, na)
 var array<float> weeklyAnchorSumSrc = array.new<float>(MAX_WEEKLY_HISTORY, 0.0)
 var array<float> weeklyAnchorSumVol = array.new<float>(MAX_WEEKLY_HISTORY, 0.0)
@@ -809,15 +703,12 @@ var array<float> weeklyAnchorVWAPs = array.new<float>(MAX_WEEKLY_HISTORY, na)
 var array<label> weeklyAnchorLabels = array.new<label>(MAX_WEEKLY_HISTORY, na)
 var bool currentSessionIsWeeklyAnchor = false
 
-// Initialize weekly anchor start times on first bar
 if barstate.isfirst
     weeklyAnchorStartsArray := getWeeklyAnchorStartsArray(weeklyAnchorSessionName, MAX_WEEKLY_HISTORY)
 
-// Active session tracking (for session levels)
 var int activeSessionIndex = na
 var string activeSessionName = na
 
-// Session levels (always track the most recently started selected session)
 var float sessionOpen = na
 var float openRangeHigh = na
 var float openRangeLow = na
@@ -826,46 +717,38 @@ var float initialBalanceLow = na
 var int sessionStartBar = na
 var int sessionStartTime = na
 
-// Track bar indices where each level was established
 var int openPriceBar = na
 var int orhBar = na
 var int orlBar = na
 var int ibhBar = na
 var int iblBar = na
 
-// Calculate elapsed minutes in session
 int openRangeMinutes = periodToMinutes(openRangePeriod)
 int ibMinutes = periodToMinutes(initialBalancePeriod)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// UNIFIED SESSION DETECTION (Calendar-based for labels, levels, and VWAPs)
-// ═══════════════════════════════════════════════════════════════════════════════
+// UNIFIED SESSION DETECTION (Calendar-based)
 
-// Detect session changes using pre-calculated session start timestamps
 for i = 0 to 4
     if array.get(sessionEnabled, i)
         string sessionName = array.get(sessionNames, i)
 
-        // Get pre-calculated session starts for this session type (most recent session only)
-        array<int> sessionStartsArray = i == 0 ? londonStarts : i == 1 ? nyStarts : i == 2 ? globexStarts : i == 3 ? sydneyStarts : tokyoStarts
+        array<int> sessionStartsArray = switch i
+            0 => londonStarts
+            1 => nyStarts
+            2 => globexStarts
+            3 => sydneyStarts
+            => tokyoStarts
         int mostRecentSessionStart = array.get(sessionStartsArray, MAX_VWAP_HISTORY - 1)
 
-        // Detect session change: current bar crossed into this session
         bool thisSessionChange = time >= mostRecentSessionStart and time[1] < mostRecentSessionStart
 
-        // When this session starts
         if thisSessionChange
-            // Note: Labels are now created in the VWAP calculation loop below
-
-            // Update session tracking (using calendar-based timestamp)
             array.set(sessionStartBars, i, bar_index)
             array.set(sessionStartTimes, i, mostRecentSessionStart)
 
-            // This session becomes the active session for levels
             activeSessionIndex := i
             activeSessionName := sessionName
 
-            // Reset session levels to this session
             sessionOpen := open
             openRangeHigh := high
             openRangeLow := low
@@ -879,19 +762,19 @@ for i = 0 to 4
             ibhBar := bar_index
             iblBar := bar_index
 
-// Update session levels (only for active session, using calendar-based timestamps)
 if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTime)
-    // Get session end time to check if session has closed
-    array<int> activeSessionEnds = activeSessionIndex == 0 ? londonEnds : activeSessionIndex == 1 ? nyEnds : activeSessionIndex == 2 ? globexEnds : activeSessionIndex == 3 ? sydneyEnds : tokyoEnds
+    array<int> activeSessionEnds = switch activeSessionIndex
+        0 => londonEnds
+        1 => nyEnds
+        2 => globexEnds
+        3 => sydneyEnds
+        => tokyoEnds
     int currentSessionEnd = array.get(activeSessionEnds, MAX_VWAP_HISTORY - 1)
 
-    // Check if we're still in the current session (after start, before end)
     bool stillInSession = time >= sessionStartTime and time < currentSessionEnd
 
     if stillInSession
-        // Calculate elapsed time since session start (calendar-based)
         int elapsedMinutes = math.round((time - sessionStartTime) / 60000)
-        // Update Open Range
         if elapsedMinutes <= openRangeMinutes
             if high > openRangeHigh
                 openRangeHigh := high
@@ -900,7 +783,6 @@ if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTim
                 openRangeLow := low
                 orlBar := bar_index
 
-        // Update Initial Balance
         if elapsedMinutes <= ibMinutes
             if high > initialBalanceHigh
                 initialBalanceHigh := high
@@ -909,25 +791,20 @@ if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTim
                 initialBalanceLow := low
                 iblBar := bar_index
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MULTI-SESSION VWAP CALCULATIONS (Calendar-based pre-calculated anchors)
-// ═══════════════════════════════════════════════════════════════════════════════
+// MULTI-SESSION VWAP CALCULATIONS
 
-// VWAP arrays to store calculated values for plotting (up to MAX_VWAP_HISTORY per session)
 var array<float> londonVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
 var array<float> nyVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
 var array<float> globexVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
 var array<float> sydneyVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
 var array<float> tokyoVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
 
-// Arrays to store label IDs for each historical VWAP
 var array<label> londonLabels = array.new<label>(MAX_VWAP_HISTORY, na)
 var array<label> nyLabels = array.new<label>(MAX_VWAP_HISTORY, na)
 var array<label> globexLabels = array.new<label>(MAX_VWAP_HISTORY, na)
 var array<label> sydneyLabels = array.new<label>(MAX_VWAP_HISTORY, na)
 var array<label> tokyoLabels = array.new<label>(MAX_VWAP_HISTORY, na)
 
-// Calculate VWAP for each enabled session using calendar-based pre-calculated session starts
 for i = 0 to 4
     if array.get(sessionEnabled, i)
         // Get configuration for this session type
@@ -938,7 +815,7 @@ for i = 0 to 4
         array<float> vwapArray = i == 0 ? londonVWAPs : i == 1 ? nyVWAPs : i == 2 ? globexVWAPs : i == 3 ? sydneyVWAPs : tokyoVWAPs
         array<label> labelArray = i == 0 ? londonLabels : i == 1 ? nyLabels : i == 2 ? globexLabels : i == 3 ? sydneyLabels : tokyoLabels
         color sessionColor = i == 0 ? colorLondon : i == 1 ? colorNewYork : i == 2 ? colorGlobex : i == 3 ? colorSydney : colorTokyo
-        string sessionName = i == 0 ? "London" : i == 1 ? "New York" : i == 2 ? "Globex" : i == 3 ? "Sydney" : "Tokyo"
+        string sessionName = array.get(sessionNames, i)
 
         // Loop through all tracked sessions (MAX_VWAP_HISTORY)
         for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
@@ -981,40 +858,22 @@ for i = 0 to 4
 
                 // Create session label at session start ONLY if within configured history count
                 if isSessionStart and showSessionMarkersCondition and showSessionLabels and isInConfiguredRange
-                    // Delete old label for this specific VWAP session
-                    label oldLabel = array.get(labelArray, arrayIdx)
-                    if not na(oldLabel)
-                        label.delete(oldLabel)
-
-                    // Calculate position in history for color matching
+                    deleteLabel(labelArray, arrayIdx)
                     int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
-
-                    // Get matching VWAP color
                     color labelColor = getVWAPColor(sessionColor, positionInHistory, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation)
-
-                    // Create new label with session name + date
-                    string labelSizeActual = getLabelSize(globalLabelSize)
                     string tz = getSessionTimezone(sessionName)
-                    string sessionDate = str.format_time(sessionStart, "d MMM", tz)
-                    string labelText = sessionName + " " + sessionDate
-
-                    label newLabel = label.new(bar_index, high, labelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=labelSizeActual, style=label.style_label_down)
+                    string labelText = sessionName + " " + str.format_time(sessionStart, "d MMM", tz)
+                    label newLabel = label.new(bar_index, high, labelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
                     array.set(labelArray, arrayIdx, newLabel)
-
-                    // Also update the main sessionLabels array for the most recent session (for backwards compatibility)
                     if arrayIdx == MAX_VWAP_HISTORY - 1
                         array.set(sessionLabels, i, newLabel)
 
             // Clean up labels that are outside the configured history count
             if not isInConfiguredRange
-                label oldLabel = array.get(labelArray, arrayIdx)
-                if not na(oldLabel)
-                    label.delete(oldLabel)
-                    array.set(labelArray, arrayIdx, na)
+                deleteLabel(labelArray, arrayIdx)
+                array.set(labelArray, arrayIdx, na)
 
-// Plot VWAPs - up to 10 historical sessions per type
-// London VWAPs (position 0 = most recent, position 1 = 2nd most recent, etc.)
-// Skip plotting most recent if it's the weekly anchor AND weekly anchor is enabled
+// Plot VWAPs - up to 5 historical sessions per type
 bool skipLondonMostRecent = showWeeklyAnchorVWAP and weeklyAnchorSessionName == "London" and currentSessionIsWeeklyAnchor
 plot(showSessionMarkersCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 1 and not skipLondonMostRecent ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 1) : na, "London VWAP 1", color=getVWAPColor(colorLondon, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 2 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 2) : na, "London VWAP 2", color=getVWAPColor(colorLondon, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
@@ -1022,7 +881,6 @@ plot(showSessionMarkersCondition and showSessionVWAP and enableLondon and london
 plot(showSessionMarkersCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 4 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 4) : na, "London VWAP 4", color=getVWAPColor(colorLondon, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableLondon and londonVWAPCount >= 5 ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 5) : na, "London VWAP 5", color=getVWAPColor(colorLondon, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
-// NY VWAPs
 bool skipNYMostRecent = showWeeklyAnchorVWAP and weeklyAnchorSessionName == "New York" and currentSessionIsWeeklyAnchor
 plot(showSessionMarkersCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 1 and not skipNYMostRecent ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 1) : na, "NY VWAP 1", color=getVWAPColor(colorNewYork, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 2 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 2) : na, "NY VWAP 2", color=getVWAPColor(colorNewYork, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
@@ -1030,7 +888,6 @@ plot(showSessionMarkersCondition and showSessionVWAP and enableNewYork and nyVWA
 plot(showSessionMarkersCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 4 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 4) : na, "NY VWAP 4", color=getVWAPColor(colorNewYork, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableNewYork and nyVWAPCount >= 5 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 5) : na, "NY VWAP 5", color=getVWAPColor(colorNewYork, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
-// Globex VWAPs
 bool skipGlobexMostRecent = showWeeklyAnchorVWAP and weeklyAnchorSessionName == "Globex" and currentSessionIsWeeklyAnchor
 plot(showSessionMarkersCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 1 and not skipGlobexMostRecent ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 1) : na, "Globex VWAP 1", color=getVWAPColor(colorGlobex, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 2 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 2) : na, "Globex VWAP 2", color=getVWAPColor(colorGlobex, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
@@ -1038,7 +895,6 @@ plot(showSessionMarkersCondition and showSessionVWAP and enableGlobex and globex
 plot(showSessionMarkersCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 4 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 4) : na, "Globex VWAP 4", color=getVWAPColor(colorGlobex, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableGlobex and globexVWAPCount >= 5 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 5) : na, "Globex VWAP 5", color=getVWAPColor(colorGlobex, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
-// Sydney VWAPs
 bool skipSydneyMostRecent = showWeeklyAnchorVWAP and weeklyAnchorSessionName == "Sydney" and currentSessionIsWeeklyAnchor
 plot(showSessionMarkersCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 1 and not skipSydneyMostRecent ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 1) : na, "Sydney VWAP 1", color=getVWAPColor(colorSydney, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 2 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 2) : na, "Sydney VWAP 2", color=getVWAPColor(colorSydney, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
@@ -1046,7 +902,6 @@ plot(showSessionMarkersCondition and showSessionVWAP and enableSydney and sydney
 plot(showSessionMarkersCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 4 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 4) : na, "Sydney VWAP 4", color=getVWAPColor(colorSydney, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableSydney and sydneyVWAPCount >= 5 ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 5) : na, "Sydney VWAP 5", color=getVWAPColor(colorSydney, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
-// Tokyo VWAPs
 bool skipTokyoMostRecent = showWeeklyAnchorVWAP and weeklyAnchorSessionName == "Tokyo" and currentSessionIsWeeklyAnchor
 plot(showSessionMarkersCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 1 and not skipTokyoMostRecent ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 1) : na, "Tokyo VWAP 1", color=getVWAPColor(colorTokyo, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 plot(showSessionMarkersCondition and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 2 ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 2) : na, "Tokyo VWAP 2", color=getVWAPColor(colorTokyo, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
@@ -1059,7 +914,12 @@ plot(showSessionMarkersCondition and showSessionVWAP and enableTokyo and tokyoVW
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Get the session arrays for the anchor session type (for skip logic)
-array<int> anchorSessionStarts = weeklyAnchorSessionName == "London" ? londonStarts : weeklyAnchorSessionName == "New York" ? nyStarts : weeklyAnchorSessionName == "Globex" ? globexStarts : weeklyAnchorSessionName == "Sydney" ? sydneyStarts : tokyoStarts
+array<int> anchorSessionStarts = switch weeklyAnchorSessionName
+    "London" => londonStarts
+    "New York" => nyStarts
+    "Globex" => globexStarts
+    "Sydney" => sydneyStarts
+    => tokyoStarts
 
 if showWeeklyAnchorVWAP and showSessionMarkersCondition
     string anchorTZ = getSessionTimezone(weeklyAnchorSessionName)
@@ -1122,9 +982,6 @@ plot(shouldPlot4 and showWeeklyAnchorVWAP and showSessionMarkersCondition ? arra
 // SESSION LEVELS RENDERING (for active session only)
 // ═══════════════════════════════════════════════════════════════════════════════
 
-var line lineOpenPrice = na, var label labelOpenPrice = na
-var line lineORH = na, var line lineORL = na, var label labelORH = na, var label labelORL = na
-var line lineIBH = na, var line lineIBL = na, var label labelIBH = na, var label labelIBL = na
 var box boxOpenRange = na
 var box boxInitialBalanceUpper = na
 var box boxInitialBalanceLower = na
@@ -1265,6 +1122,73 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
     var array<float> renderedPrices = array.new<float>()
     array.clear(renderedPrices)
 
+    // Initialize level arrays on first render
+    if array.size(sessionLevels) == 0
+        array.push(sessionLevels, LevelRenderer.new("Open", showOpenPrice, sessionOpen, openRounded, openPriceStartBar, colorOpenPrice, intradayLevelsLineWidth, intradayLevelsLineStyle, na, na))
+        array.push(sessionLevels, LevelRenderer.new("ORH", showOpenRange, openRangeHigh, orhRounded, orhStartBar, colorORH, intradayLevelsLineWidth, intradayLevelsLineStyle, na, na))
+        array.push(sessionLevels, LevelRenderer.new("ORL", showOpenRange, openRangeLow, orlRounded, orlStartBar, colorORL, intradayLevelsLineWidth, intradayLevelsLineStyle, na, na))
+        array.push(sessionLevels, LevelRenderer.new("IBH", showInitialBalance, initialBalanceHigh, ibhRounded, ibhStartBar, colorIBH, intradayLevelsLineWidth, intradayLevelsLineStyle, na, na))
+        array.push(sessionLevels, LevelRenderer.new("IBL", showInitialBalance, initialBalanceLow, iblRounded, iblStartBar, colorIBL, intradayLevelsLineWidth, intradayLevelsLineStyle, na, na))
+
+        array.push(pivotLevels, LevelRenderer.new("P", showPivotP, pivotP, pivotPRounded, startBar, pivotColorP, pivotLineWidth, pivotLineStyle, na, na))
+        array.push(pivotLevels, LevelRenderer.new("R1", showPivotR1, pivotR1, pivotR1Rounded, startBar, pivotColorR1, pivotLineWidth, pivotLineStyle, na, na))
+        array.push(pivotLevels, LevelRenderer.new("R2", showPivotR2, pivotR2, pivotR2Rounded, startBar, pivotColorR2, pivotLineWidth, pivotLineStyle, na, na))
+        array.push(pivotLevels, LevelRenderer.new("R3", showPivotR3, pivotR3, pivotR3Rounded, startBar, pivotColorR3, pivotLineWidth, pivotLineStyle, na, na))
+        array.push(pivotLevels, LevelRenderer.new("S1", showPivotS1, pivotS1, pivotS1Rounded, startBar, pivotColorS1, pivotLineWidth, pivotLineStyle, na, na))
+        array.push(pivotLevels, LevelRenderer.new("S2", showPivotS2, pivotS2, pivotS2Rounded, startBar, pivotColorS2, pivotLineWidth, pivotLineStyle, na, na))
+        array.push(pivotLevels, LevelRenderer.new("S3", showPivotS3, pivotS3, pivotS3Rounded, startBar, pivotColorS3, pivotLineWidth, pivotLineStyle, na, na))
+
+        array.push(keyLevels, LevelRenderer.new("ATH", showATH, ath, athRounded, startBar, colorATH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("PYH", showPYH, pyh, pyhRounded, startBar, colorPYH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("PYL", showPYL, pyl, pylRounded, startBar, colorPYL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("PMH", showPMH, pmh, pmhRounded, startBar, colorPMH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("PML", showPML, pml, pmlRounded, startBar, colorPML, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("PWH", showPWH, pwh, pwhRounded, startBar, colorPWH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("PWL", showPWL, pwl, pwlRounded, startBar, colorPWL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("PDH", showPDH, pdh, pdhRounded, startBar, colorPDH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("PDL", showPDL, pdl, pdlRounded, startBar, colorPDL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("CYH", showCYH, cyh, cyhRounded, startBar, colorCYH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("CYL", showCYL, cyl, cylRounded, startBar, colorCYL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("CMH", showCMH, cmh, cmhRounded, startBar, colorCMH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("CML", showCML, cml, cmlRounded, startBar, colorCML, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("CWH", showCWH, cwh, cwhRounded, startBar, colorCWH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("CWL", showCWL, cwl, cwlRounded, startBar, colorCWL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("CDH", showCDH, cdh, cdhRounded, startBar, colorCDH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        array.push(keyLevels, LevelRenderer.new("CDL", showCDL, cdl, cdlRounded, startBar, colorCDL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+    else
+        // Update level data each bar
+        array.get(sessionLevels, 0).update(showOpenPrice, sessionOpen, openRounded, openPriceStartBar)
+        array.get(sessionLevels, 1).update(showOpenRange, openRangeHigh, orhRounded, orhStartBar)
+        array.get(sessionLevels, 2).update(showOpenRange, openRangeLow, orlRounded, orlStartBar)
+        array.get(sessionLevels, 3).update(showInitialBalance, initialBalanceHigh, ibhRounded, ibhStartBar)
+        array.get(sessionLevels, 4).update(showInitialBalance, initialBalanceLow, iblRounded, iblStartBar)
+
+        array.get(pivotLevels, 0).update(showPivotP, pivotP, pivotPRounded, startBar)
+        array.get(pivotLevels, 1).update(showPivotR1, pivotR1, pivotR1Rounded, startBar)
+        array.get(pivotLevels, 2).update(showPivotR2, pivotR2, pivotR2Rounded, startBar)
+        array.get(pivotLevels, 3).update(showPivotR3, pivotR3, pivotR3Rounded, startBar)
+        array.get(pivotLevels, 4).update(showPivotS1, pivotS1, pivotS1Rounded, startBar)
+        array.get(pivotLevels, 5).update(showPivotS2, pivotS2, pivotS2Rounded, startBar)
+        array.get(pivotLevels, 6).update(showPivotS3, pivotS3, pivotS3Rounded, startBar)
+
+        array.get(keyLevels, 0).update(showATH, ath, athRounded, startBar)
+        array.get(keyLevels, 1).update(showPYH, pyh, pyhRounded, startBar)
+        array.get(keyLevels, 2).update(showPYL, pyl, pylRounded, startBar)
+        array.get(keyLevels, 3).update(showPMH, pmh, pmhRounded, startBar)
+        array.get(keyLevels, 4).update(showPML, pml, pmlRounded, startBar)
+        array.get(keyLevels, 5).update(showPWH, pwh, pwhRounded, startBar)
+        array.get(keyLevels, 6).update(showPWL, pwl, pwlRounded, startBar)
+        array.get(keyLevels, 7).update(showPDH, pdh, pdhRounded, startBar)
+        array.get(keyLevels, 8).update(showPDL, pdl, pdlRounded, startBar)
+        array.get(keyLevels, 9).update(showCYH, cyh, cyhRounded, startBar)
+        array.get(keyLevels, 10).update(showCYL, cyl, cylRounded, startBar)
+        array.get(keyLevels, 11).update(showCMH, cmh, cmhRounded, startBar)
+        array.get(keyLevels, 12).update(showCML, cml, cmlRounded, startBar)
+        array.get(keyLevels, 13).update(showCWH, cwh, cwhRounded, startBar)
+        array.get(keyLevels, 14).update(showCWL, cwl, cwlRounded, startBar)
+        array.get(keyLevels, 15).update(showCDH, cdh, cdhRounded, startBar)
+        array.get(keyLevels, 16).update(showCDL, cdl, cdlRounded, startBar)
+
     // ═══════════════════════════════════════════════════════════════════════════════
     // SESSION LEVELS RENDERING (FIRST - highest priority for line style)
     // ═══════════════════════════════════════════════════════════════════════════════
@@ -1273,138 +1197,37 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
     // Only show session levels if we have an active session
     bool shouldShowSessionLevels = showSessionMarkersCondition and showSessionLevels and not na(activeSessionIndex) and not na(sessionOpen)
 
-    // Opening Price
-    if shouldShowSessionLevels and showOpenPrice and isWithinATR(sessionOpen, close, atrThreshold, useATRFilter)
-        if not array.includes(renderedPrices, openRounded)
-            string combinedLabel = map.contains(priceLabels, openRounded) ? map.get(priceLabels, openRounded) : "Open"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(sessionOpen, format.mintick) + ")" : combinedLabel
-            if na(lineOpenPrice)
-                lineOpenPrice := line.new(openPriceStartBar, sessionOpen, bar_index, sessionOpen, color=colorOpenPrice, width=intradayLevelsLineWidth, style=sessionLineStyleActual)
-                labelOpenPrice := label.new(bar_index, sessionOpen, labelText, color=labelBgColor(colorOpenPrice), textcolor=colorOpenPrice, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineOpenPrice, openPriceStartBar, sessionOpen), line.set_xy2(lineOpenPrice, bar_index, sessionOpen)
-                label.set_xy(labelOpenPrice, bar_index, sessionOpen), label.set_text(labelOpenPrice, labelText)
-            array.push(renderedPrices, openRounded)
-    else if not na(lineOpenPrice)
-        line.delete(lineOpenPrice), lineOpenPrice := na, label.delete(labelOpenPrice), labelOpenPrice := na
+    // Render session levels using array-based approach
+    for level in sessionLevels
+        level.render(shouldShowSessionLevels, true, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter)
 
-    // Open Range High
-    if shouldShowSessionLevels and showOpenRange and not na(openRangeHigh) and isWithinATR(openRangeHigh, close, atrThreshold, useATRFilter)
-        if not array.includes(renderedPrices, orhRounded)
-            string combinedLabel = map.contains(priceLabels, orhRounded) ? map.get(priceLabels, orhRounded) : "ORH"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(openRangeHigh, format.mintick) + ")" : combinedLabel
-            if na(lineORH)
-                lineORH := line.new(orhStartBar, openRangeHigh, bar_index, openRangeHigh, color=colorORH, width=intradayLevelsLineWidth, style=sessionLineStyleActual)
-                labelORH := label.new(bar_index, openRangeHigh, labelText, color=labelBgColor(colorORH), textcolor=colorORH, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineORH, orhStartBar, openRangeHigh), line.set_xy2(lineORH, bar_index, openRangeHigh)
-                label.set_xy(labelORH, bar_index, openRangeHigh), label.set_text(labelORH, labelText)
-            array.push(renderedPrices, orhRounded)
-    else if not na(lineORH)
-        line.delete(lineORH), lineORH := na, label.delete(labelORH), labelORH := na
-
-    // Open Range Low
-    if shouldShowSessionLevels and showOpenRange and not na(openRangeLow) and isWithinATR(openRangeLow, close, atrThreshold, useATRFilter)
-        if not array.includes(renderedPrices, orlRounded)
-            string combinedLabel = map.contains(priceLabels, orlRounded) ? map.get(priceLabels, orlRounded) : "ORL"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(openRangeLow, format.mintick) + ")" : combinedLabel
-            if na(lineORL)
-                lineORL := line.new(orlStartBar, openRangeLow, bar_index, openRangeLow, color=colorORL, width=intradayLevelsLineWidth, style=sessionLineStyleActual)
-                labelORL := label.new(bar_index, openRangeLow, labelText, color=labelBgColor(colorORL), textcolor=colorORL, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineORL, orlStartBar, openRangeLow), line.set_xy2(lineORL, bar_index, openRangeLow)
-                label.set_xy(labelORL, bar_index, openRangeLow), label.set_text(labelORL, labelText)
-            array.push(renderedPrices, orlRounded)
-    else if not na(lineORL)
-        line.delete(lineORL), lineORL := na, label.delete(labelORL), labelORL := na
-
-    // Open Range Background Shading (boxes represent time periods, always start from session start)
+    // Open Range Background Shading
     if shouldShowSessionLevels and showOpenRange and shadeOpenRange and not na(openRangeHigh) and not na(openRangeLow)
-        // Box always starts from session start but truncate if beyond hard limit
-        int boxORStartBar = not na(sessionStartBar) ? sessionStartBar : startBar
-        // Apply hard limit: if box would be too long, truncate to configured length
-        if bar_index - boxORStartBar > maxLineDistance
-            boxORStartBar := startBar
-        if na(boxOpenRange)
-            boxOpenRange := box.new(boxORStartBar, openRangeHigh, bar_index, openRangeLow, border_color=na, bgcolor=colorOpenRangeShade)
-        else
-            box.set_lefttop(boxOpenRange, boxORStartBar, openRangeHigh)
-            box.set_rightbottom(boxOpenRange, bar_index, openRangeLow)
+        int boxORStartBar = not na(sessionStartBar) ? (bar_index - sessionStartBar > maxLineDistance ? startBar : sessionStartBar) : startBar
+        boxOpenRange := updateBox(boxOpenRange, boxORStartBar, openRangeHigh, bar_index, openRangeLow, colorOpenRangeShade)
     else if not na(boxOpenRange)
         box.delete(boxOpenRange), boxOpenRange := na
 
-    // Initial Balance High
-    if shouldShowSessionLevels and showInitialBalance and not na(initialBalanceHigh) and isWithinATR(initialBalanceHigh, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, ibhRounded)
-        string combinedLabel = map.contains(priceLabels, ibhRounded) ? map.get(priceLabels, ibhRounded) : "IBH"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(initialBalanceHigh, format.mintick) + ")" : combinedLabel
-        if na(lineIBH)
-            lineIBH := line.new(ibhStartBar, initialBalanceHigh, bar_index, initialBalanceHigh, color=colorIBH, width=intradayLevelsLineWidth, style=sessionLineStyleActual)
-            labelIBH := label.new(bar_index, initialBalanceHigh, labelText, color=labelBgColor(colorIBH), textcolor=colorIBH, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineIBH, ibhStartBar, initialBalanceHigh), line.set_xy2(lineIBH, bar_index, initialBalanceHigh)
-            label.set_xy(labelIBH, bar_index, initialBalanceHigh), label.set_text(labelIBH, labelText)
-        array.push(renderedPrices, ibhRounded)
-    else if not na(lineIBH)
-        line.delete(lineIBH), lineIBH := na, label.delete(labelIBH), labelIBH := na
 
-    // Initial Balance Low
-    if shouldShowSessionLevels and showInitialBalance and not na(initialBalanceLow) and isWithinATR(initialBalanceLow, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, iblRounded)
-        string combinedLabel = map.contains(priceLabels, iblRounded) ? map.get(priceLabels, iblRounded) : "IBL"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(initialBalanceLow, format.mintick) + ")" : combinedLabel
-        if na(lineIBL)
-            lineIBL := line.new(iblStartBar, initialBalanceLow, bar_index, initialBalanceLow, color=colorIBL, width=intradayLevelsLineWidth, style=sessionLineStyleActual)
-            labelIBL := label.new(bar_index, initialBalanceLow, labelText, color=labelBgColor(colorIBL), textcolor=colorIBL, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineIBL, iblStartBar, initialBalanceLow), line.set_xy2(lineIBL, bar_index, initialBalanceLow)
-            label.set_xy(labelIBL, bar_index, initialBalanceLow), label.set_text(labelIBL, labelText)
-        array.push(renderedPrices, iblRounded)
-    else if not na(lineIBL)
-        line.delete(lineIBL), lineIBL := na, label.delete(labelIBL), labelIBL := na
 
-    // Initial Balance Background Shading (boxes represent time periods, always start from session start)
+    // Initial Balance Background Shading
     if shouldShowSessionLevels and showInitialBalance and shadeInitialBalance and not na(initialBalanceHigh) and not na(initialBalanceLow)
-        // Box always starts from session start but truncate if beyond hard limit
-        int boxIBStartBar = not na(sessionStartBar) ? sessionStartBar : startBar
-        // Apply hard limit: if box would be too long, truncate to configured length
-        if bar_index - boxIBStartBar > maxLineDistance
-            boxIBStartBar := startBar
-
-        // If both OR and IB boxes enabled, split IB into upper/lower to avoid overlap
+        int boxIBStartBar = not na(sessionStartBar) ? (bar_index - sessionStartBar > maxLineDistance ? startBar : sessionStartBar) : startBar
         bool splitIBBox = showOpenRange and shadeOpenRange and not na(openRangeHigh) and not na(openRangeLow)
-
         if splitIBBox
-            // Create upper box: IBH to ORH
             if initialBalanceHigh > openRangeHigh
-                if na(boxInitialBalanceUpper)
-                    boxInitialBalanceUpper := box.new(boxIBStartBar, initialBalanceHigh, bar_index, openRangeHigh, border_color=na, bgcolor=colorInitialBalanceShade)
-                else
-                    box.set_lefttop(boxInitialBalanceUpper, boxIBStartBar, initialBalanceHigh)
-                    box.set_rightbottom(boxInitialBalanceUpper, bar_index, openRangeHigh)
+                boxInitialBalanceUpper := updateBox(boxInitialBalanceUpper, boxIBStartBar, initialBalanceHigh, bar_index, openRangeHigh, colorInitialBalanceShade)
             else if not na(boxInitialBalanceUpper)
                 box.delete(boxInitialBalanceUpper), boxInitialBalanceUpper := na
-
-            // Create lower box: ORL to IBL
             if initialBalanceLow < openRangeLow
-                if na(boxInitialBalanceLower)
-                    boxInitialBalanceLower := box.new(boxIBStartBar, openRangeLow, bar_index, initialBalanceLow, border_color=na, bgcolor=colorInitialBalanceShade)
-                else
-                    box.set_lefttop(boxInitialBalanceLower, boxIBStartBar, openRangeLow)
-                    box.set_rightbottom(boxInitialBalanceLower, bar_index, initialBalanceLow)
+                boxInitialBalanceLower := updateBox(boxInitialBalanceLower, boxIBStartBar, openRangeLow, bar_index, initialBalanceLow, colorInitialBalanceShade)
             else if not na(boxInitialBalanceLower)
                 box.delete(boxInitialBalanceLower), boxInitialBalanceLower := na
         else
-            // Single IB box when OR box not shown
-            if na(boxInitialBalanceUpper)
-                boxInitialBalanceUpper := box.new(boxIBStartBar, initialBalanceHigh, bar_index, initialBalanceLow, border_color=na, bgcolor=colorInitialBalanceShade)
-            else
-                box.set_lefttop(boxInitialBalanceUpper, boxIBStartBar, initialBalanceHigh)
-                box.set_rightbottom(boxInitialBalanceUpper, bar_index, initialBalanceLow)
-
-            // Delete lower box if it exists
+            boxInitialBalanceUpper := updateBox(boxInitialBalanceUpper, boxIBStartBar, initialBalanceHigh, bar_index, initialBalanceLow, colorInitialBalanceShade)
             if not na(boxInitialBalanceLower)
                 box.delete(boxInitialBalanceLower), boxInitialBalanceLower := na
     else
-        // Delete both boxes when IB shading disabled
         if not na(boxInitialBalanceUpper)
             box.delete(boxInitialBalanceUpper), boxInitialBalanceUpper := na
         if not na(boxInitialBalanceLower)
@@ -1414,373 +1237,14 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
     // PIVOT POINTS RENDERING (SECOND - after session levels, before key levels)
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    string pivotLineStyleActual = getLineStyle(pivotLineStyle)
-
-    // Pivot P
-    if showPivotsCondition and showPivotP and not na(pivotP) and isWithinATR(pivotP, close, atrThreshold, useATRFilter)
-        if not array.includes(renderedPrices, pivotPRounded)
-            string combinedLabel = map.contains(priceLabels, pivotPRounded) ? map.get(priceLabels, pivotPRounded) : "P"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pivotP, format.mintick) + ")" : combinedLabel
-            if na(lineP)
-                lineP := line.new(startBar, pivotP, bar_index, pivotP, color=pivotColorP, width=pivotLineWidth, style=pivotLineStyleActual)
-                labelP := label.new(bar_index, pivotP, labelText, color=labelBgColor(pivotColorP), textcolor=pivotColorP, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineP, startBar, pivotP), line.set_xy2(lineP, bar_index, pivotP)
-                label.set_xy(labelP, bar_index, pivotP), label.set_text(labelP, labelText)
-            array.push(renderedPrices, pivotPRounded)
-        else
-            if not na(lineP)
-                line.delete(lineP), lineP := na, label.delete(labelP), labelP := na
-    else if not na(lineP)
-        line.delete(lineP), lineP := na, label.delete(labelP), labelP := na
-
-    // Pivot R1
-    if showPivotsCondition and showPivotR1 and not na(pivotR1) and isWithinATR(pivotR1, close, atrThreshold, useATRFilter)
-        if not array.includes(renderedPrices, pivotR1Rounded)
-            string combinedLabel = map.contains(priceLabels, pivotR1Rounded) ? map.get(priceLabels, pivotR1Rounded) : "R1"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pivotR1, format.mintick) + ")" : combinedLabel
-            if na(lineR1)
-                lineR1 := line.new(startBar, pivotR1, bar_index, pivotR1, color=pivotColorR1, width=pivotLineWidth, style=pivotLineStyleActual)
-                labelR1 := label.new(bar_index, pivotR1, labelText, color=labelBgColor(pivotColorR1), textcolor=pivotColorR1, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineR1, startBar, pivotR1), line.set_xy2(lineR1, bar_index, pivotR1)
-                label.set_xy(labelR1, bar_index, pivotR1), label.set_text(labelR1, labelText)
-            array.push(renderedPrices, pivotR1Rounded)
-        else
-            if not na(lineR1)
-                line.delete(lineR1), lineR1 := na, label.delete(labelR1), labelR1 := na
-    else if not na(lineR1)
-        line.delete(lineR1), lineR1 := na, label.delete(labelR1), labelR1 := na
-
-    // Pivot R2
-    if showPivotsCondition and showPivotR2 and not na(pivotR2) and isWithinATR(pivotR2, close, atrThreshold, useATRFilter)
-        if not array.includes(renderedPrices, pivotR2Rounded)
-            string combinedLabel = map.contains(priceLabels, pivotR2Rounded) ? map.get(priceLabels, pivotR2Rounded) : "R2"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pivotR2, format.mintick) + ")" : combinedLabel
-            if na(lineR2)
-                lineR2 := line.new(startBar, pivotR2, bar_index, pivotR2, color=pivotColorR2, width=pivotLineWidth, style=pivotLineStyleActual)
-                labelR2 := label.new(bar_index, pivotR2, labelText, color=labelBgColor(pivotColorR2), textcolor=pivotColorR2, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineR2, startBar, pivotR2), line.set_xy2(lineR2, bar_index, pivotR2)
-                label.set_xy(labelR2, bar_index, pivotR2), label.set_text(labelR2, labelText)
-            array.push(renderedPrices, pivotR2Rounded)
-        else
-            if not na(lineR2)
-                line.delete(lineR2), lineR2 := na, label.delete(labelR2), labelR2 := na
-    else if not na(lineR2)
-        line.delete(lineR2), lineR2 := na, label.delete(labelR2), labelR2 := na
-
-    // Pivot R3
-    if showPivotsCondition and showPivotR3 and not na(pivotR3) and isWithinATR(pivotR3, close, atrThreshold, useATRFilter)
-        if not array.includes(renderedPrices, pivotR3Rounded)
-            string combinedLabel = map.contains(priceLabels, pivotR3Rounded) ? map.get(priceLabels, pivotR3Rounded) : "R3"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pivotR3, format.mintick) + ")" : combinedLabel
-            if na(lineR3)
-                lineR3 := line.new(startBar, pivotR3, bar_index, pivotR3, color=pivotColorR3, width=pivotLineWidth, style=pivotLineStyleActual)
-                labelR3 := label.new(bar_index, pivotR3, labelText, color=labelBgColor(pivotColorR3), textcolor=pivotColorR3, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineR3, startBar, pivotR3), line.set_xy2(lineR3, bar_index, pivotR3)
-                label.set_xy(labelR3, bar_index, pivotR3), label.set_text(labelR3, labelText)
-            array.push(renderedPrices, pivotR3Rounded)
-        else
-            if not na(lineR3)
-                line.delete(lineR3), lineR3 := na, label.delete(labelR3), labelR3 := na
-    else if not na(lineR3)
-        line.delete(lineR3), lineR3 := na, label.delete(labelR3), labelR3 := na
-
-    // Pivot S1
-    if showPivotsCondition and showPivotS1 and not na(pivotS1) and isWithinATR(pivotS1, close, atrThreshold, useATRFilter)
-        if not array.includes(renderedPrices, pivotS1Rounded)
-            string combinedLabel = map.contains(priceLabels, pivotS1Rounded) ? map.get(priceLabels, pivotS1Rounded) : "S1"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pivotS1, format.mintick) + ")" : combinedLabel
-            if na(lineS1)
-                lineS1 := line.new(startBar, pivotS1, bar_index, pivotS1, color=pivotColorS1, width=pivotLineWidth, style=pivotLineStyleActual)
-                labelS1 := label.new(bar_index, pivotS1, labelText, color=labelBgColor(pivotColorS1), textcolor=pivotColorS1, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineS1, startBar, pivotS1), line.set_xy2(lineS1, bar_index, pivotS1)
-                label.set_xy(labelS1, bar_index, pivotS1), label.set_text(labelS1, labelText)
-            array.push(renderedPrices, pivotS1Rounded)
-        else
-            if not na(lineS1)
-                line.delete(lineS1), lineS1 := na, label.delete(labelS1), labelS1 := na
-    else if not na(lineS1)
-        line.delete(lineS1), lineS1 := na, label.delete(labelS1), labelS1 := na
-
-    // Pivot S2
-    if showPivotsCondition and showPivotS2 and not na(pivotS2) and isWithinATR(pivotS2, close, atrThreshold, useATRFilter)
-        if not array.includes(renderedPrices, pivotS2Rounded)
-            string combinedLabel = map.contains(priceLabels, pivotS2Rounded) ? map.get(priceLabels, pivotS2Rounded) : "S2"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pivotS2, format.mintick) + ")" : combinedLabel
-            if na(lineS2)
-                lineS2 := line.new(startBar, pivotS2, bar_index, pivotS2, color=pivotColorS2, width=pivotLineWidth, style=pivotLineStyleActual)
-                labelS2 := label.new(bar_index, pivotS2, labelText, color=labelBgColor(pivotColorS2), textcolor=pivotColorS2, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineS2, startBar, pivotS2), line.set_xy2(lineS2, bar_index, pivotS2)
-                label.set_xy(labelS2, bar_index, pivotS2), label.set_text(labelS2, labelText)
-            array.push(renderedPrices, pivotS2Rounded)
-        else
-            if not na(lineS2)
-                line.delete(lineS2), lineS2 := na, label.delete(labelS2), labelS2 := na
-    else if not na(lineS2)
-        line.delete(lineS2), lineS2 := na, label.delete(labelS2), labelS2 := na
-
-    // Pivot S3
-    if showPivotsCondition and showPivotS3 and not na(pivotS3) and isWithinATR(pivotS3, close, atrThreshold, useATRFilter)
-        if not array.includes(renderedPrices, pivotS3Rounded)
-            string combinedLabel = map.contains(priceLabels, pivotS3Rounded) ? map.get(priceLabels, pivotS3Rounded) : "S3"
-            string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pivotS3, format.mintick) + ")" : combinedLabel
-            if na(lineS3)
-                lineS3 := line.new(startBar, pivotS3, bar_index, pivotS3, color=pivotColorS3, width=pivotLineWidth, style=pivotLineStyleActual)
-                labelS3 := label.new(bar_index, pivotS3, labelText, color=labelBgColor(pivotColorS3), textcolor=pivotColorS3, style=label.style_label_left, size=labelSizeActual)
-            else
-                line.set_xy1(lineS3, startBar, pivotS3), line.set_xy2(lineS3, bar_index, pivotS3)
-                label.set_xy(labelS3, bar_index, pivotS3), label.set_text(labelS3, labelText)
-            array.push(renderedPrices, pivotS3Rounded)
-        else
-            if not na(lineS3)
-                line.delete(lineS3), lineS3 := na, label.delete(labelS3), labelS3 := na
-    else if not na(lineS3)
-        line.delete(lineS3), lineS3 := na, label.delete(labelS3), labelS3 := na
+    // Render pivot levels using array-based approach
+    for level in pivotLevels
+        level.render(showPivotsCondition, false, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter)
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // KEY LEVELS RENDERING (THIRD - after session levels and pivots)
     // ═══════════════════════════════════════════════════════════════════════════════
 
-    // ATH
-    if showKeyLevelsCondition and showATH and not na(ath) and isWithinATR(ath, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, athRounded)
-        string combinedLabel = map.contains(priceLabels, athRounded) ? map.get(priceLabels, athRounded) : "ATH"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(ath, format.mintick) + ")" : combinedLabel
-        if na(lineATH)
-            lineATH := line.new(startBar, ath, bar_index, ath, color=colorATH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelATH := label.new(bar_index, ath, labelText, color=labelBgColor(colorATH), textcolor=colorATH, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineATH, startBar, ath), line.set_xy2(lineATH, bar_index, ath)
-            label.set_xy(labelATH, bar_index, ath), label.set_text(labelATH, labelText)
-        array.push(renderedPrices, athRounded)
-    else if not na(lineATH)
-        line.delete(lineATH), lineATH := na, label.delete(labelATH), labelATH := na
-
-    // PYH
-    if showKeyLevelsCondition and showPYH and not na(pyh) and isWithinATR(pyh, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, pyhRounded)
-        string combinedLabel = map.contains(priceLabels, pyhRounded) ? map.get(priceLabels, pyhRounded) : "PYH"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pyh, format.mintick) + ")" : combinedLabel
-        if na(linePYH)
-            linePYH := line.new(startBar, pyh, bar_index, pyh, color=colorPYH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelPYH := label.new(bar_index, pyh, labelText, color=labelBgColor(colorPYH), textcolor=colorPYH, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(linePYH, startBar, pyh), line.set_xy2(linePYH, bar_index, pyh)
-            label.set_xy(labelPYH, bar_index, pyh), label.set_text(labelPYH, labelText)
-        array.push(renderedPrices, pyhRounded)
-    else if not na(linePYH)
-        line.delete(linePYH), linePYH := na, label.delete(labelPYH), labelPYH := na
-
-    // PYL
-    if showKeyLevelsCondition and showPYL and not na(pyl) and isWithinATR(pyl, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, pylRounded)
-        string combinedLabel = map.contains(priceLabels, pylRounded) ? map.get(priceLabels, pylRounded) : "PYL"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pyl, format.mintick) + ")" : combinedLabel
-        if na(linePYL)
-            linePYL := line.new(startBar, pyl, bar_index, pyl, color=colorPYL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelPYL := label.new(bar_index, pyl, labelText, color=labelBgColor(colorPYL), textcolor=colorPYL, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(linePYL, startBar, pyl), line.set_xy2(linePYL, bar_index, pyl)
-            label.set_xy(labelPYL, bar_index, pyl), label.set_text(labelPYL, labelText)
-        array.push(renderedPrices, pylRounded)
-    else if not na(linePYL)
-        line.delete(linePYL), linePYL := na, label.delete(labelPYL), labelPYL := na
-
-    // PMH
-    if showKeyLevelsCondition and showPMH and not na(pmh) and isWithinATR(pmh, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, pmhRounded)
-        string combinedLabel = map.contains(priceLabels, pmhRounded) ? map.get(priceLabels, pmhRounded) : "PMH"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pmh, format.mintick) + ")" : combinedLabel
-        if na(linePMH)
-            linePMH := line.new(startBar, pmh, bar_index, pmh, color=colorPMH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelPMH := label.new(bar_index, pmh, labelText, color=labelBgColor(colorPMH), textcolor=colorPMH, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(linePMH, startBar, pmh), line.set_xy2(linePMH, bar_index, pmh)
-            label.set_xy(labelPMH, bar_index, pmh), label.set_text(labelPMH, labelText)
-        array.push(renderedPrices, pmhRounded)
-    else if not na(linePMH)
-        line.delete(linePMH), linePMH := na, label.delete(labelPMH), labelPMH := na
-
-    // PML
-    if showKeyLevelsCondition and showPML and not na(pml) and isWithinATR(pml, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, pmlRounded)
-        string combinedLabel = map.contains(priceLabels, pmlRounded) ? map.get(priceLabels, pmlRounded) : "PML"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pml, format.mintick) + ")" : combinedLabel
-        if na(linePML)
-            linePML := line.new(startBar, pml, bar_index, pml, color=colorPML, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelPML := label.new(bar_index, pml, labelText, color=labelBgColor(colorPML), textcolor=colorPML, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(linePML, startBar, pml), line.set_xy2(linePML, bar_index, pml)
-            label.set_xy(labelPML, bar_index, pml), label.set_text(labelPML, labelText)
-        array.push(renderedPrices, pmlRounded)
-    else if not na(linePML)
-        line.delete(linePML), linePML := na, label.delete(labelPML), labelPML := na
-
-    // PWH
-    if showKeyLevelsCondition and showPWH and not na(pwh) and isWithinATR(pwh, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, pwhRounded)
-        string combinedLabel = map.contains(priceLabels, pwhRounded) ? map.get(priceLabels, pwhRounded) : "PWH"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pwh, format.mintick) + ")" : combinedLabel
-        if na(linePWH)
-            linePWH := line.new(startBar, pwh, bar_index, pwh, color=colorPWH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelPWH := label.new(bar_index, pwh, labelText, color=labelBgColor(colorPWH), textcolor=colorPWH, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(linePWH, startBar, pwh), line.set_xy2(linePWH, bar_index, pwh)
-            label.set_xy(labelPWH, bar_index, pwh), label.set_text(labelPWH, labelText)
-        array.push(renderedPrices, pwhRounded)
-    else if not na(linePWH)
-        line.delete(linePWH), linePWH := na, label.delete(labelPWH), labelPWH := na
-
-    // PWL
-    if showKeyLevelsCondition and showPWL and not na(pwl) and isWithinATR(pwl, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, pwlRounded)
-        string combinedLabel = map.contains(priceLabels, pwlRounded) ? map.get(priceLabels, pwlRounded) : "PWL"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pwl, format.mintick) + ")" : combinedLabel
-        if na(linePWL)
-            linePWL := line.new(startBar, pwl, bar_index, pwl, color=colorPWL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelPWL := label.new(bar_index, pwl, labelText, color=labelBgColor(colorPWL), textcolor=colorPWL, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(linePWL, startBar, pwl), line.set_xy2(linePWL, bar_index, pwl)
-            label.set_xy(labelPWL, bar_index, pwl), label.set_text(labelPWL, labelText)
-        array.push(renderedPrices, pwlRounded)
-    else if not na(linePWL)
-        line.delete(linePWL), linePWL := na, label.delete(labelPWL), labelPWL := na
-
-    // PDH
-    if showKeyLevelsCondition and showPDH and not na(pdh) and isWithinATR(pdh, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, pdhRounded)
-        string combinedLabel = map.contains(priceLabels, pdhRounded) ? map.get(priceLabels, pdhRounded) : "PDH"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pdh, format.mintick) + ")" : combinedLabel
-        if na(linePDH)
-            linePDH := line.new(startBar, pdh, bar_index, pdh, color=colorPDH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelPDH := label.new(bar_index, pdh, labelText, color=labelBgColor(colorPDH), textcolor=colorPDH, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(linePDH, startBar, pdh), line.set_xy2(linePDH, bar_index, pdh)
-            label.set_xy(labelPDH, bar_index, pdh), label.set_text(labelPDH, labelText)
-        array.push(renderedPrices, pdhRounded)
-    else if not na(linePDH)
-        line.delete(linePDH), linePDH := na, label.delete(labelPDH), labelPDH := na
-
-    // PDL
-    if showKeyLevelsCondition and showPDL and not na(pdl) and isWithinATR(pdl, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, pdlRounded)
-        string combinedLabel = map.contains(priceLabels, pdlRounded) ? map.get(priceLabels, pdlRounded) : "PDL"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(pdl, format.mintick) + ")" : combinedLabel
-        if na(linePDL)
-            linePDL := line.new(startBar, pdl, bar_index, pdl, color=colorPDL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelPDL := label.new(bar_index, pdl, labelText, color=labelBgColor(colorPDL), textcolor=colorPDL, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(linePDL, startBar, pdl), line.set_xy2(linePDL, bar_index, pdl)
-            label.set_xy(labelPDL, bar_index, pdl), label.set_text(labelPDL, labelText)
-        array.push(renderedPrices, pdlRounded)
-    else if not na(linePDL)
-        line.delete(linePDL), linePDL := na, label.delete(labelPDL), labelPDL := na
-
-
-    // CYH
-    if showKeyLevelsCondition and showCYH and not na(cyh) and isWithinATR(cyh, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, cyhRounded)
-        string combinedLabel = map.contains(priceLabels, cyhRounded) ? map.get(priceLabels, cyhRounded) : "CYH"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cyh, format.mintick) + ")" : combinedLabel
-        if na(lineCYH)
-            lineCYH := line.new(startBar, cyh, bar_index, cyh, color=colorCYH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelCYH := label.new(bar_index, cyh, labelText, color=labelBgColor(colorCYH), textcolor=colorCYH, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineCYH, startBar, cyh), line.set_xy2(lineCYH, bar_index, cyh)
-            label.set_xy(labelCYH, bar_index, cyh), label.set_text(labelCYH, labelText)
-        array.push(renderedPrices, cyhRounded)
-    else if not na(lineCYH)
-        line.delete(lineCYH), lineCYH := na, label.delete(labelCYH), labelCYH := na
-
-    // CYL
-    if showKeyLevelsCondition and showCYL and not na(cyl) and isWithinATR(cyl, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, cylRounded)
-        string combinedLabel = map.contains(priceLabels, cylRounded) ? map.get(priceLabels, cylRounded) : "CYL"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cyl, format.mintick) + ")" : combinedLabel
-        if na(lineCYL)
-            lineCYL := line.new(startBar, cyl, bar_index, cyl, color=colorCYL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelCYL := label.new(bar_index, cyl, labelText, color=labelBgColor(colorCYL), textcolor=colorCYL, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineCYL, startBar, cyl), line.set_xy2(lineCYL, bar_index, cyl)
-            label.set_xy(labelCYL, bar_index, cyl), label.set_text(labelCYL, labelText)
-        array.push(renderedPrices, cylRounded)
-    else if not na(lineCYL)
-        line.delete(lineCYL), lineCYL := na, label.delete(labelCYL), labelCYL := na
-
-    // CMH
-    if showKeyLevelsCondition and showCMH and not na(cmh) and isWithinATR(cmh, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, cmhRounded)
-        string combinedLabel = map.contains(priceLabels, cmhRounded) ? map.get(priceLabels, cmhRounded) : "CMH"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cmh, format.mintick) + ")" : combinedLabel
-        if na(lineCMH)
-            lineCMH := line.new(startBar, cmh, bar_index, cmh, color=colorCMH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelCMH := label.new(bar_index, cmh, labelText, color=labelBgColor(colorCMH), textcolor=colorCMH, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineCMH, startBar, cmh), line.set_xy2(lineCMH, bar_index, cmh)
-            label.set_xy(labelCMH, bar_index, cmh), label.set_text(labelCMH, labelText)
-        array.push(renderedPrices, cmhRounded)
-    else if not na(lineCMH)
-        line.delete(lineCMH), lineCMH := na, label.delete(labelCMH), labelCMH := na
-
-    // CWH
-    if showKeyLevelsCondition and showCWH and not na(cwh) and isWithinATR(cwh, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, cwhRounded)
-        string combinedLabel = map.contains(priceLabels, cwhRounded) ? map.get(priceLabels, cwhRounded) : "CWH"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cwh, format.mintick) + ")" : combinedLabel
-        if na(lineCWH)
-            lineCWH := line.new(startBar, cwh, bar_index, cwh, color=colorCWH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelCWH := label.new(bar_index, cwh, labelText, color=labelBgColor(colorCWH), textcolor=colorCWH, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineCWH, startBar, cwh), line.set_xy2(lineCWH, bar_index, cwh)
-            label.set_xy(labelCWH, bar_index, cwh), label.set_text(labelCWH, labelText)
-        array.push(renderedPrices, cwhRounded)
-    else if not na(lineCWH)
-        line.delete(lineCWH), lineCWH := na, label.delete(labelCWH), labelCWH := na
-
-    // CWL
-    if showKeyLevelsCondition and showCWL and not na(cwl) and isWithinATR(cwl, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, cwlRounded)
-        string combinedLabel = map.contains(priceLabels, cwlRounded) ? map.get(priceLabels, cwlRounded) : "CWL"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cwl, format.mintick) + ")" : combinedLabel
-        if na(lineCWL)
-            lineCWL := line.new(startBar, cwl, bar_index, cwl, color=colorCWL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelCWL := label.new(bar_index, cwl, labelText, color=labelBgColor(colorCWL), textcolor=colorCWL, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineCWL, startBar, cwl), line.set_xy2(lineCWL, bar_index, cwl)
-            label.set_xy(labelCWL, bar_index, cwl), label.set_text(labelCWL, labelText)
-        array.push(renderedPrices, cwlRounded)
-    else if not na(lineCWL)
-        line.delete(lineCWL), lineCWL := na, label.delete(labelCWL), labelCWL := na
-
-    // CML
-    if showKeyLevelsCondition and showCML and not na(cml) and isWithinATR(cml, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, cmlRounded)
-        string combinedLabel = map.contains(priceLabels, cmlRounded) ? map.get(priceLabels, cmlRounded) : "CML"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cml, format.mintick) + ")" : combinedLabel
-        if na(lineCML)
-            lineCML := line.new(startBar, cml, bar_index, cml, color=colorCML, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelCML := label.new(bar_index, cml, labelText, color=labelBgColor(colorCML), textcolor=colorCML, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineCML, startBar, cml), line.set_xy2(lineCML, bar_index, cml)
-            label.set_xy(labelCML, bar_index, cml), label.set_text(labelCML, labelText)
-        array.push(renderedPrices, cmlRounded)
-    else if not na(lineCML)
-        line.delete(lineCML), lineCML := na, label.delete(labelCML), labelCML := na
-
-    // CDH
-    if showKeyLevelsCondition and showCDH and not na(cdh) and isWithinATR(cdh, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, cdhRounded)
-        string combinedLabel = map.contains(priceLabels, cdhRounded) ? map.get(priceLabels, cdhRounded) : "CDH"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cdh, format.mintick) + ")" : combinedLabel
-        if na(lineCDH)
-            lineCDH := line.new(startBar, cdh, bar_index, cdh, color=colorCDH, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelCDH := label.new(bar_index, cdh, labelText, color=labelBgColor(colorCDH), textcolor=colorCDH, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineCDH, startBar, cdh), line.set_xy2(lineCDH, bar_index, cdh)
-            label.set_xy(labelCDH, bar_index, cdh), label.set_text(labelCDH, labelText)
-        array.push(renderedPrices, cdhRounded)
-    else if not na(lineCDH)
-        line.delete(lineCDH), lineCDH := na, label.delete(labelCDH), labelCDH := na
-
-    // CDL
-    if showKeyLevelsCondition and showCDL and not na(cdl) and isWithinATR(cdl, close, atrThreshold, useATRFilter) and not array.includes(renderedPrices, cdlRounded)
-        string combinedLabel = map.contains(priceLabels, cdlRounded) ? map.get(priceLabels, cdlRounded) : "CDL"
-        string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(cdl, format.mintick) + ")" : combinedLabel
-        if na(lineCDL)
-            lineCDL := line.new(startBar, cdl, bar_index, cdl, color=colorCDL, width=keyLevelsLineWidth, style=keyLevelsLineStyleActual)
-            labelCDL := label.new(bar_index, cdl, labelText, color=labelBgColor(colorCDL), textcolor=colorCDL, style=label.style_label_left, size=labelSizeActual)
-        else
-            line.set_xy1(lineCDL, startBar, cdl), line.set_xy2(lineCDL, bar_index, cdl)
-            label.set_xy(labelCDL, bar_index, cdl), label.set_text(labelCDL, labelText)
-        array.push(renderedPrices, cdlRounded)
-    else if not na(lineCDL)
-        line.delete(lineCDL), lineCDL := na, label.delete(labelCDL), labelCDL := na
+    // Render key levels using array-based approach
+    for level in keyLevels
+        level.render(showKeyLevelsCondition, false, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter)
