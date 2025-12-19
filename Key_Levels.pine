@@ -43,7 +43,9 @@ showSessionMarkers = input.bool(true, "Enable Session Features", group="🕒 Ses
 
 showSessionLabels = input.bool(true, "Enable Anchor Labels", group="🕒 Sessions • General", tooltip="Master switch for session VWAP anchor labels.")
 compactLabels = input.bool(true, "Compact Anchor Labels", group="🕒 Sessions • General", tooltip="Use abbreviated anchor labels (daily/weekly anchors).")
-longTermAnchorSession = input.string("Auto", "Primary Anchor Session", options=["Auto", "Globex", "Sydney", "Tokyo", "London", "New York"], group="🕒 Sessions • General", tooltip="Primary session used to define weekly/monthly/yearly VWAP anchors and longer-term anchors.")
+longTermAnchorSession = input.string("Auto", "Primary Anchor Session", options=["Auto", "Globex", "Sydney", "Tokyo", "London", "New York"], group="🕒 Sessions • General", tooltip="Primary session used to define weekly/monthly/yearly VWAP anchors. Auto selects New York for stocks, Globex for all other symbols.")
+rthOnlyForStocks = input.bool(true, "RTH Only for NY Sessions (Stocks)", group="🕒 Sessions • General", tooltip="For stocks on ETH charts: provides correct RTH-based VWAPs by filtering NY session and NY-based anchors (Weekly/Monthly/Yearly) to Regular Trading Hours only (9:30 AM - 4:00 PM ET). Excludes pre-market and after-hours volume from calculations. Other sessions (London, Globex, etc.) use their full session data for reference.")
+rthOnlyForIndices = input.bool(false, "RTH Only for NY Sessions (Indices)", group="🕒 Sessions • General", tooltip="For equity index futures on ETH charts: provides correct RTH-based VWAPs by filtering NY session and NY-based anchors to Regular Trading Hours only (9:30 AM - 4:00 PM ET). Other sessions use their full session data.")
 
 showSessionVWAP = input.bool(true, "Enable Daily VWAP Anchors", group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Show daily session VWAP anchors (each session start), including their labels.")
 
@@ -56,7 +58,7 @@ sessionVWAPLineStyle = sessionVWAPLineStyleInput == "Solid" ? plot.linestyle_sol
 
 enableGlobex = input.bool(true, "Globex", inline="SS_GLX", group="🕒 Sessions • VWAP Anchors • Daily")
 colorGlobex = input.color(#4CAF50, "", inline="SS_GLX", group="🕒 Sessions • VWAP Anchors • Daily")
-globexVWAPCount = input.int(5, "History", inline="SS_GLX", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Number of daily anchors to show (1=current only, 2=current+previous).")
+globexVWAPCount = input.int(3, "History", inline="SS_GLX", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Number of daily anchors to show (1=current only, 2=current+previous).")
 
 enableSydney = input.bool(false, "Sydney", inline="SS_SYD", group="🕒 Sessions • VWAP Anchors • Daily")
 colorSydney = input.color(#9C27B0, "", inline="SS_SYD", group="🕒 Sessions • VWAP Anchors • Daily")
@@ -77,40 +79,46 @@ nyVWAPCount = input.int(2, "History", inline="SS_NY", minval=1, maxval=5, group=
 vwapColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Visually de-emphasize older daily VWAP anchors.")
 vwapMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Transparency applied to the oldest visible daily VWAP anchor (0=opaque).")
 vwapDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Reduce color vibrancy for older daily VWAP anchors (0=vibrant, 100=gray).")
-vwapHueShift = input.int(-12, "Hue Shift", minval=-50, maxval=50, group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Shift hue for older daily VWAP anchors (-=cooler, +=warmer).")
+vwapBrightness = input.int(0, "Brightness", minval=-100, maxval=100, group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Adjust brightness for older daily VWAP anchors (0=no change, -=darker, +=brighter).")
+vwapHueShift = input.int(-5, "Hue Shift", minval=-50, maxval=50, group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Shift hue for older daily VWAP anchors (-=cooler, +=warmer).")
 
 showWeeklyAnchorVWAP = input.bool(true, "Enable Weekly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Show weekly VWAP anchor (first Primary Anchor Session of the trading week).")
-weeklyAnchorMaxTimeframe = input.string("4h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D"], group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Maximum chart timeframe where weekly VWAP anchors remain visible.")
-colorWeeklyAnchor = input.color(#b51b00, "Color", group="🗓️ Sessions • VWAP Anchors • Weekly")
-weeklyAnchorCount = input.int(5, "History", minval=1, maxval=5, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Number of weekly anchors to show (1=current only, 2=current+previous).")
+weeklyAnchorMaxTimeframe = input.string("2h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D"], group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Maximum chart timeframe where weekly VWAP anchors remain visible.")
+colorWeeklyAnchor = input.color(#B01200, "Color", group="🗓️ Sessions • VWAP Anchors • Weekly")
+weeklyAnchorCount = input.int(6, "History", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Number of weekly anchors to show (1=current only, 2=current+previous).")
 longTermAnchorColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Visually de-emphasize older weekly VWAP anchors.")
 longTermAnchorMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Transparency applied to the oldest visible weekly VWAP anchor (0=opaque).")
 longTermAnchorDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Reduce color vibrancy for older weekly VWAP anchors (0=vibrant, 100=gray).")
+longTermAnchorBrightness = input.int(0, "Brightness", minval=-100, maxval=100, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Adjust brightness for older weekly VWAP anchors (0=no change, -=darker, +=brighter).")
 longTermAnchorHueShift = input.int(-12, "Hue Shift", minval=-50, maxval=50, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Shift hue for older weekly VWAP anchors (-=cooler, +=warmer).")
 
-showMonthlyAnchorVWAP = input.bool(false, "Enable Monthly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Monthly")
+showMonthlyAnchorVWAP = input.bool(true, "Enable Monthly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Monthly")
+monthlyAnchorMinTimeframe = input.string("4h", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Minimum chart timeframe where monthly VWAP anchors become visible.")
 monthlyAnchorMaxTimeframe = input.string("1D", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Maximum chart timeframe where monthly VWAP anchors remain visible.")
-colorMonthlyAnchor = input.color(#0f4c81, "Color", group="🗓️ Sessions • VWAP Anchors • Monthly")
-monthlyAnchorCount = input.int(3, "History", minval=1, maxval=10, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Number of monthly anchors to show (1=current only, 2=current+previous).")
+colorMonthlyAnchor = input.color(#3B5BFF, "Color", group="🗓️ Sessions • VWAP Anchors • Monthly")
+monthlyAnchorCount = input.int(1, "History", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Number of monthly anchors to show (1=current only, 2=current+previous).")
 monthlyAnchorColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Visually de-emphasize older monthly VWAP anchors.")
 monthlyAnchorMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Transparency applied to the oldest visible monthly VWAP anchor (0=opaque).")
-monthlyAnchorDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Reduce color vibrancy for older monthly VWAP anchors (0=vibrant, 100=gray).")
-monthlyAnchorHueShift = input.int(-12, "Hue Shift", minval=-50, maxval=50, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Shift hue for older monthly VWAP anchors (-=cooler, +=warmer).")
+monthlyAnchorDesaturation = input.int(80, "Desaturation", minval=0, maxval=100, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Reduce color vibrancy for older monthly VWAP anchors (0=vibrant, 100=gray).")
+monthlyAnchorBrightness = input.int(0, "Brightness", minval=-100, maxval=100, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Adjust brightness for older monthly VWAP anchors (0=no change, -=darker, +=brighter).")
+monthlyAnchorHueShift = input.int(6, "Hue Shift", minval=-50, maxval=50, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Shift hue for older monthly VWAP anchors (-=cooler, +=warmer).")
 
-showYearlyAnchorVWAP = input.bool(false, "Enable Yearly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Yearly")
+showYearlyAnchorVWAP = input.bool(true, "Enable Yearly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Yearly")
+yearlyAnchorMinTimeframe = input.string("15m", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W", "1M"], group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Minimum chart timeframe where yearly VWAP anchors become visible.")
 yearlyAnchorMaxTimeframe = input.string("1W", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W", "1M"], group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Maximum chart timeframe where yearly VWAP anchors remain visible.")
-colorYearlyAnchor = input.color(#111111, "Color", group="🗓️ Sessions • VWAP Anchors • Yearly")
+colorYearlyAnchor = input.color(#000000, "Color", group="🗓️ Sessions • VWAP Anchors • Yearly")
 yearlyAnchorCount = input.int(2, "History", minval=1, maxval=2, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Number of yearly anchors to show (1=current only, 2=current+previous).")
 yearlyAnchorColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Visually de-emphasize older yearly VWAP anchors.")
 yearlyAnchorMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Transparency applied to the oldest visible yearly VWAP anchor (0=opaque).")
 yearlyAnchorDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Reduce color vibrancy for older yearly VWAP anchors (0=vibrant, 100=gray).")
+yearlyAnchorBrightness = input.int(50, "Brightness", minval=-100, maxval=100, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Adjust brightness for older yearly VWAP anchors (0=no change, -=darker, +=brighter).")
 yearlyAnchorHueShift = input.int(-12, "Hue Shift", minval=-50, maxval=50, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Shift hue for older yearly VWAP anchors (-=cooler, +=warmer).")
 
 
 // ────────────────────────────────────────────────────────────────────────────────
 // 📏 Sessions • Levels • Visibility
 // ────────────────────────────────────────────────────────────────────────────────
-showSessionLevels = input.bool(true, "Enable Session Levels", group="📏 Sessions • Levels • Visibility", tooltip="Master switch for session levels (Opening Price, ORB, IB).")
+showSessionLevelsInput = input.string("Futures Only", "Enable Session Levels", options=["Always", "Futures Only", "Off"], group="📏 Sessions • Levels • Visibility", tooltip="Master switch for session levels (Opening Price, ORB, IB). Futures Only: show only on futures symbols.")
 sessionLevelsMaxTimeframe = input.string("5m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📏 Sessions • Levels • Visibility", tooltip="Hide session levels on timeframes above this")
 sessionLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📏 Sessions • Levels • Visibility")
 sessionLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📏 Sessions • Levels • Visibility", tooltip="Width for Opening Price / ORB / IB lines")
@@ -348,13 +356,13 @@ deleteLabel(array<label> labelArray, int idx) =>
 
 
 
-// Calculate color with transparency, hue shift, and desaturation based on VWAP position in history (0 = most recent)
-getVWAPColor(color baseColor, int positionInHistory, bool useDifferentiation, int maxTransp, int hueShift, int desat) =>
+// Calculate color with transparency, hue shift, desaturation, and brightness based on VWAP position in history (0 = most recent)
+getVWAPColor(color baseColor, int positionInHistory, bool useDifferentiation, int maxTransp, int hueShift, int desat, int brightness, int maxPos = 4) =>
     if not useDifferentiation or positionInHistory == 0
         baseColor
     else
         // Linear gradient for transparency
-        float normalizedPos = positionInHistory / 4.0  // Normalize to 0-1 range (assuming max 5 visible)
+        float normalizedPos = maxPos > 0 ? positionInHistory / float(maxPos) : 0.0
         int transparency = int(normalizedPos * maxTransp)
 
         // Extract RGB components
@@ -375,6 +383,11 @@ getVWAPColor(color baseColor, int positionInHistory, bool useDifferentiation, in
         if desat > 0
             float desatFactor = (normalizedPos * desat) / 100.0
             s := s * (1.0 - desatFactor)
+
+        // Apply brightness adjustment
+        if brightness != 0
+            float brightnessFactor = (normalizedPos * brightness) / 100.0
+            l := math.max(0.0, math.min(1.0, l + brightnessFactor))
 
         // Convert back to RGB
         [newR, newG, newB] = hslToRgb(h, s, l)
@@ -704,10 +717,22 @@ bool meetsSessionLevelsMaxTimeframe = sessionLevelsMaxTimeframe == "None" or cur
 bool meetsPivotMaxTimeframe = pivotMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(pivotMaxTimeframe)
 bool showPivotsCondition = showPivots and meetsPivotMaxTimeframe
 
+// NY session filter for stocks and equity indices (RTH = 9:30 AM - 4:00 PM ET, bars before 4:00 PM)
+int nyHour = hour(time, "America/New_York")
+int nyMinute = minute(time, "America/New_York")
+bool isNYSession = (nyHour == 9 and nyMinute >= 30) or (nyHour > 9 and nyHour < 16)
+bool isEquityIndex = syminfo.type == "futures" and (str.contains(syminfo.ticker, "ES") or str.contains(syminfo.ticker, "MES") or str.contains(syminfo.ticker, "NQ") or str.contains(syminfo.ticker, "MNQ") or str.contains(syminfo.ticker, "RTY") or str.contains(syminfo.ticker, "M2K") or str.contains(syminfo.ticker, "YM") or str.contains(syminfo.ticker, "MYM"))
+bool shouldFilterRTH = (rthOnlyForStocks and syminfo.type == "stock") or (rthOnlyForIndices and isEquityIndex)
+bool isRTHBar = not shouldFilterRTH or isNYSession
+
 // Check timeframe condition for weekly anchors
 bool meetsWeeklyAnchorMaxTimeframe = weeklyAnchorMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(weeklyAnchorMaxTimeframe)
+bool meetsMonthlyAnchorMinTimeframe = monthlyAnchorMinTimeframe == "None" or currentTfMinutes >= periodToMinutes(monthlyAnchorMinTimeframe)
 bool meetsMonthlyAnchorMaxTimeframe = monthlyAnchorMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(monthlyAnchorMaxTimeframe)
+bool meetsMonthlyAnchorTimeframe = meetsMonthlyAnchorMinTimeframe and meetsMonthlyAnchorMaxTimeframe
+bool meetsYearlyAnchorMinTimeframe = yearlyAnchorMinTimeframe == "None" or currentTfMinutes >= periodToMinutes(yearlyAnchorMinTimeframe)
 bool meetsYearlyAnchorMaxTimeframe = yearlyAnchorMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(yearlyAnchorMaxTimeframe)
+bool meetsYearlyAnchorTimeframe = meetsYearlyAnchorMinTimeframe and meetsYearlyAnchorMaxTimeframe
 
 // KEY LEVELS DATA - Conditional requests for performance
 var float pdh = na, var float pdl = na
@@ -777,8 +802,8 @@ var array<LevelRenderer> sessionLevels = array.new<LevelRenderer>()
 // MULTI-SESSION INFRASTRUCTURE
 
 const int MAX_VWAP_HISTORY = 10
-const int MAX_WEEKLY_HISTORY = 5
-const int MAX_MONTHLY_HISTORY = 10
+const int MAX_WEEKLY_HISTORY = 6
+const int MAX_MONTHLY_HISTORY = 6
 const int MAX_YEARLY_HISTORY = 2
 
 var array<bool> sessionEnabled = array.from(enableLondon, enableNewYork, enableGlobex, enableSydney, enableTokyo)
@@ -987,28 +1012,34 @@ for i = 0 to 4
             // They continue calculating even after the next session starts (unlike the old logic)
             bool shouldCalculate = time >= sessionStart and isInConfiguredRange
 
+            // Reset accumulators on session start (always, regardless of RTH)
+            if isSessionStart and isInConfiguredRange
+                array.set(sumSrcArray, arrayIdx, 0.0)
+                array.set(sumVolArray, arrayIdx, 0.0)
+
             if shouldCalculate
                 // Get current accumulators for this session
                 float currentSumSrc = array.get(sumSrcArray, arrayIdx)
                 float currentSumVol = array.get(sumVolArray, arrayIdx)
 
-                // Reset accumulators on new session start, otherwise accumulate continuously
-                float newSumSrc = isSessionStart ? (ohlc4 * volume) : (currentSumSrc + ohlc4 * volume)
-                float newSumVol = isSessionStart ? volume : (currentSumVol + volume)
+                // Accumulate: only filter NY session to RTH if enabled, all other sessions use full data
+                bool isNYSessionVWAP = sessionName == "New York"
+                bool shouldAccumulate = not isNYSessionVWAP or not shouldFilterRTH or isNYSession
+                if shouldAccumulate
+                    currentSumSrc += (ohlc4 * volume)
+                    currentSumVol += volume
+                    array.set(sumSrcArray, arrayIdx, currentSumSrc)
+                    array.set(sumVolArray, arrayIdx, currentSumVol)
 
-                // Update accumulators
-                array.set(sumSrcArray, arrayIdx, newSumSrc)
-                array.set(sumVolArray, arrayIdx, newSumVol)
-
-                // Calculate VWAP and store in array
-                float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
+                // Calculate VWAP from current accumulators (after accumulation)
+                float vwap = currentSumVol > 0 ? currentSumSrc / currentSumVol : na
                 array.set(vwapArray, arrayIdx, vwap)
 
                 // Create session label at session start ONLY if within configured history count and timeframe
                 if isSessionStart and sessionBaseCondition and meetsThisSessionVWAPTimeframe and showSessionLabels and showSessionVWAP and isInConfiguredRange
                     deleteLabel(labelArray, arrayIdx)
                     int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
-                    color labelColor = getVWAPColor(sessionColor, positionInHistory, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation)
+                    color labelColor = getVWAPColor(sessionColor, positionInHistory, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, historyCount - 1)
                     bool isPrimarySession = sessionName == primarySessionName
                     // For Globex, show the trading day (session end day) not the start day
                     int labelTimestamp = sessionName == "Globex" ? sessionStart + 86400000 : sessionStart
@@ -1025,27 +1056,27 @@ for i = 0 to 4
 
 // Plot VWAPs - up to 5 historical sessions per type
 bool skipLondonMostRecent = showWeeklyAnchorVWAP and primarySessionName == "London" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and meetsLondonVWAPTimeframe and showSessionVWAP and enableLondon and londonVWAPCount >= 1 and not skipLondonMostRecent ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 1) : na, "London VWAP 1", color=getVWAPColor(colorLondon, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsLondonVWAPTimeframe and showSessionVWAP and enableLondon and londonVWAPCount >= 1 and not skipLondonMostRecent ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 1) : na, "London VWAP 1", color=getVWAPColor(colorLondon, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, londonVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 bool skipNYMostRecent = showWeeklyAnchorVWAP and primarySessionName == "New York" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYork and nyVWAPCount >= 1 and not skipNYMostRecent ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 1) : na, "NY VWAP 1", color=getVWAPColor(colorNewYork, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYork and nyVWAPCount >= 2 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 2) : na, "NY VWAP 2", color=getVWAPColor(colorNewYork, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYork and nyVWAPCount >= 3 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 3) : na, "NY VWAP 3", color=getVWAPColor(colorNewYork, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYork and nyVWAPCount >= 4 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 4) : na, "NY VWAP 4", color=getVWAPColor(colorNewYork, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYork and nyVWAPCount >= 5 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 5) : na, "NY VWAP 5", color=getVWAPColor(colorNewYork, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYork and nyVWAPCount >= 1 and not skipNYMostRecent ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 1) : na, "NY VWAP 1", color=getVWAPColor(colorNewYork, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, nyVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYork and nyVWAPCount >= 2 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 2) : na, "NY VWAP 2", color=getVWAPColor(colorNewYork, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, nyVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYork and nyVWAPCount >= 3 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 3) : na, "NY VWAP 3", color=getVWAPColor(colorNewYork, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, nyVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYork and nyVWAPCount >= 4 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 4) : na, "NY VWAP 4", color=getVWAPColor(colorNewYork, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, nyVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYork and nyVWAPCount >= 5 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 5) : na, "NY VWAP 5", color=getVWAPColor(colorNewYork, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, nyVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 bool skipGlobexMostRecent = showWeeklyAnchorVWAP and primarySessionName == "Globex" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobex and globexVWAPCount >= 1 and not skipGlobexMostRecent ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 1) : na, "Globex VWAP 1", color=getVWAPColor(colorGlobex, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobex and globexVWAPCount >= 2 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 2) : na, "Globex VWAP 2", color=getVWAPColor(colorGlobex, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobex and globexVWAPCount >= 3 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 3) : na, "Globex VWAP 3", color=getVWAPColor(colorGlobex, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobex and globexVWAPCount >= 4 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 4) : na, "Globex VWAP 4", color=getVWAPColor(colorGlobex, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobex and globexVWAPCount >= 5 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 5) : na, "Globex VWAP 5", color=getVWAPColor(colorGlobex, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobex and globexVWAPCount >= 1 and not skipGlobexMostRecent ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 1) : na, "Globex VWAP 1", color=getVWAPColor(colorGlobex, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, globexVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobex and globexVWAPCount >= 2 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 2) : na, "Globex VWAP 2", color=getVWAPColor(colorGlobex, 1, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, globexVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobex and globexVWAPCount >= 3 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 3) : na, "Globex VWAP 3", color=getVWAPColor(colorGlobex, 2, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, globexVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobex and globexVWAPCount >= 4 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 4) : na, "Globex VWAP 4", color=getVWAPColor(colorGlobex, 3, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, globexVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobex and globexVWAPCount >= 5 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 5) : na, "Globex VWAP 5", color=getVWAPColor(colorGlobex, 4, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, globexVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 bool skipSydneyMostRecent = showWeeklyAnchorVWAP and primarySessionName == "Sydney" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and meetsSydneyVWAPTimeframe and showSessionVWAP and enableSydney and sydneyVWAPCount >= 1 and not skipSydneyMostRecent ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 1) : na, "Sydney VWAP 1", color=getVWAPColor(colorSydney, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsSydneyVWAPTimeframe and showSessionVWAP and enableSydney and sydneyVWAPCount >= 1 and not skipSydneyMostRecent ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 1) : na, "Sydney VWAP 1", color=getVWAPColor(colorSydney, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, sydneyVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 bool skipTokyoMostRecent = showWeeklyAnchorVWAP and primarySessionName == "Tokyo" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and meetsTokyoVWAPTimeframe and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 1 and not skipTokyoMostRecent ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 1) : na, "Tokyo VWAP 1", color=getVWAPColor(colorTokyo, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and meetsTokyoVWAPTimeframe and showSessionVWAP and enableTokyo and tokyoVWAPCount >= 1 and not skipTokyoMostRecent ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 1) : na, "Tokyo VWAP 1", color=getVWAPColor(colorTokyo, 0, vwapColorDifferentiation, vwapMaxTransparency, vwapHueShift, vwapDesaturation, vwapBrightness, tokyoVWAPCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // WEEKLY ANCHOR VWAP CALCULATION (Multi-week support)
@@ -1086,13 +1117,14 @@ if showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe
                     if not na(oldLabel)
                         label.delete(oldLabel)
                     int positionInWeeklyHistory = (MAX_WEEKLY_HISTORY - 1) - weekIdx
-                    color weeklyLabelColor = getVWAPColor(colorWeeklyAnchor, positionInWeeklyHistory, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation)
+                    color weeklyLabelColor = getVWAPColor(colorWeeklyAnchor, positionInWeeklyHistory, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1)
                     string weeklyLabelText = compactLabels ? "W" + str.tostring(positionInWeeklyHistory + 1) : "Week " + str.tostring(weekofyear(weekStart, anchorTZ)) + " (" + primarySessionName + ")"
                     label newLabel = label.new(bar_index, high, weeklyLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=weeklyLabelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
                     array.set(weeklyAnchorLabels, weekIdx, newLabel)
 
-            // Accumulate if we're at or after this week's start
-            if time >= weekStart
+            // Accumulate if we're at or after this week's start (apply RTH filter for stocks/indices)
+            bool shouldAccumulateWeekly = not shouldFilterRTH or isNYSession
+            if time >= weekStart and shouldAccumulateWeekly
                 float currentSumSrc = array.get(weeklyAnchorSumSrc, weekIdx)
                 float currentSumVol = array.get(weeklyAnchorSumVol, weekIdx)
                 array.set(weeklyAnchorSumSrc, weekIdx, currentSumSrc + (ohlc4 * volume))
@@ -1104,24 +1136,26 @@ if showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe
                 array.set(weeklyAnchorVWAPs, weekIdx, vwap)
 
 // Plot weekly anchor VWAPs (only plot the number specified by count)
-// Index 4 = most recent (when MAX=5), Index 3 = 2nd most recent, etc.
+// Index 5 = most recent (when MAX=6), Index 4 = 2nd most recent, etc.
 bool shouldPlot0 = 0 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
 bool shouldPlot1 = 1 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
 bool shouldPlot2 = 2 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
 bool shouldPlot3 = 3 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
 bool shouldPlot4 = 4 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
+bool shouldPlot5 = 5 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
 
-plot(shouldPlot0 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 0) : na, "Weekly Anchor 1", color=getVWAPColor(colorWeeklyAnchor, 4, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlot1 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 1) : na, "Weekly Anchor 2", color=getVWAPColor(colorWeeklyAnchor, 3, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlot2 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 2) : na, "Weekly Anchor 3", color=getVWAPColor(colorWeeklyAnchor, 2, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlot3 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 3) : na, "Weekly Anchor 4", color=getVWAPColor(colorWeeklyAnchor, 1, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlot4 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 4) : na, "Weekly Anchor 5", color=getVWAPColor(colorWeeklyAnchor, 0, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlot0 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 0) : na, "Weekly Anchor 1", color=getVWAPColor(colorWeeklyAnchor, 5, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlot1 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 1) : na, "Weekly Anchor 2", color=getVWAPColor(colorWeeklyAnchor, 4, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlot2 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 2) : na, "Weekly Anchor 3", color=getVWAPColor(colorWeeklyAnchor, 3, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlot3 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 3) : na, "Weekly Anchor 4", color=getVWAPColor(colorWeeklyAnchor, 2, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlot4 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 4) : na, "Weekly Anchor 5", color=getVWAPColor(colorWeeklyAnchor, 1, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlot5 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 5) : na, "Weekly Anchor 6", color=getVWAPColor(colorWeeklyAnchor, 0, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MONTHLY ANCHOR VWAP CALCULATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-if showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe
+if showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe
     string anchorTZ = getSessionTimezone(primarySessionName)
     for monthIdx = 0 to MAX_MONTHLY_HISTORY - 1
         int monthStart = array.get(monthlyAnchorStartsArray, monthIdx)
@@ -1138,15 +1172,17 @@ if showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimefra
                     if not na(oldLabel)
                         label.delete(oldLabel)
                     int positionInMonthlyHistory = (MAX_MONTHLY_HISTORY - 1) - monthIdx
-                    color monthlyLabelColor = getVWAPColor(colorMonthlyAnchor, positionInMonthlyHistory, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation)
+                    color monthlyLabelColor = getVWAPColor(colorMonthlyAnchor, positionInMonthlyHistory, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1)
                     string monthlyLabelText = compactLabels ? "M" + str.tostring(positionInMonthlyHistory + 1) : str.format("{0,date,MMM yyyy}", monthStart) + " (" + primarySessionName + ")"
                     label newLabel = label.new(bar_index, high, monthlyLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=monthlyLabelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
                     array.set(monthlyAnchorLabels, monthIdx, newLabel)
             if time >= monthStart
-                float currentSumSrc = array.get(monthlyAnchorSumSrc, monthIdx)
-                float currentSumVol = array.get(monthlyAnchorSumVol, monthIdx)
-                array.set(monthlyAnchorSumSrc, monthIdx, currentSumSrc + (ohlc4 * volume))
-                array.set(monthlyAnchorSumVol, monthIdx, currentSumVol + volume)
+                bool shouldAccumulateMonthly = not shouldFilterRTH or isNYSession
+                if shouldAccumulateMonthly
+                    float currentSumSrc = array.get(monthlyAnchorSumSrc, monthIdx)
+                    float currentSumVol = array.get(monthlyAnchorSumVol, monthIdx)
+                    array.set(monthlyAnchorSumSrc, monthIdx, currentSumSrc + (ohlc4 * volume))
+                    array.set(monthlyAnchorSumVol, monthIdx, currentSumVol + volume)
                 float newSumSrc = array.get(monthlyAnchorSumSrc, monthIdx)
                 float newSumVol = array.get(monthlyAnchorSumVol, monthIdx)
                 float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
@@ -1158,27 +1194,19 @@ bool shouldPlotM2 = 2 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
 bool shouldPlotM3 = 3 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
 bool shouldPlotM4 = 4 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
 bool shouldPlotM5 = 5 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-bool shouldPlotM6 = 6 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-bool shouldPlotM7 = 7 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-bool shouldPlotM8 = 8 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-bool shouldPlotM9 = 9 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
 
-plot(shouldPlotM0 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe ? array.get(monthlyAnchorVWAPs, 0) : na, "Monthly Anchor 1", color=getVWAPColor(colorMonthlyAnchor, 9, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM1 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe ? array.get(monthlyAnchorVWAPs, 1) : na, "Monthly Anchor 2", color=getVWAPColor(colorMonthlyAnchor, 8, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM2 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe ? array.get(monthlyAnchorVWAPs, 2) : na, "Monthly Anchor 3", color=getVWAPColor(colorMonthlyAnchor, 7, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM3 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe ? array.get(monthlyAnchorVWAPs, 3) : na, "Monthly Anchor 4", color=getVWAPColor(colorMonthlyAnchor, 6, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM4 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe ? array.get(monthlyAnchorVWAPs, 4) : na, "Monthly Anchor 5", color=getVWAPColor(colorMonthlyAnchor, 5, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM5 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe ? array.get(monthlyAnchorVWAPs, 5) : na, "Monthly Anchor 6", color=getVWAPColor(colorMonthlyAnchor, 4, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM6 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe ? array.get(monthlyAnchorVWAPs, 6) : na, "Monthly Anchor 7", color=getVWAPColor(colorMonthlyAnchor, 3, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM7 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe ? array.get(monthlyAnchorVWAPs, 7) : na, "Monthly Anchor 8", color=getVWAPColor(colorMonthlyAnchor, 2, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM8 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe ? array.get(monthlyAnchorVWAPs, 8) : na, "Monthly Anchor 9", color=getVWAPColor(colorMonthlyAnchor, 1, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM9 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorMaxTimeframe ? array.get(monthlyAnchorVWAPs, 9) : na, "Monthly Anchor 10", color=getVWAPColor(colorMonthlyAnchor, 0, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlotM0 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 0) : na, "Monthly Anchor 1", color=getVWAPColor(colorMonthlyAnchor, 5, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlotM1 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 1) : na, "Monthly Anchor 2", color=getVWAPColor(colorMonthlyAnchor, 4, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlotM2 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 2) : na, "Monthly Anchor 3", color=getVWAPColor(colorMonthlyAnchor, 3, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlotM3 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 3) : na, "Monthly Anchor 4", color=getVWAPColor(colorMonthlyAnchor, 2, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlotM4 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 4) : na, "Monthly Anchor 5", color=getVWAPColor(colorMonthlyAnchor, 1, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlotM5 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 5) : na, "Monthly Anchor 6", color=getVWAPColor(colorMonthlyAnchor, 0, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // YEARLY ANCHOR VWAP CALCULATION
 // ═══════════════════════════════════════════════════════════════════════════════
 
-if showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorMaxTimeframe
+if showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe
     string anchorTZ = getSessionTimezone(primarySessionName)
     for yearIdx = 0 to MAX_YEARLY_HISTORY - 1
         int yearStart = array.get(yearlyAnchorStartsArray, yearIdx)
@@ -1195,15 +1223,17 @@ if showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorMaxTimeframe
                     if not na(oldLabel)
                         label.delete(oldLabel)
                     int positionInYearlyHistory = (MAX_YEARLY_HISTORY - 1) - yearIdx
-                    color yearlyLabelColor = getVWAPColor(colorYearlyAnchor, positionInYearlyHistory, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation)
+                    color yearlyLabelColor = getVWAPColor(colorYearlyAnchor, positionInYearlyHistory, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation, yearlyAnchorBrightness, yearlyAnchorCount - 1)
                     string yearlyLabelText = compactLabels ? "Y" + str.tostring(positionInYearlyHistory + 1) : str.format("{0,date,yyyy}", yearStart) + " (" + primarySessionName + ")"
                     label newLabel = label.new(bar_index, high, yearlyLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=yearlyLabelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
                     array.set(yearlyAnchorLabels, yearIdx, newLabel)
             if time >= yearStart
-                float currentSumSrc = array.get(yearlyAnchorSumSrc, yearIdx)
-                float currentSumVol = array.get(yearlyAnchorSumVol, yearIdx)
-                array.set(yearlyAnchorSumSrc, yearIdx, currentSumSrc + (ohlc4 * volume))
-                array.set(yearlyAnchorSumVol, yearIdx, currentSumVol + volume)
+                bool shouldAccumulateYearly = not shouldFilterRTH or isNYSession
+                if shouldAccumulateYearly
+                    float currentSumSrc = array.get(yearlyAnchorSumSrc, yearIdx)
+                    float currentSumVol = array.get(yearlyAnchorSumVol, yearIdx)
+                    array.set(yearlyAnchorSumSrc, yearIdx, currentSumSrc + (ohlc4 * volume))
+                    array.set(yearlyAnchorSumVol, yearIdx, currentSumVol + volume)
                 float newSumSrc = array.get(yearlyAnchorSumSrc, yearIdx)
                 float newSumVol = array.get(yearlyAnchorSumVol, yearIdx)
                 float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
@@ -1212,8 +1242,8 @@ if showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorMaxTimeframe
 bool shouldPlotY0 = 0 >= (MAX_YEARLY_HISTORY - yearlyAnchorCount)
 bool shouldPlotY1 = 1 >= (MAX_YEARLY_HISTORY - yearlyAnchorCount)
 
-plot(shouldPlotY0 and showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorMaxTimeframe ? array.get(yearlyAnchorVWAPs, 0) : na, "Yearly Anchor 1", color=getVWAPColor(colorYearlyAnchor, 1, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotY1 and showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorMaxTimeframe ? array.get(yearlyAnchorVWAPs, 1) : na, "Yearly Anchor 2", color=getVWAPColor(colorYearlyAnchor, 0, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlotY0 and showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe ? array.get(yearlyAnchorVWAPs, 0) : na, "Yearly Anchor 1", color=getVWAPColor(colorYearlyAnchor, 1, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation, yearlyAnchorBrightness, yearlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(shouldPlotY1 and showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe ? array.get(yearlyAnchorVWAPs, 1) : na, "Yearly Anchor 2", color=getVWAPColor(colorYearlyAnchor, 0, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation, yearlyAnchorBrightness, yearlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SESSION LEVELS RENDERING (for active session only)
@@ -1431,6 +1461,7 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
 
     string sessionLineStyleActual = getLineStyle(sessionLevelsLineStyle)
     // Only show session levels if enabled and we meet the session levels timeframe filter
+    bool showSessionLevels = showSessionLevelsInput == "Always" or (showSessionLevelsInput == "Futures Only" and syminfo.type == "futures")
     bool shouldShowSessionLevels = showSessionLevels and sessionBaseCondition and meetsSessionLevelsMaxTimeframe and not na(activeSessionIndex) and not na(sessionOpen)
 
     // Render session levels using array-based approach
