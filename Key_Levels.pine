@@ -30,85 +30,85 @@ indicator("Key Levels", overlay=true, max_lines_count=500, max_boxes_count=100)
 // ────────────────────────────────────────────────────────────────────────────────
 // 🏷️ Horizontal Levels
 // ────────────────────────────────────────────────────────────────────────────────
-globalShowPriceValues = input.bool(false, "Show Prices in Level Labels", group="🏷️ Horizontal Levels", tooltip="Show price in labels: 'PDH (4523.50)' vs 'PDH'")
+globalShowPriceValues = input.bool(false, "Show Prices in Level Labels", group="🏷️ Horizontal Levels", tooltip="Include price values in labels")
 
-useATRFilter = input.bool(true, "Hide Distant Levels", group="🏷️ Horizontal Levels", tooltip="Only show horizontal levels within specified ATR distance from current price")
-atrMultiplier = input.float(1.5, "Distance (ATR)", minval=1.0, maxval=10.0, step=0.5, group="🏷️ Horizontal Levels", tooltip="Hide levels beyond this many ATRs from current price")
-atrPeriod = input.int(20, "ATR Period (Days)", minval=1, maxval=500, group="🏷️ Horizontal Levels", tooltip="ATR calculated from daily bars (last N days), regardless of chart timeframe")
+useATRFilter = input.bool(true, "Hide Distant Levels", group="🏷️ Horizontal Levels", tooltip="Show levels within ATR range only")
+atrMultiplier = input.float(1.5, "Distance (ATR)", minval=1.0, maxval=10.0, step=0.5, group="🏷️ Horizontal Levels", tooltip="Max ATR distance from price")
+atrPeriod = input.int(20, "ATR Period (Days)", minval=1, maxval=500, group="🏷️ Horizontal Levels", tooltip="Daily ATR lookback period")
 
-globalLabelSize = input.string("Normal", "Level Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="🏷️ Horizontal Levels", tooltip="Label size for horizontal level lines (Session Levels, Pivot Points, Key Levels)")
-globalLineLengthBars = input.int(50, "Line Length (Bars)", minval=10, maxval=200, group="🏷️ Horizontal Levels", tooltip="Bars to extend lines backward from current bar (used when Line Start = Fixed Bars Back). Hard limit for lines: 200")
+globalLabelSize = input.string("Normal", "Level Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="🏷️ Horizontal Levels", tooltip="Label size for all level lines")
+globalLineLengthBars = input.int(50, "Line Length (Bars)", minval=10, maxval=200, group="🏷️ Horizontal Levels", tooltip="Bars back for Fixed mode (max 200)")
 
-showSessionMarkers = input.bool(true, "Enable Session Features", group="🕒 Sessions • General", tooltip="Master switch for session features (VWAP anchors, session levels, labels).")
+showSessionMarkers = input.bool(true, "Enable Session Features", group="🕒 Sessions • General", tooltip="Master switch for all session features")
 
-showSessionLabels = input.bool(true, "Enable Anchor Labels", group="🕒 Sessions • General", tooltip="Master switch for session VWAP anchor labels.")
-compactLabels = input.bool(true, "Compact Anchor Labels", group="🕒 Sessions • General", tooltip="Use abbreviated anchor labels (daily/weekly anchors).")
-longTermAnchorSession = input.string("Auto", "Primary Anchor Session", options=["Auto", "Globex", "Sydney", "Tokyo", "London", "New York"], group="🕒 Sessions • General", tooltip="Primary session used to define weekly/monthly/yearly VWAP anchors. Auto selects New York for stocks, Globex for all other symbols.")
-rthOnlyForStocks = input.bool(true, "RTH Only for NY Sessions (Stocks)", group="🕒 Sessions • General", tooltip="For stocks on ETH charts: provides correct RTH-based VWAPs by filtering NY session and NY-based anchors (Weekly/Monthly/Yearly) to Regular Trading Hours only (9:30 AM - 4:00 PM ET). Excludes pre-market and after-hours volume from calculations. Other sessions (London, Globex, etc.) use their full session data for reference.")
-rthOnlyForIndices = input.bool(false, "RTH Only for NY Sessions (Indices)", group="🕒 Sessions • General", tooltip="For equity index futures on ETH charts: provides correct RTH-based VWAPs by filtering NY session and NY-based anchors to Regular Trading Hours only (9:30 AM - 4:00 PM ET). Other sessions use their full session data.")
+showSessionLabels = input.bool(true, "Enable Anchor Labels", group="🕒 Sessions • General", tooltip="Show VWAP anchor labels")
+compactLabels = input.bool(true, "Compact Anchor Labels", group="🕒 Sessions • General", tooltip="Abbreviated labels (D1/W1 vs full)")
+longTermAnchorSession = input.string("Auto", "Primary Anchor Session", options=["Auto", "Globex", "Sydney", "Tokyo", "London", "New York"], group="🕒 Sessions • General", tooltip="Session for weekly/monthly/yearly anchors")
+rthOnlyForStocks = input.bool(true, "RTH Only for NY Sessions (Stocks)", group="🕒 Sessions • General", tooltip="Stocks: filter NY to RTH 9:30-4:00 ET")
+rthOnlyForIndices = input.bool(false, "RTH Only for NY Sessions (Indices)", group="🕒 Sessions • General", tooltip="Index futures: filter NY to RTH 9:30-4:00 ET")
 
-showSessionVWAP = input.bool(true, "Enable Daily VWAP Anchors", group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Show daily session VWAP anchors (each session start), including their labels.")
+showSessionVWAP = input.bool(true, "Enable Daily VWAP Anchors", group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Show daily session VWAPs")
 
-longTermAnchorSessionMaxTimeframe = input.string("30m", "Max Timeframe (Primary)", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Maximum chart timeframe where the Primary Anchor session remains visible.")
-otherSessionsMaxTimeframe = input.string("5m", "Max Timeframe (Other)", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Maximum chart timeframe where non-primary sessions remain visible.")
+longTermAnchorSessionMaxTimeframe = input.string("30m", "Max Timeframe (Primary)", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Hide primary session above this TF")
+otherSessionsMaxTimeframe = input.string("5m", "Max Timeframe (Other)", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Hide other sessions above this TF")
 
-sessionVWAPLineStyleInput = input.string("Dotted", "Line Style", options=["Solid", "Dashed", "Dotted"], group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Line appearance for session VWAP anchors.")
-sessionVWAPLineWidth = input.int(3, "Line Width", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily", tooltip="Line thickness for session VWAP anchors.")
+sessionVWAPLineStyleInput = input.string("Dotted", "Line Style", options=["Solid", "Dashed", "Dotted"], group="🕒 Sessions • VWAP Anchors • Daily", tooltip="VWAP line style")
+sessionVWAPLineWidth = input.int(3, "Line Width", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily", tooltip="VWAP line width")
 sessionVWAPLineStyle = sessionVWAPLineStyleInput == "Solid" ? plot.linestyle_solid : sessionVWAPLineStyleInput == "Dashed" ? plot.linestyle_dashed : plot.linestyle_dotted
 
 // Stock-specific session settings
 enableGlobexStock = input.bool(false, "Globex", inline="SS_GLX_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
 colorGlobexStock = input.color(#4CAF50, "", inline="SS_GLX_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
-globexVWAPCountStock = input.int(1, "History", inline="SS_GLX_STK", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Number of daily Globex anchors to show for stocks.")
+globexVWAPCountStock = input.int(1, "History", inline="SS_GLX_STK", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Daily Globex anchors count")
 
 enableSydneyStock = input.bool(false, "Sydney", inline="SS_SYD_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
 colorSydneyStock = input.color(#800080, "", inline="SS_SYD_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
-sydneyVWAPCountStock = input.int(1, "History", inline="SS_SYD_STK", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Number of daily Sydney anchors to show for stocks.")
+sydneyVWAPCountStock = input.int(1, "History", inline="SS_SYD_STK", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Daily Sydney anchors count")
 
 enableTokyoStock = input.bool(false, "Tokyo", inline="SS_TKY_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
 colorTokyoStock = input.color(#FF0000, "", inline="SS_TKY_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
-tokyoVWAPCountStock = input.int(1, "History", inline="SS_TKY_STK", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Number of daily Tokyo anchors to show for stocks.")
+tokyoVWAPCountStock = input.int(1, "History", inline="SS_TKY_STK", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Daily Tokyo anchors count")
 
 enableLondonStock = input.bool(false, "London", inline="SS_LON_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
 colorLondonStock = input.color(#FFA500, "", inline="SS_LON_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
-londonVWAPCountStock = input.int(1, "History", inline="SS_LON_STK", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Number of daily London anchors to show for stocks.")
+londonVWAPCountStock = input.int(1, "History", inline="SS_LON_STK", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Daily London anchors count")
 
 enableNewYorkStock = input.bool(true, "New York", inline="SS_NY_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
 colorNewYorkStock = input.color(#0000FF, "", inline="SS_NY_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
-nyVWAPCountStock = input.int(3, "History", inline="SS_NY_STK", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Number of daily NY anchors to show for stocks.")
+nyVWAPCountStock = input.int(3, "History", inline="SS_NY_STK", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Daily NY anchors count")
 
-vwapColorDifferentiationStock = input.bool(true, "Fade Past Sessions", group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Visually de-emphasize older daily VWAP anchors.")
-vwapMaxTransparencyStock = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Transparency applied to the oldest visible daily VWAP anchor (0=opaque).")
-vwapDesaturationStock = input.int(0, "Desaturation", minval=0, maxval=100, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Reduce color vibrancy for older daily VWAP anchors (0=vibrant, 100=gray).")
-vwapBrightnessStock = input.int(0, "Brightness", minval=-100, maxval=100, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Adjust brightness for older daily VWAP anchors (0=no change, -=darker, +=brighter).")
-vwapHueShiftStock = input.int(-5, "Hue Shift", minval=-50, maxval=50, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Shift hue for older daily VWAP anchors (-=cooler, +=warmer).")
+vwapColorDifferentiationStock = input.bool(true, "Fade Past Sessions", group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="De-emphasize older anchors")
+vwapMaxTransparencyStock = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Oldest anchor transparency (0=opaque)")
+vwapDesaturationStock = input.int(0, "Desaturation", minval=0, maxval=100, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Reduce color (0=vibrant, 100=gray)")
+vwapBrightnessStock = input.int(0, "Brightness", minval=-100, maxval=100, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Brightness shift (-=darker, +=brighter)")
+vwapHueShiftStock = input.int(-5, "Hue Shift", minval=-50, maxval=50, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Hue shift (-=cooler, +=warmer)")
 
 // Non-stock (futures, crypto, etc.) session settings
 enableGlobex = input.bool(true, "Globex", inline="SS_GLX", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
 colorGlobex = input.color(#4CAF50, "", inline="SS_GLX", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
-globexVWAPCount = input.int(3, "History", inline="SS_GLX", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Number of daily Globex anchors to show for non-stocks.")
+globexVWAPCount = input.int(3, "History", inline="SS_GLX", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Daily Globex anchors count")
 
 enableSydney = input.bool(false, "Sydney", inline="SS_SYD", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
 colorSydney = input.color(#800080, "", inline="SS_SYD", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
-sydneyVWAPCount = input.int(1, "History", inline="SS_SYD", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Number of daily Sydney anchors to show for non-stocks.")
+sydneyVWAPCount = input.int(1, "History", inline="SS_SYD", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Daily Sydney anchors count")
 
 enableTokyo = input.bool(false, "Tokyo", inline="SS_TKY", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
 colorTokyo = input.color(#FF0000, "", inline="SS_TKY", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
-tokyoVWAPCount = input.int(1, "History", inline="SS_TKY", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Number of daily Tokyo anchors to show for non-stocks.")
+tokyoVWAPCount = input.int(1, "History", inline="SS_TKY", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Daily Tokyo anchors count")
 
 enableLondon = input.bool(true, "London", inline="SS_LON", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
 colorLondon = input.color(#FFA500, "", inline="SS_LON", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
-londonVWAPCount = input.int(1, "History", inline="SS_LON", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Number of daily London anchors to show for non-stocks.")
+londonVWAPCount = input.int(1, "History", inline="SS_LON", minval=1, maxval=1, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Daily London anchors count")
 
 enableNewYork = input.bool(true, "New York", inline="SS_NY", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
 colorNewYork = input.color(#0000FF, "", inline="SS_NY", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
-nyVWAPCount = input.int(2, "History", inline="SS_NY", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Number of daily NY anchors to show for non-stocks.")
+nyVWAPCount = input.int(2, "History", inline="SS_NY", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Daily NY anchors count")
 
-vwapColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Visually de-emphasize older daily VWAP anchors.")
-vwapMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Transparency applied to the oldest visible daily VWAP anchor (0=opaque).")
-vwapDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Reduce color vibrancy for older daily VWAP anchors (0=vibrant, 100=gray).")
-vwapBrightness = input.int(0, "Brightness", minval=-100, maxval=100, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Adjust brightness for older daily VWAP anchors (0=no change, -=darker, +=brighter).")
-vwapHueShift = input.int(-5, "Hue Shift", minval=-50, maxval=50, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Shift hue for older daily VWAP anchors (-=cooler, +=warmer).")
+vwapColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="De-emphasize older anchors")
+vwapMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Oldest anchor transparency (0=opaque)")
+vwapDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Reduce color (0=vibrant, 100=gray)")
+vwapBrightness = input.int(0, "Brightness", minval=-100, maxval=100, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Brightness shift (-=darker, +=brighter)")
+vwapHueShift = input.int(-5, "Hue Shift", minval=-50, maxval=50, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Hue shift (-=cooler, +=warmer)")
 
 // Select which settings to use based on symbol type
 bool isStock = syminfo.type == "stock"
@@ -133,58 +133,58 @@ int vwapDesaturationActive = isStock ? vwapDesaturationStock : vwapDesaturation
 int vwapBrightnessActive = isStock ? vwapBrightnessStock : vwapBrightness
 int vwapHueShiftActive = isStock ? vwapHueShiftStock : vwapHueShift
 
-showWeeklyAnchorVWAP = input.bool(true, "Enable Weekly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Show weekly VWAP anchor (first Primary Anchor Session of the trading week).")
-weeklyAnchorMaxTimeframe = input.string("2h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D"], group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Maximum chart timeframe where weekly VWAP anchors remain visible.")
+showWeeklyAnchorVWAP = input.bool(true, "Enable Weekly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Show weekly VWAP anchors")
+weeklyAnchorMaxTimeframe = input.string("2h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D"], group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Hide above this TF")
 colorWeeklyAnchor = input.color(#B01200, "Color", group="🗓️ Sessions • VWAP Anchors • Weekly")
-weeklyAnchorCount = input.int(6, "History", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Number of weekly anchors to show (1=current only, 2=current+previous).")
-longTermAnchorColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Visually de-emphasize older weekly VWAP anchors.")
-longTermAnchorMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Transparency applied to the oldest visible weekly VWAP anchor (0=opaque).")
-longTermAnchorDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Reduce color vibrancy for older weekly VWAP anchors (0=vibrant, 100=gray).")
-longTermAnchorBrightness = input.int(0, "Brightness", minval=-100, maxval=100, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Adjust brightness for older weekly VWAP anchors (0=no change, -=darker, +=brighter).")
-longTermAnchorHueShift = input.int(-12, "Hue Shift", minval=-50, maxval=50, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Shift hue for older weekly VWAP anchors (-=cooler, +=warmer).")
+weeklyAnchorCount = input.int(6, "History", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Weeks to show (1=current only)")
+longTermAnchorColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="De-emphasize older anchors")
+longTermAnchorMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Oldest anchor transparency (0=opaque)")
+longTermAnchorDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Reduce color (0=vibrant, 100=gray)")
+longTermAnchorBrightness = input.int(0, "Brightness", minval=-100, maxval=100, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Brightness shift (-=darker, +=brighter)")
+longTermAnchorHueShift = input.int(-12, "Hue Shift", minval=-50, maxval=50, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Hue shift (-=cooler, +=warmer)")
 
 showMonthlyAnchorVWAP = input.bool(true, "Enable Monthly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Monthly")
-monthlyAnchorMinTimeframe = input.string("4h", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Minimum chart timeframe where monthly VWAP anchors become visible.")
-monthlyAnchorMaxTimeframe = input.string("1D", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Maximum chart timeframe where monthly VWAP anchors remain visible.")
+monthlyAnchorMinTimeframe = input.string("4h", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Show above this TF")
+monthlyAnchorMaxTimeframe = input.string("1D", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Hide above this TF")
 colorMonthlyAnchor = input.color(#3B5BFF, "Color", group="🗓️ Sessions • VWAP Anchors • Monthly")
-monthlyAnchorCount = input.int(6, "History", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Number of monthly anchors to show (1=current only, 2=current+previous).")
-monthlyAnchorColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Visually de-emphasize older monthly VWAP anchors.")
-monthlyAnchorMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Transparency applied to the oldest visible monthly VWAP anchor (0=opaque).")
-monthlyAnchorDesaturation = input.int(80, "Desaturation", minval=0, maxval=100, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Reduce color vibrancy for older monthly VWAP anchors (0=vibrant, 100=gray).")
-monthlyAnchorBrightness = input.int(0, "Brightness", minval=-100, maxval=100, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Adjust brightness for older monthly VWAP anchors (0=no change, -=darker, +=brighter).")
-monthlyAnchorHueShift = input.int(6, "Hue Shift", minval=-50, maxval=50, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Shift hue for older monthly VWAP anchors (-=cooler, +=warmer).")
+monthlyAnchorCount = input.int(6, "History", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Months to show (1=current only)")
+monthlyAnchorColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="De-emphasize older anchors")
+monthlyAnchorMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Oldest anchor transparency (0=opaque)")
+monthlyAnchorDesaturation = input.int(80, "Desaturation", minval=0, maxval=100, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Reduce color (0=vibrant, 100=gray)")
+monthlyAnchorBrightness = input.int(0, "Brightness", minval=-100, maxval=100, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Brightness shift (-=darker, +=brighter)")
+monthlyAnchorHueShift = input.int(6, "Hue Shift", minval=-50, maxval=50, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Hue shift (-=cooler, +=warmer)")
 
 showYearlyAnchorVWAP = input.bool(true, "Enable Yearly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Yearly")
-yearlyAnchorMinTimeframe = input.string("15m", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W", "1M"], group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Minimum chart timeframe where yearly VWAP anchors become visible.")
-yearlyAnchorMaxTimeframe = input.string("1W", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W", "1M"], group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Maximum chart timeframe where yearly VWAP anchors remain visible.")
+yearlyAnchorMinTimeframe = input.string("15m", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W", "1M"], group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Show above this TF")
+yearlyAnchorMaxTimeframe = input.string("1W", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W", "1M"], group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Hide above this TF")
 colorYearlyAnchor = input.color(#000000, "Color", group="🗓️ Sessions • VWAP Anchors • Yearly")
-yearlyAnchorCount = input.int(2, "History", minval=1, maxval=2, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Number of yearly anchors to show (1=current only, 2=current+previous).")
-yearlyAnchorColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Visually de-emphasize older yearly VWAP anchors.")
-yearlyAnchorMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Transparency applied to the oldest visible yearly VWAP anchor (0=opaque).")
-yearlyAnchorDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Reduce color vibrancy for older yearly VWAP anchors (0=vibrant, 100=gray).")
-yearlyAnchorBrightness = input.int(50, "Brightness", minval=-100, maxval=100, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Adjust brightness for older yearly VWAP anchors (0=no change, -=darker, +=brighter).")
-yearlyAnchorHueShift = input.int(-12, "Hue Shift", minval=-50, maxval=50, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Shift hue for older yearly VWAP anchors (-=cooler, +=warmer).")
+yearlyAnchorCount = input.int(2, "History", minval=1, maxval=2, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Years to show (1=current only)")
+yearlyAnchorColorDifferentiation = input.bool(true, "Fade Past Sessions", group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="De-emphasize older anchors")
+yearlyAnchorMaxTransparency = input.int(0, "Oldest Transparency", minval=0, maxval=95, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Oldest anchor transparency (0=opaque)")
+yearlyAnchorDesaturation = input.int(0, "Desaturation", minval=0, maxval=100, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Reduce color (0=vibrant, 100=gray)")
+yearlyAnchorBrightness = input.int(50, "Brightness", minval=-100, maxval=100, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Brightness shift (-=darker, +=brighter)")
+yearlyAnchorHueShift = input.int(-12, "Hue Shift", minval=-50, maxval=50, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Hue shift (-=cooler, +=warmer)")
 
 
 // ────────────────────────────────────────────────────────────────────────────────
 // 📏 Sessions • Levels • Visibility
 // ────────────────────────────────────────────────────────────────────────────────
-showSessionLevelsInput = input.string("Futures Only", "Enable Session Levels", options=["Always", "Futures Only", "Off"], group="📏 Sessions • Levels • Visibility", tooltip="Master switch for session levels (Opening Price, ORB, IB). Futures Only: show only on futures symbols.")
-sessionLevelsMaxTimeframe = input.string("5m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📏 Sessions • Levels • Visibility", tooltip="Hide session levels on timeframes above this")
+showSessionLevelsInput = input.string("Futures Only", "Enable Session Levels", options=["Always", "Futures Only", "Off"], group="📏 Sessions • Levels • Visibility", tooltip="Open/ORB/IB levels visibility")
+sessionLevelsMaxTimeframe = input.string("5m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📏 Sessions • Levels • Visibility", tooltip="Hide above this TF")
 sessionLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📏 Sessions • Levels • Visibility")
-sessionLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📏 Sessions • Levels • Visibility", tooltip="Width for Opening Price / ORB / IB lines")
-sessionLineStartMode = input.string("Level Established", "Line Start", options=["Session Open", "Level Established", "Fixed Bars Back"], group="📏 Sessions • Levels • Visibility", tooltip="Session Open: from session start\nLevel Established: from where level was created\nFixed Bars Back: use 🏷️ Horizontal Levels → Line Length (Bars)")
+sessionLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📏 Sessions • Levels • Visibility", tooltip="Line width for session levels")
+sessionLineStartMode = input.string("Level Established", "Line Start", options=["Session Open", "Level Established", "Fixed Bars Back"], group="📏 Sessions • Levels • Visibility", tooltip="Line start point mode")
 
 // ────────────────────────────────────────────────────────────────────────────────
 // 📏 Sessions • Levels • Opening Price
 // ────────────────────────────────────────────────────────────────────────────────
 showOpenPrice = input.bool(true, "Enable Opening Price", group="📏 Sessions • Levels • Opening Price")
-colorOpenPrice = input.color(#fbbe30, "Color", group="📏 Sessions • Levels • Opening Price", tooltip="First traded price at session open")
+colorOpenPrice = input.color(#fbbe30, "Color", group="📏 Sessions • Levels • Opening Price", tooltip="First bar open price")
 
 // ────────────────────────────────────────────────────────────────────────────────
 // 📏 Sessions • Levels • Opening Range (ORB)
 // ────────────────────────────────────────────────────────────────────────────────
-showOpenRange = input.bool(true, "Enable Opening Range (ORB)", group="📏 Sessions • Levels • Opening Range (ORB)", tooltip="High/Low of the first 15–30 minutes after session open.")
+showOpenRange = input.bool(true, "Enable Opening Range (ORB)", group="📏 Sessions • Levels • Opening Range (ORB)", tooltip="First 15-30min high/low")
 openRangeLength = input.string("15m", "Length", options=["15m", "30m"], group="📏 Sessions • Levels • Opening Range (ORB)")
 colorORH = input.color(#4682b4, "High", inline="SL_ORC", group="📏 Sessions • Levels • Opening Range (ORB)")
 colorORL = input.color(#cd5c5c, "Low", inline="SL_ORC", group="📏 Sessions • Levels • Opening Range (ORB)")
@@ -194,7 +194,7 @@ colorOpenRangeShade = input.color(color.new(color.black, 98), "", inline="SL_ORC
 // ────────────────────────────────────────────────────────────────────────────────
 // 📏 Sessions • Levels • Initial Balance (IB)
 // ────────────────────────────────────────────────────────────────────────────────
-showInitialBalance = input.bool(false, "Enable Initial Balance (IB)", group="📏 Sessions • Levels • Initial Balance (IB)", tooltip="High/Low of the first 30–60 minutes after session open.")
+showInitialBalance = input.bool(false, "Enable Initial Balance (IB)", group="📏 Sessions • Levels • Initial Balance (IB)", tooltip="First 30-60min high/low")
 initialBalanceLength = input.string("1h", "Length", options=["30m", "1h"], group="📏 Sessions • Levels • Initial Balance (IB)")
 colorIBH = input.color(#81ce6f, "High", inline="SL_IBC", group="📏 Sessions • Levels • Initial Balance (IB)")
 colorIBL = input.color(#e43b38, "Low", inline="SL_IBC", group="📏 Sessions • Levels • Initial Balance (IB)")
@@ -203,8 +203,8 @@ colorInitialBalanceShade = input.color(color.new(color.green, 95), "", inline="S
 
 
 
-showPivots = input.bool(true, "Enable Pivot Points", group="🔁 Pivot Points", tooltip="Traditional pivots calculated from the previous day's High/Low/Close.")
-pivotMaxTimeframe = input.string("4h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🔁 Pivot Points", tooltip="Hide on timeframes above this")
+showPivots = input.bool(true, "Enable Pivot Points", group="🔁 Pivot Points", tooltip="Traditional pivots from prev day HLC")
+pivotMaxTimeframe = input.string("4h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🔁 Pivot Points", tooltip="Hide above this TF")
 pivotLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="🔁 Pivot Points")
 pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="🔁 Pivot Points")
 
@@ -227,13 +227,13 @@ pivotColorS3 = input.color(#b51b00, "", inline="PV_S3", group="🔁 Pivot Points
 
 
 
-showKeyLevels = input.bool(true, "Enable Key Levels", group="📈 Key Levels", tooltip="Master toggle for key levels (ATH, Year/Month/Week/Day High/Low).")
-keyLevelsMaxTimeframe = input.string("15m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📈 Key Levels", tooltip="Hide on timeframes above this")
+showKeyLevels = input.bool(true, "Enable Key Levels", group="📈 Key Levels", tooltip="ATH/Year/Month/Week/Day high/low")
+keyLevelsMaxTimeframe = input.string("15m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📈 Key Levels", tooltip="Hide above this TF")
 keyLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📈 Key Levels")
 keyLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📈 Key Levels")
 
 showATH = input.bool(true, "All-Time High", inline="KL_ATH", group="📈 Key Levels • All-Time High")
-colorATH = input.color(#00fcff, "Color", inline="KL_ATH", group="📈 Key Levels • All-Time High", tooltip="All-time high")
+colorATH = input.color(#00fcff, "Color", inline="KL_ATH", group="📈 Key Levels • All-Time High")
 
 showCYH = input.bool(true, "Current", inline="KL_CY", group="📈 Key Levels • Year")
 colorCYH = input.color(#449955, "High", inline="KL_CY", group="📈 Key Levels • Year")
@@ -290,6 +290,9 @@ labelBgColor(color c) => color.new(c, 100)
 
 roundToTick(float price) =>
     syminfo.mintick > 0 ? math.round(price / syminfo.mintick) * syminfo.mintick : price
+
+priceToTicks(float price) =>
+    syminfo.mintick > 0 ? int(math.round(price / syminfo.mintick)) : int(price)
 
 updateBox(box boxRef, int x1, float y1, int x2, float y2, color bg) =>
     if na(boxRef)
@@ -352,12 +355,11 @@ getSessionAbbr(string sessionName) =>
 
 // LEVEL RENDERER UDT
 
-
 type LevelRenderer
     string name
     bool enabled
     float price
-    float priceRounded
+    int priceTicks
     int startBar
     color levelColor
     int lineWidth
@@ -365,10 +367,13 @@ type LevelRenderer
     line lineRef
     label labelRef
 
+addLevel(array<LevelRenderer> arr, string name, bool show, float price, int priceTicks, int startBar, color col, int width, string style) =>
+    array.push(arr, LevelRenderer.new(name, show, price, priceTicks, startBar, col, width, style, na, na))
+
 // Render method for a single level with deduplication support
-method render(LevelRenderer this, bool groupCondition, bool checkDuplicate, map<float, string> priceLabels, array<float> renderedPrices, bool globalShowPriceValues, string labelSizeActual, float atrThreshold, bool useATRFilter) =>
-    if groupCondition and this.enabled and not na(this.price) and isWithinATR(this.price, close, atrThreshold, useATRFilter) and (not checkDuplicate or not array.includes(renderedPrices, this.priceRounded))
-        string combinedLabel = map.contains(priceLabels, this.priceRounded) ? map.get(priceLabels, this.priceRounded) : this.name
+method render(LevelRenderer this, bool groupCondition, bool checkDuplicate, map<int, string> priceLabels, array<int> renderedPrices, bool globalShowPriceValues, string labelSizeActual, float atrThreshold, bool useATRFilter) =>
+    if groupCondition and this.enabled and not na(this.price) and isWithinATR(this.price, close, atrThreshold, useATRFilter) and (not checkDuplicate or not array.includes(renderedPrices, this.priceTicks))
+        string combinedLabel = map.contains(priceLabels, this.priceTicks) ? map.get(priceLabels, this.priceTicks) : this.name
         string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(this.price, format.mintick) + ")" : combinedLabel
         if na(this.lineRef)
             line tempLine = line.new(this.startBar, this.price, bar_index, this.price, color=this.levelColor, width=this.lineWidth, style=getLineStyle(this.lineStyle))
@@ -382,7 +387,7 @@ method render(LevelRenderer this, bool groupCondition, bool checkDuplicate, map<
             label.set_xy(this.labelRef, bar_index, this.price)
             label.set_text(this.labelRef, labelText)
             true
-        array.push(renderedPrices, this.priceRounded)
+        array.push(renderedPrices, this.priceTicks)
         true
     else if not na(this.lineRef)
         line.delete(this.lineRef)
@@ -393,10 +398,10 @@ method render(LevelRenderer this, bool groupCondition, bool checkDuplicate, map<
     else
         true
 
-method update(LevelRenderer this, bool enabled, float price, float priceRounded, int startBar) =>
+method update(LevelRenderer this, bool enabled, float price, int priceTicks, int startBar) =>
     this.enabled := enabled
     this.price := price
-    this.priceRounded := priceRounded
+    this.priceTicks := priceTicks
     this.startBar := startBar
     true
 
@@ -408,7 +413,7 @@ deleteLabel(array<label> labelArray, int idx) =>
 
 
 // Calculate color with transparency, hue shift, desaturation, and brightness based on VWAP position in history (0 = most recent)
-getVWAPColor(color baseColor, int positionInHistory, bool useDifferentiation, int maxTransp, int hueShift, int desat, int brightness, int maxPos = 4) =>
+getVWAPColor(color baseColor, int positionInHistory, bool useDifferentiation, int maxTransp, int hueShift, int desat, int brightness, int maxPos) =>
     if not useDifferentiation or positionInHistory == 0
         baseColor
     else
@@ -538,7 +543,7 @@ getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
     int daysBackOffset = 0
     int lastTimestamp = na
 
-    while sessionsCollected < sessionsBack
+    while sessionsCollected < sessionsBack and daysBackOffset < 730
         int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBackOffset * 86400000)
         int y = year(targetMidnight, tz)
         int m = month(targetMidnight, tz)
@@ -582,64 +587,6 @@ getSessionEndsArray(string session, int sessionsBack) =>
     getSessionTimestampsArray(session, sessionsBack, false)
 
 
-// Weekly anchor start timestamps (Monday for most, Sunday for Globex)
-getWeeklyAnchorStartsArray(string session, int weeksBack) =>
-    var array<int> starts = array.new<int>()
-    array.clear(starts)
-
-    string tz = getSessionTimezone(session)
-
-    int currentY = year(timenow, tz)
-    int currentM = month(timenow, tz)
-    int currentD = dayofmonth(timenow, tz)
-    int currentDayOfWeek = dayofweek(timenow, tz)
-
-    // Step 2: Adjust weekend to Friday (same as daily sessions)
-    if currentDayOfWeek == dayofweek.saturday
-        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
-        currentY := year(fridayMidnight, tz)
-        currentM := month(fridayMidnight, tz)
-        currentD := dayofmonth(fridayMidnight, tz)
-    else if currentDayOfWeek == dayofweek.sunday and session != "Globex"
-        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
-        currentY := year(fridayMidnight, tz)
-        currentM := month(fridayMidnight, tz)
-        currentD := dayofmonth(fridayMidnight, tz)
-
-    // Step 3: Check if today's session has started
-    int todaySessionStart = getSessionStartForDate(session, currentY, currentM, currentD)
-    int mostRecentY = currentY
-    int mostRecentM = currentM
-    int mostRecentD = currentD
-
-    if timenow < todaySessionStart
-        int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
-        mostRecentY := year(yesterdayMidnight, tz)
-        mostRecentM := month(yesterdayMidnight, tz)
-        mostRecentD := dayofmonth(yesterdayMidnight, tz)
-
-    // Step 4: Walk backwards collecting only week-start days (Monday or Sunday)
-    int targetDayOfWeek = session == "Globex" ? dayofweek.sunday : dayofweek.monday
-    int weeksCollected = 0
-    int daysBackOffset = 0
-
-    while weeksCollected < weeksBack
-        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBackOffset * 86400000)
-        int y = year(targetMidnight, tz)
-        int m = month(targetMidnight, tz)
-        int d = dayofmonth(targetMidnight, tz)
-        int dow = dayofweek(targetMidnight, tz)
-
-        if dow == targetDayOfWeek
-            // This is a week-start day - add the session start
-            int weekStart = getSessionStartForDate(session, y, m, d)
-            array.unshift(starts, weekStart)
-            weeksCollected := weeksCollected + 1
-
-        daysBackOffset := daysBackOffset + 1
-
-    starts
-
 // Find first valid trading day of a month (returns day 1-31, or na if none found in 14 days)
 getFirstTradingDayOfMonth(string session, int targetYear, int targetMonth) =>
     string tz = getSessionTimezone(session)
@@ -660,50 +607,98 @@ getFirstTradingDayOfMonth(string session, int targetYear, int targetMonth) =>
             break
     foundDay
 
-// Monthly anchor start timestamps (first session of each month)
-getMonthlyAnchorStartsArray(string session, int monthsBack) =>
+// Generic anchor start timestamps - handles weekly, monthly, yearly periods
+getAnchorStarts(string period, string session, int count) =>
     var array<int> starts = array.new<int>()
     array.clear(starts)
     string tz = getSessionTimezone(session)
     int currentY = year(timenow, tz)
     int currentM = month(timenow, tz)
-    if na(currentY) or na(currentM)
-        for i = 0 to monthsBack - 1
-            array.unshift(starts, na)
-    else
-        for i = 0 to monthsBack - 1
-            int targetM = currentM - i
-            int targetY = currentY
-            while targetM < 1
-                targetM := targetM + 12
-                targetY := targetY - 1
-            int firstDay = getFirstTradingDayOfMonth(session, targetY, targetM)
-            if not na(firstDay)
-                int monthStart = getSessionStartForDate(session, targetY, targetM, firstDay)
-                array.unshift(starts, monthStart)
-            else
+    int currentD = dayofmonth(timenow, tz)
+
+    if period == "W"
+        int currentDayOfWeek = dayofweek(timenow, tz)
+        if currentDayOfWeek == dayofweek.saturday
+            int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+            currentY := year(fridayMidnight, tz)
+            currentM := month(fridayMidnight, tz)
+            currentD := dayofmonth(fridayMidnight, tz)
+        else if currentDayOfWeek == dayofweek.sunday and session != "Globex"
+            int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
+            currentY := year(fridayMidnight, tz)
+            currentM := month(fridayMidnight, tz)
+            currentD := dayofmonth(fridayMidnight, tz)
+        int todaySessionStart = getSessionStartForDate(session, currentY, currentM, currentD)
+        int mostRecentY = currentY
+        int mostRecentM = currentM
+        int mostRecentD = currentD
+        if timenow < todaySessionStart
+            int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+            mostRecentY := year(yesterdayMidnight, tz)
+            mostRecentM := month(yesterdayMidnight, tz)
+            mostRecentD := dayofmonth(yesterdayMidnight, tz)
+        int targetDayOfWeek = session == "Globex" ? dayofweek.sunday : dayofweek.monday
+        int collected = 0
+        int daysBack = 0
+        while collected < count and daysBack < 730
+            int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBack * 86400000)
+            int y = year(targetMidnight, tz)
+            int m = month(targetMidnight, tz)
+            int d = dayofmonth(targetMidnight, tz)
+            int dow = dayofweek(targetMidnight, tz)
+            if dow == targetDayOfWeek
+                int anchorStart = getSessionStartForDate(session, y, m, d)
+                array.unshift(starts, anchorStart)
+                collected := collected + 1
+            daysBack := daysBack + 1
+    else if period == "M"
+        if na(currentY) or na(currentM)
+            for i = 0 to count - 1
                 array.unshift(starts, na)
+        else
+            for i = 0 to count - 1
+                int targetM = currentM - i
+                int targetY = currentY
+                while targetM < 1
+                    targetM := targetM + 12
+                    targetY := targetY - 1
+                int firstDay = getFirstTradingDayOfMonth(session, targetY, targetM)
+                if not na(firstDay)
+                    int anchorStart = getSessionStartForDate(session, targetY, targetM, firstDay)
+                    array.unshift(starts, anchorStart)
+                else
+                    array.unshift(starts, na)
+    else if period == "Y"
+        if na(currentY)
+            for i = 0 to count - 1
+                array.unshift(starts, na)
+        else
+            for i = 0 to count - 1
+                int targetY = currentY - i
+                int firstDay = getFirstTradingDayOfMonth(session, targetY, 1)
+                if not na(firstDay)
+                    int anchorStart = getSessionStartForDate(session, targetY, 1, firstDay)
+                    array.unshift(starts, anchorStart)
+                else
+                    array.unshift(starts, na)
     starts
 
-// Yearly anchor start timestamps (first session of each year)
-getYearlyAnchorStartsArray(string session, int yearsBack) =>
-    var array<int> starts = array.new<int>()
-    array.clear(starts)
-    string tz = getSessionTimezone(session)
-    int currentY = year(timenow, tz)
-    if na(currentY)
-        for i = 0 to yearsBack - 1
-            array.unshift(starts, na)
-    else
-        for i = 0 to yearsBack - 1
-            int targetY = currentY - i
-            int firstDay = getFirstTradingDayOfMonth(session, targetY, 1)
-            if not na(firstDay)
-                int yearStart = getSessionStartForDate(session, targetY, 1, firstDay)
-                array.unshift(starts, yearStart)
-            else
-                array.unshift(starts, na)
-    starts
+// Create anchor label helper
+createAnchorLabel(array<label> labelArray, int idx, int anchorStart, string period, int positionInHistory, color anchorColor, bool colorDiff, int maxTrans, int hueShift, int desat, int brightness, int maxCount, string anchorTZ, string sessionName) =>
+    if not na(anchorStart)
+        label oldLabel = array.get(labelArray, idx)
+        if not na(oldLabel)
+            label.delete(oldLabel)
+        color labelColor = getVWAPColor(anchorColor, positionInHistory, colorDiff, maxTrans, hueShift, desat, brightness, maxCount)
+        string labelText = ""
+        if period == "W"
+            labelText := compactLabels ? "W" + str.tostring(positionInHistory + 1) : "Week " + str.tostring(weekofyear(anchorStart, anchorTZ)) + " (" + sessionName + ")"
+        else if period == "M"
+            labelText := compactLabels ? "M" + str.tostring(positionInHistory + 1) : str.format("{0,date,MMM yyyy}", anchorStart) + " (" + sessionName + ")"
+        else if period == "Y"
+            labelText := compactLabels ? "Y" + str.tostring(positionInHistory + 1) : str.tostring(year(anchorStart, anchorTZ)) + " (" + sessionName + ")"
+        label newLabel = label.new(bar_index, high, labelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+        array.set(labelArray, idx, newLabel)
 
 // Convert period string to minutes
 periodToMinutes(string period) =>
@@ -720,8 +715,8 @@ getTimeframeMinutes() =>
         tfSeconds / 60
 
 // Add level to priceLabels map with duplicate detection
-addToMap(map<float, string> priceMap, float price, string label) =>
-    float key = roundToTick(price)
+addToMap(map<int, string> priceMap, float price, string label) =>
+    int key = priceToTicks(price)
     string existing = map.contains(priceMap, key) ? map.get(priceMap, key) : ""
     if existing != ""
         map.put(priceMap, key, existing + "/" + label)
@@ -786,43 +781,44 @@ var float pwh = na, var float pwl = na
 var float pmh = na, var float pml = na
 var float pyh = na, var float pyl = na
 
-// Previous period levels - only update on confirmed bars (static values don't change intrabar)
-if barstate.isconfirmed and showKeyLevelsCondition and (showPDH or showPDL or showCDH or showCDL)
-    [_pdh, _pdl] = request.security(syminfo.tickerid, "D", [high[1], low[1]], lookahead=barmerge.lookahead_on)
-    pdh := _pdh, pdl := _pdl
-if barstate.isconfirmed and showKeyLevelsCondition and (showPWH or showPWL or showCWH or showCWL)
-    [_pwh, _pwl] = request.security(syminfo.tickerid, "W", [high[1], low[1]], lookahead=barmerge.lookahead_on)
-    pwh := _pwh, pwl := _pwl
-if barstate.isconfirmed and showKeyLevelsCondition and (showPMH or showPML or showCMH or showCML)
-    [_pmh, _pml] = request.security(syminfo.tickerid, "M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
-    pmh := _pmh, pml := _pml
-if barstate.isconfirmed and showKeyLevelsCondition and (showPYH or showPYL or showCYH or showCYL)
-    [_pyh, _pyl] = request.security(syminfo.tickerid, "12M", [high[1], low[1]], lookahead=barmerge.lookahead_on)
-    pyh := _pyh, pyl := _pyl
-
 // Current period levels (developing periods)
 var float cdh = na, var float cdl = na
 var float cwh = na, var float cwl = na
 var float cmh = na, var float cml = na
 var float cyh = na, var float cyl = na
 
-if showKeyLevelsCondition and (showCDH or showCDL)
+// Fetch previous and current period levels in single calls
+if barstate.isconfirmed and showKeyLevelsCondition and (showPDH or showPDL or showCDH or showCDL)
+    [_pdh, _pdl, _cdh, _cdl] = request.security(syminfo.tickerid, "D", [high[1], low[1], high, low], lookahead=barmerge.lookahead_on)
+    pdh := _pdh, pdl := _pdl, cdh := _cdh, cdl := _cdl
+else if showKeyLevelsCondition and (showCDH or showCDL)
     [_cdh, _cdl] = request.security(syminfo.tickerid, "D", [high, low], lookahead=barmerge.lookahead_on)
     cdh := _cdh, cdl := _cdl
-if showKeyLevelsCondition and (showCWH or showCWL)
+
+if barstate.isconfirmed and showKeyLevelsCondition and (showPWH or showPWL or showCWH or showCWL)
+    [_pwh, _pwl, _cwh, _cwl] = request.security(syminfo.tickerid, "W", [high[1], low[1], high, low], lookahead=barmerge.lookahead_on)
+    pwh := _pwh, pwl := _pwl, cwh := _cwh, cwl := _cwl
+else if showKeyLevelsCondition and (showCWH or showCWL)
     [_cwh, _cwl] = request.security(syminfo.tickerid, "W", [high, low], lookahead=barmerge.lookahead_on)
     cwh := _cwh, cwl := _cwl
-if showKeyLevelsCondition and (showCMH or showCML)
+
+if barstate.isconfirmed and showKeyLevelsCondition and (showPMH or showPML or showCMH or showCML)
+    [_pmh, _pml, _cmh, _cml] = request.security(syminfo.tickerid, "M", [high[1], low[1], high, low], lookahead=barmerge.lookahead_on)
+    pmh := _pmh, pml := _pml, cmh := _cmh, cml := _cml
+else if showKeyLevelsCondition and (showCMH or showCML)
     [_cmh, _cml] = request.security(syminfo.tickerid, "M", [high, low], lookahead=barmerge.lookahead_on)
     cmh := _cmh, cml := _cml
-if showKeyLevelsCondition and (showCYH or showCYL)
+
+if barstate.isconfirmed and showKeyLevelsCondition and (showPYH or showPYL or showCYH or showCYL)
+    [_pyh, _pyl, _cyh, _cyl] = request.security(syminfo.tickerid, "12M", [high[1], low[1], high, low], lookahead=barmerge.lookahead_on)
+    pyh := _pyh, pyl := _pyl, cyh := _cyh, cyl := _cyl
+else if showKeyLevelsCondition and (showCYH or showCYL)
     [_cyh, _cyl] = request.security(syminfo.tickerid, "12M", [high, low], lookahead=barmerge.lookahead_on)
     cyh := _cyh, cyl := _cyl
 
 var float ath = na
-float _ath = ta.highest(high, bar_index + 1)
-if barstate.isconfirmed
-    ath := showKeyLevelsCondition and showATH ? request.security(syminfo.tickerid, "M", _ath, lookahead=barmerge.lookahead_on) : na
+if showKeyLevelsCondition and showATH
+    ath := na(ath) ? high : math.max(ath, high)
 
 // PIVOT POINTS (from previous day's HLC)
 var float dailyHigh = na, var float dailyLow = na, var float dailyClose = na
@@ -852,65 +848,61 @@ const int MAX_WEEKLY_HISTORY = 6
 const int MAX_MONTHLY_HISTORY = 6
 const int MAX_YEARLY_HISTORY = 2
 
+type SessionManager
+    string name
+    bool enabled
+    color col
+    int historyCount
+    array<int> starts
+    array<int> ends
+    array<int> startBars
+    array<float> sumSrc
+    array<float> sumVol
+    array<float> vwaps
+    array<label> labels
+    int prevMostRecentStart
+    bool meetsTimeframe
+
+// Shift session VWAP arrays left when new session detected
+shiftSessionArrays(array<int> oldStarts, array<int> newStarts, array<int> startBars, array<float> sumSrc, array<float> sumVol, array<float> vwaps) =>
+    array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+    for oldIdx = 0 to MAX_VWAP_HISTORY - 1
+        int oldSessionTime = array.get(oldStarts, oldIdx)
+        int oldBarIdx = array.get(startBars, oldIdx)
+        if not na(oldSessionTime) and not na(oldBarIdx)
+            for newIdx = 0 to MAX_VWAP_HISTORY - 1
+                int newSessionTime = array.get(newStarts, newIdx)
+                if newSessionTime == oldSessionTime
+                    array.set(tempStartBars, newIdx, oldBarIdx)
+                    break
+    for i = 0 to MAX_VWAP_HISTORY - 2
+        int srcIdx = MAX_VWAP_HISTORY - 1 - i
+        int dstIdx = srcIdx - 1
+        array.set(sumSrc, dstIdx, array.get(sumSrc, srcIdx))
+        array.set(sumVol, dstIdx, array.get(sumVol, srcIdx))
+        array.set(vwaps, dstIdx, array.get(vwaps, srcIdx))
+    array.set(sumSrc, MAX_VWAP_HISTORY - 1, 0.0)
+    array.set(sumVol, MAX_VWAP_HISTORY - 1, 0.0)
+    array.set(vwaps, MAX_VWAP_HISTORY - 1, na)
+    for idx = 0 to MAX_VWAP_HISTORY - 1
+        array.set(startBars, idx, array.get(tempStartBars, idx))
+
+var array<SessionManager> sessionManagers = array.new<SessionManager>()
+
+if barstate.isfirst
+    array.push(sessionManagers, SessionManager.new("London", enableLondonActive, colorLondonActive, londonVWAPCountActive, getSessionStartsArray("London", MAX_VWAP_HISTORY), getSessionEndsArray("London", MAX_VWAP_HISTORY), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsLondonVWAPTimeframe))
+    array.push(sessionManagers, SessionManager.new("New York", enableNewYorkActive, colorNewYorkActive, nyVWAPCountActive, getSessionStartsArray("New York", MAX_VWAP_HISTORY), getSessionEndsArray("New York", MAX_VWAP_HISTORY), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsNYVWAPTimeframe))
+    array.push(sessionManagers, SessionManager.new("Globex", enableGlobexActive, colorGlobexActive, globexVWAPCountActive, getSessionStartsArray("Globex", MAX_VWAP_HISTORY), getSessionEndsArray("Globex", MAX_VWAP_HISTORY), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsGlobexVWAPTimeframe))
+    array.push(sessionManagers, SessionManager.new("Sydney", enableSydneyActive, colorSydneyActive, sydneyVWAPCountActive, getSessionStartsArray("Sydney", MAX_VWAP_HISTORY), getSessionEndsArray("Sydney", MAX_VWAP_HISTORY), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsSydneyVWAPTimeframe))
+    array.push(sessionManagers, SessionManager.new("Tokyo", enableTokyoActive, colorTokyoActive, tokyoVWAPCountActive, getSessionStartsArray("Tokyo", MAX_VWAP_HISTORY), getSessionEndsArray("Tokyo", MAX_VWAP_HISTORY), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsTokyoVWAPTimeframe))
+
+    for i = 0 to 4
+        SessionManager mgr = array.get(sessionManagers, i)
+        mgr.prevMostRecentStart := array.get(mgr.starts, MAX_VWAP_HISTORY - 1)
+
 var array<bool> sessionEnabled = array.from(enableLondonActive, enableNewYorkActive, enableGlobexActive, enableSydneyActive, enableTokyoActive)
 var array<string> sessionNames = array.from("London", "New York", "Globex", "Sydney", "Tokyo")
 var array<color> sessionColors = array.from(colorLondonActive, colorNewYorkActive, colorGlobexActive, colorSydneyActive, colorTokyoActive)
-
-var array<int> londonStarts = array.new<int>()
-var array<int> nyStarts = array.new<int>()
-var array<int> globexStarts = array.new<int>()
-var array<int> sydneyStarts = array.new<int>()
-var array<int> tokyoStarts = array.new<int>()
-
-var array<int> londonEnds = array.new<int>()
-var array<int> nyEnds = array.new<int>()
-var array<int> globexEnds = array.new<int>()
-var array<int> sydneyEnds = array.new<int>()
-var array<int> tokyoEnds = array.new<int>()
-
-// Track most recent session starts to detect shifts
-var int prevMostRecentLondonStart = na
-var int prevMostRecentNYStart = na
-var int prevMostRecentGlobexStart = na
-var int prevMostRecentSydneyStart = na
-var int prevMostRecentTokyoStart = na
-
-// Track session start bars for label recreation
-var array<int> londonStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
-var array<int> nyStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
-var array<int> globexStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
-var array<int> sydneyStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
-var array<int> tokyoStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
-
-if barstate.isfirst
-    londonStarts := getSessionStartsArray("London", MAX_VWAP_HISTORY)
-    nyStarts := getSessionStartsArray("New York", MAX_VWAP_HISTORY)
-    globexStarts := getSessionStartsArray("Globex", MAX_VWAP_HISTORY)
-    sydneyStarts := getSessionStartsArray("Sydney", MAX_VWAP_HISTORY)
-    tokyoStarts := getSessionStartsArray("Tokyo", MAX_VWAP_HISTORY)
-
-    prevMostRecentLondonStart := array.get(londonStarts, MAX_VWAP_HISTORY - 1)
-    prevMostRecentNYStart := array.get(nyStarts, MAX_VWAP_HISTORY - 1)
-    prevMostRecentGlobexStart := array.get(globexStarts, MAX_VWAP_HISTORY - 1)
-    prevMostRecentSydneyStart := array.get(sydneyStarts, MAX_VWAP_HISTORY - 1)
-    prevMostRecentTokyoStart := array.get(tokyoStarts, MAX_VWAP_HISTORY - 1)
-
-    londonEnds := getSessionEndsArray("London", MAX_VWAP_HISTORY)
-    nyEnds := getSessionEndsArray("New York", MAX_VWAP_HISTORY)
-    globexEnds := getSessionEndsArray("Globex", MAX_VWAP_HISTORY)
-    sydneyEnds := getSessionEndsArray("Sydney", MAX_VWAP_HISTORY)
-    tokyoEnds := getSessionEndsArray("Tokyo", MAX_VWAP_HISTORY)
-
-var array<float> londonSumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
-var array<float> londonSumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
-var array<float> nySumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
-var array<float> nySumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
-var array<float> globexSumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
-var array<float> globexSumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
-var array<float> sydneySumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
-var array<float> sydneySumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
-var array<float> tokyoSumSrc = array.new<float>(MAX_VWAP_HISTORY, 0.0)
-var array<float> tokyoSumVol = array.new<float>(MAX_VWAP_HISTORY, 0.0)
 
 var array<int> sessionStartBars = array.new<int>(5, na)
 var array<int> sessionStartTimes = array.new<int>(5, na)
@@ -938,11 +930,11 @@ var array<label> yearlyAnchorLabels = array.new<label>(MAX_YEARLY_HISTORY, na)
 var bool currentSessionIsYearlyAnchor = false
 
 if barstate.isfirst
-    weeklyAnchorStartsArray := getWeeklyAnchorStartsArray(primarySessionName, MAX_WEEKLY_HISTORY)
+    weeklyAnchorStartsArray := getAnchorStarts("W", primarySessionName, MAX_WEEKLY_HISTORY)
     if showMonthlyAnchorVWAP
-        monthlyAnchorStartsArray := getMonthlyAnchorStartsArray(primarySessionName, MAX_MONTHLY_HISTORY)
+        monthlyAnchorStartsArray := getAnchorStarts("M", primarySessionName, MAX_MONTHLY_HISTORY)
     if showYearlyAnchorVWAP
-        yearlyAnchorStartsArray := getYearlyAnchorStartsArray(primarySessionName, MAX_YEARLY_HISTORY)
+        yearlyAnchorStartsArray := getAnchorStarts("Y", primarySessionName, MAX_YEARLY_HISTORY)
 
 var int activeSessionIndex = na
 var string activeSessionName = na
@@ -971,19 +963,9 @@ for i = 0 to 4
     if array.get(sessionEnabled, i)
         string sessionName = array.get(sessionNames, i)
 
-        array<int> sessionStartsArray = switch i
-            0 => londonStarts
-            1 => nyStarts
-            2 => globexStarts
-            3 => sydneyStarts
-            => tokyoStarts
-
-        array<int> sessionEndsArray = switch i
-            0 => londonEnds
-            1 => nyEnds
-            2 => globexEnds
-            3 => sydneyEnds
-            => tokyoEnds
+        SessionManager mgr = array.get(sessionManagers, i)
+        array<int> sessionStartsArray = mgr.starts
+        array<int> sessionEndsArray = mgr.ends
 
         // Find which session from this type is active at current time (for historical replay)
         for arrayIdx = MAX_VWAP_HISTORY - 1 to 0
@@ -1019,12 +1001,8 @@ for i = 0 to 4
                     break
 
 if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTime)
-    array<int> activeSessionEnds = switch activeSessionIndex
-        0 => londonEnds
-        1 => nyEnds
-        2 => globexEnds
-        3 => sydneyEnds
-        => tokyoEnds
+    SessionManager activeMgr = array.get(sessionManagers, activeSessionIndex)
+    array<int> activeSessionEnds = activeMgr.ends
 
     // Use stored session end time (set at session start) to handle edge case where
     // active session gets dropped from array after MAX_VWAP_HISTORY shifts
@@ -1050,430 +1028,138 @@ if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTim
 
 // MULTI-SESSION VWAP CALCULATIONS
 
-var array<float> londonVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
-var array<float> nyVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
-var array<float> globexVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
-var array<float> sydneyVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
-var array<float> tokyoVWAPs = array.new<float>(MAX_VWAP_HISTORY, na)
-
-var array<label> londonLabels = array.new<label>(MAX_VWAP_HISTORY, na)
-var array<label> nyLabels = array.new<label>(MAX_VWAP_HISTORY, na)
-var array<label> globexLabels = array.new<label>(MAX_VWAP_HISTORY, na)
-var array<label> sydneyLabels = array.new<label>(MAX_VWAP_HISTORY, na)
-var array<label> tokyoLabels = array.new<label>(MAX_VWAP_HISTORY, na)
-
 for i = 0 to 4
-    if array.get(sessionEnabled, i)
-        // Get configuration for this session type (user's visible count)
-        int historyCountUser = i == 0 ? londonVWAPCountActive : i == 1 ? nyVWAPCountActive : i == 2 ? globexVWAPCountActive : i == 3 ? sydneyVWAPCountActive : tokyoVWAPCountActive
-        // Add buffer for future session AND potential holidays (use all available slots to ensure we get enough trading sessions)
+    SessionManager mgr = array.get(sessionManagers, i)
+    if mgr.enabled
+        int historyCountUser = mgr.historyCount
         int historyCountCalc = MAX_VWAP_HISTORY
-        array<int> sessionStartsArray = i == 0 ? londonStarts : i == 1 ? nyStarts : i == 2 ? globexStarts : i == 3 ? sydneyStarts : tokyoStarts
-        array<float> sumSrcArray = i == 0 ? londonSumSrc : i == 1 ? nySumSrc : i == 2 ? globexSumSrc : i == 3 ? sydneySumSrc : tokyoSumSrc
-        array<float> sumVolArray = i == 0 ? londonSumVol : i == 1 ? nySumVol : i == 2 ? globexSumVol : i == 3 ? sydneySumVol : tokyoSumVol
-        array<float> vwapArray = i == 0 ? londonVWAPs : i == 1 ? nyVWAPs : i == 2 ? globexVWAPs : i == 3 ? sydneyVWAPs : tokyoVWAPs
-        array<label> labelArray = i == 0 ? londonLabels : i == 1 ? nyLabels : i == 2 ? globexLabels : i == 3 ? sydneyLabels : tokyoLabels
-        color sessionColor = i == 0 ? colorLondon : i == 1 ? colorNewYork : i == 2 ? colorGlobex : i == 3 ? colorSydney : colorTokyo
-        string sessionName = array.get(sessionNames, i)
-        bool meetsThisSessionVWAPTimeframe = i == 0 ? meetsLondonVWAPTimeframe : i == 1 ? meetsNYVWAPTimeframe : i == 2 ? meetsGlobexVWAPTimeframe : i == 3 ? meetsSydneyVWAPTimeframe : meetsTokyoVWAPTimeframe
 
         // Loop through all tracked sessions (MAX_VWAP_HISTORY)
         for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
-            int sessionStart = array.get(sessionStartsArray, arrayIdx)
-
-            // Get the next session start (to know when to stop calculating this VWAP)
-            int nextSessionStart = arrayIdx < MAX_VWAP_HISTORY - 1 ? array.get(sessionStartsArray, arrayIdx + 1) : int(na)
-
-            // Check if we're at the start of this session
+            int sessionStart = array.get(mgr.starts, arrayIdx)
+            int nextSessionStart = arrayIdx < MAX_VWAP_HISTORY - 1 ? array.get(mgr.starts, arrayIdx + 1) : int(na)
             bool isSessionStart = not na(sessionStart) and time >= sessionStart and time[1] < sessionStart
-
-            // Check if this VWAP is within the configured history count
-            // Array layout: [0=oldest ... 9=newest] with MAX_VWAP_HISTORY=10
-            // If historyCount=1: only arrayIdx=9 is visible (sessionIndexInHistory >= 0)
-            // If historyCount=2: arrayIdx=8,9 are visible
-            // If historyCount=5: arrayIdx=5,6,7,8,9 are visible
             int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - historyCountCalc)
             bool isInConfiguredRange = sessionIndexInHistory >= 0
-
-            // VWAPs should calculate as long as they're in the configured range AND after their session started
-            // They continue calculating even after the next session starts (unlike the old logic)
-            // Skip future sessions (look-ahead) until they actually start
             bool sessionInFuture = not na(sessionStart) and sessionStart > time
             bool shouldCalculate = not na(sessionStart) and time >= sessionStart and isInConfiguredRange and not sessionInFuture
 
-            // Only reset accumulators if session has actual volume (skip holidays/gaps entirely)
             if isSessionStart and isInConfiguredRange and not na(volume) and volume > 0
-                array.set(sumSrcArray, arrayIdx, 0.0)
-                array.set(sumVolArray, arrayIdx, 0.0)
-
-                // Track session start bar
-                array<int> startBarsArray = i == 0 ? londonStartBars : i == 1 ? nyStartBars : i == 2 ? globexStartBars : i == 3 ? sydneyStartBars : tokyoStartBars
-                array.set(startBarsArray, arrayIdx, bar_index)
+                array.set(mgr.sumSrc, arrayIdx, 0.0)
+                array.set(mgr.sumVol, arrayIdx, 0.0)
+                array.set(mgr.startBars, arrayIdx, bar_index)
 
             if shouldCalculate
-                // Only calculate if session has a bar index (proves it actually started with data)
-                // This prevents holiday/gap sessions from accumulating data from bars after the gap
-                array<int> checkStartBars = i == 0 ? londonStartBars : i == 1 ? nyStartBars : i == 2 ? globexStartBars : i == 3 ? sydneyStartBars : tokyoStartBars
-                int sessionBarIdx = array.get(checkStartBars, arrayIdx)
+                int sessionBarIdx = array.get(mgr.startBars, arrayIdx)
 
                 if not na(sessionBarIdx)
-                    // Get current accumulators for this session
-                    float currentSumSrc = array.get(sumSrcArray, arrayIdx)
-                    float currentSumVol = array.get(sumVolArray, arrayIdx)
+                    float currentSumSrc = array.get(mgr.sumSrc, arrayIdx)
+                    float currentSumVol = array.get(mgr.sumVol, arrayIdx)
 
-                    // Accumulate: only filter NY session to RTH if enabled, all other sessions use full data
-                    bool isNYSessionVWAP = sessionName == "New York"
+                    bool isNYSessionVWAP = mgr.name == "New York"
                     bool shouldAccumulate = not isNYSessionVWAP or not shouldFilterRTH or isNYSession
                     if shouldAccumulate and not na(ohlc4) and not na(volume)
                         currentSumSrc += (ohlc4 * volume)
                         currentSumVol += volume
-                        array.set(sumSrcArray, arrayIdx, currentSumSrc)
-                        array.set(sumVolArray, arrayIdx, currentSumVol)
+                        array.set(mgr.sumSrc, arrayIdx, currentSumSrc)
+                        array.set(mgr.sumVol, arrayIdx, currentSumVol)
 
-                    // Calculate VWAP from current accumulators (after accumulation)
                     float vwap = currentSumVol > 0 ? currentSumSrc / currentSumVol : na
-                    array.set(vwapArray, arrayIdx, vwap)
+                    array.set(mgr.vwaps, arrayIdx, vwap)
 
-                // Create session label at session start ONLY if within user's visible count and timeframe
                 int visibleSessionIndex = arrayIdx - (MAX_VWAP_HISTORY - historyCountUser)
                 bool isVisibleToUser = visibleSessionIndex >= 0
-                if isSessionStart and sessionBaseCondition and meetsThisSessionVWAPTimeframe and showSessionLabels and showSessionVWAP and isVisibleToUser
-                    deleteLabel(labelArray, arrayIdx)
+                if isSessionStart and sessionBaseCondition and mgr.meetsTimeframe and showSessionLabels and showSessionVWAP and isVisibleToUser
+                    deleteLabel(mgr.labels, arrayIdx)
                     int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
-                    color labelColor = getVWAPColor(sessionColor, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, historyCountUser - 1)
-                    bool isPrimarySession = sessionName == primarySessionName
-                    // For Globex, show the trading day (session end day) not the start day
-                    int labelTimestamp = sessionName == "Globex" ? sessionStart + 86400000 : sessionStart
-                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(sessionName) + str.tostring(positionInHistory + 1)) : sessionName + " " + str.format_time(labelTimestamp, "d MMM", getSessionTimezone(sessionName))
+                    color labelColor = getVWAPColor(mgr.col, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, historyCountUser - 1)
+                    bool isPrimarySession = mgr.name == primarySessionName
+                    int labelTimestamp = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
+                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(mgr.name) + str.tostring(positionInHistory + 1)) : mgr.name + " " + str.format_time(labelTimestamp, "d MMM", getSessionTimezone(mgr.name))
                     label newLabel = label.new(bar_index, high, sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
-                    array.set(labelArray, arrayIdx, newLabel)
+                    array.set(mgr.labels, arrayIdx, newLabel)
                     if arrayIdx == MAX_VWAP_HISTORY - 1
                         array.set(sessionLabels, i, newLabel)
 
-            // Clean up labels that are outside the configured history count
             if not isInConfiguredRange
-                deleteLabel(labelArray, arrayIdx)
-                array.set(labelArray, arrayIdx, na)
+                deleteLabel(mgr.labels, arrayIdx)
+                array.set(mgr.labels, arrayIdx, na)
 
 // Detect array shifts and shift accumulators + recreate labels with updated position numbers
-// Run on confirmed bars only to avoid re-execution on every real-time tick
 if barstate.isconfirmed and not barstate.isfirst
-    // Recalculate session arrays to detect if new sessions have been added
-    array<int> currentLondonStarts = getSessionStartsArray("London", MAX_VWAP_HISTORY)
-    array<int> currentNYStarts = getSessionStartsArray("New York", MAX_VWAP_HISTORY)
-    array<int> currentGlobexStarts = getSessionStartsArray("Globex", MAX_VWAP_HISTORY)
-    array<int> currentSydneyStarts = getSessionStartsArray("Sydney", MAX_VWAP_HISTORY)
-    array<int> currentTokyoStarts = getSessionStartsArray("Tokyo", MAX_VWAP_HISTORY)
+    for i = 0 to 4
+        SessionManager mgr = array.get(sessionManagers, i)
+        if mgr.enabled
+            array<int> currentStarts = getSessionStartsArray(mgr.name, MAX_VWAP_HISTORY)
+            array<int> currentEnds = getSessionEndsArray(mgr.name, MAX_VWAP_HISTORY)
 
-    array<int> currentLondonEnds = getSessionEndsArray("London", MAX_VWAP_HISTORY)
-    array<int> currentNYEnds = getSessionEndsArray("New York", MAX_VWAP_HISTORY)
-    array<int> currentGlobexEnds = getSessionEndsArray("Globex", MAX_VWAP_HISTORY)
-    array<int> currentSydneyEnds = getSessionEndsArray("Sydney", MAX_VWAP_HISTORY)
-    array<int> currentTokyoEnds = getSessionEndsArray("Tokyo", MAX_VWAP_HISTORY)
+            bool shifted = not na(mgr.prevMostRecentStart) and array.get(currentStarts, MAX_VWAP_HISTORY - 1) != mgr.prevMostRecentStart
 
-    bool londonShifted = enableLondonActive and not na(prevMostRecentLondonStart) and array.get(currentLondonStarts, MAX_VWAP_HISTORY - 1) != prevMostRecentLondonStart
-    bool nyShifted = enableNewYorkActive and not na(prevMostRecentNYStart) and array.get(currentNYStarts, MAX_VWAP_HISTORY - 1) != prevMostRecentNYStart
-    bool globexShifted = enableGlobexActive and not na(prevMostRecentGlobexStart) and array.get(currentGlobexStarts, MAX_VWAP_HISTORY - 1) != prevMostRecentGlobexStart
-    bool sydneyShifted = enableSydneyActive and not na(prevMostRecentSydneyStart) and array.get(currentSydneyStarts, MAX_VWAP_HISTORY - 1) != prevMostRecentSydneyStart
-    bool tokyoShifted = enableTokyoActive and not na(prevMostRecentTokyoStart) and array.get(currentTokyoStarts, MAX_VWAP_HISTORY - 1) != prevMostRecentTokyoStart
+            if shifted
+                mgr.starts := currentStarts
+                mgr.ends := currentEnds
+                shiftSessionArrays(mgr.starts, currentStarts, mgr.startBars, mgr.sumSrc, mgr.sumVol, mgr.vwaps)
 
-    // Update session arrays if any shifted
-    if londonShifted
-        londonStarts := currentLondonStarts
-        londonEnds := currentLondonEnds
-    if nyShifted
-        nyStarts := currentNYStarts
-        nyEnds := currentNYEnds
-    if globexShifted
-        globexStarts := currentGlobexStarts
-        globexEnds := currentGlobexEnds
-    if sydneyShifted
-        sydneyStarts := currentSydneyStarts
-        sydneyEnds := currentSydneyEnds
-    if tokyoShifted
-        tokyoStarts := currentTokyoStarts
-        tokyoEnds := currentTokyoEnds
+                for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
+                    int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - mgr.historyCount)
+                    if sessionIndexInHistory >= 0
+                        int sessionStart = array.get(mgr.starts, arrayIdx)
+                        int mgrSessionStartBar = array.get(mgr.startBars, arrayIdx)
+                        bool withinLookback = not na(mgrSessionStartBar) and mgrSessionStartBar <= bar_index and (bar_index - mgrSessionStartBar) < 5000
+                        bool sessionInFuture = sessionStart > time
+                        if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and mgr.meetsTimeframe
+                            deleteLabel(mgr.labels, arrayIdx)
+                            int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
+                            color labelColor = getVWAPColor(mgr.col, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, mgr.historyCount - 1)
+                            bool isPrimarySession = mgr.name == primarySessionName
+                            int labelTimestamp = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
+                            string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(mgr.name) + str.tostring(positionInHistory + 1)) : mgr.name + " " + str.format_time(labelTimestamp, "d MMM", getSessionTimezone(mgr.name))
+                            label newLabel = label.new(mgrSessionStartBar, high[bar_index - mgrSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                            array.set(mgr.labels, arrayIdx, newLabel)
 
-    // Shift London accumulators and recreate labels if shifted
-    if londonShifted
-        // Preserve bar indices by matching session timestamps before shift
-        array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
-        for oldIdx = 0 to MAX_VWAP_HISTORY - 1
-            int oldSessionTime = array.get(londonStarts, oldIdx)
-            int oldBarIdx = array.get(londonStartBars, oldIdx)
-            if not na(oldSessionTime) and not na(oldBarIdx)
-                // Find this session in the new array
-                for newIdx = 0 to MAX_VWAP_HISTORY - 1
-                    int newSessionTime = array.get(currentLondonStarts, newIdx)
-                    if newSessionTime == oldSessionTime
-                        array.set(tempStartBars, newIdx, oldBarIdx)
-                        break
-
-        // Shift accumulators left to maintain alignment with shifted session array
-        for i = 0 to MAX_VWAP_HISTORY - 2
-            int srcIdx = MAX_VWAP_HISTORY - 1 - i
-            int dstIdx = srcIdx - 1
-            array.set(londonSumSrc, dstIdx, array.get(londonSumSrc, srcIdx))
-            array.set(londonSumVol, dstIdx, array.get(londonSumVol, srcIdx))
-            array.set(londonVWAPs, dstIdx, array.get(londonVWAPs, srcIdx))
-        // Clear newest slot (will be filled when new session starts)
-        array.set(londonSumSrc, MAX_VWAP_HISTORY - 1, 0.0)
-        array.set(londonSumVol, MAX_VWAP_HISTORY - 1, 0.0)
-        array.set(londonVWAPs, MAX_VWAP_HISTORY - 1, na)
-
-        // Update startBars with preserved values
-        for idx = 0 to MAX_VWAP_HISTORY - 1
-            array.set(londonStartBars, idx, array.get(tempStartBars, idx))
-
-        // Recreate labels with updated position numbers
-        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
-            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - londonVWAPCountActive)
-            if sessionIndexInHistory >= 0
-                int sessionStart = array.get(londonStarts, arrayIdx)
-                int londonSessionStartBar = array.get(londonStartBars, arrayIdx)
-                bool withinLookback = not na(londonSessionStartBar) and londonSessionStartBar <= bar_index and (bar_index - londonSessionStartBar) < 5000
-                bool sessionInFuture = sessionStart > time
-                if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and meetsLondonVWAPTimeframe
-                    deleteLabel(londonLabels, arrayIdx)
-                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
-                    color labelColor = getVWAPColor(colorLondonActive, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, londonVWAPCountActive - 1)
-                    bool isPrimarySession = "London" == primarySessionName
-                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : "LON" + str.tostring(positionInHistory + 1)) : "London " + str.format_time(sessionStart, "d MMM", "Europe/London")
-                    label newLabel = label.new(londonSessionStartBar, high[bar_index - londonSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
-                    array.set(londonLabels, arrayIdx, newLabel)
-
-    // Shift NY accumulators and recreate labels if shifted
-    if nyShifted
-        // Preserve bar indices by matching session timestamps before shift
-        array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
-        for oldIdx = 0 to MAX_VWAP_HISTORY - 1
-            int oldSessionTime = array.get(nyStarts, oldIdx)
-            int oldBarIdx = array.get(nyStartBars, oldIdx)
-            if not na(oldSessionTime) and not na(oldBarIdx)
-                // Find this session in the new array
-                for newIdx = 0 to MAX_VWAP_HISTORY - 1
-                    int newSessionTime = array.get(currentNYStarts, newIdx)
-                    if newSessionTime == oldSessionTime
-                        array.set(tempStartBars, newIdx, oldBarIdx)
-                        break
-
-        // Shift accumulators left to maintain alignment
-        for i = 0 to MAX_VWAP_HISTORY - 2
-            int srcIdx = MAX_VWAP_HISTORY - 1 - i
-            int dstIdx = srcIdx - 1
-            array.set(nySumSrc, dstIdx, array.get(nySumSrc, srcIdx))
-            array.set(nySumVol, dstIdx, array.get(nySumVol, srcIdx))
-            array.set(nyVWAPs, dstIdx, array.get(nyVWAPs, srcIdx))
-        array.set(nySumSrc, MAX_VWAP_HISTORY - 1, 0.0)
-        array.set(nySumVol, MAX_VWAP_HISTORY - 1, 0.0)
-        array.set(nyVWAPs, MAX_VWAP_HISTORY - 1, na)
-
-        // Update startBars with preserved values
-        for idx = 0 to MAX_VWAP_HISTORY - 1
-            array.set(nyStartBars, idx, array.get(tempStartBars, idx))
-
-        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
-            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - nyVWAPCountActive)
-            if sessionIndexInHistory >= 0
-                int sessionStart = array.get(nyStarts, arrayIdx)
-                int nySessionStartBar = array.get(nyStartBars, arrayIdx)
-                bool withinLookback = not na(nySessionStartBar) and nySessionStartBar <= bar_index and (bar_index - nySessionStartBar) < 5000
-                bool sessionInFuture = sessionStart > time
-                if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and meetsNYVWAPTimeframe
-                    deleteLabel(nyLabels, arrayIdx)
-                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
-                    color labelColor = getVWAPColor(colorNewYorkActive, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyVWAPCountActive - 1)
-                    bool isPrimarySession = "New York" == primarySessionName
-                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : "NY" + str.tostring(positionInHistory + 1)) : "New York " + str.format_time(sessionStart, "d MMM", "America/New_York")
-                    label newLabel = label.new(nySessionStartBar, high[bar_index - nySessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
-                    array.set(nyLabels, arrayIdx, newLabel)
-
-    // Shift Globex accumulators and recreate labels if shifted
-    if globexShifted
-        // Preserve bar indices by matching session timestamps before shift
-        array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
-        for oldIdx = 0 to MAX_VWAP_HISTORY - 1
-            int oldSessionTime = array.get(globexStarts, oldIdx)
-            int oldBarIdx = array.get(globexStartBars, oldIdx)
-            if not na(oldSessionTime) and not na(oldBarIdx)
-                // Find this session in the new array
-                for newIdx = 0 to MAX_VWAP_HISTORY - 1
-                    int newSessionTime = array.get(currentGlobexStarts, newIdx)
-                    if newSessionTime == oldSessionTime
-                        array.set(tempStartBars, newIdx, oldBarIdx)
-                        break
-
-        // Shift accumulators left to maintain alignment
-        for i = 0 to MAX_VWAP_HISTORY - 2
-            int srcIdx = MAX_VWAP_HISTORY - 1 - i
-            int dstIdx = srcIdx - 1
-            array.set(globexSumSrc, dstIdx, array.get(globexSumSrc, srcIdx))
-            array.set(globexSumVol, dstIdx, array.get(globexSumVol, srcIdx))
-            array.set(globexVWAPs, dstIdx, array.get(globexVWAPs, srcIdx))
-        array.set(globexSumSrc, MAX_VWAP_HISTORY - 1, 0.0)
-        array.set(globexSumVol, MAX_VWAP_HISTORY - 1, 0.0)
-        array.set(globexVWAPs, MAX_VWAP_HISTORY - 1, na)
-
-        // Update startBars with preserved values
-        for idx = 0 to MAX_VWAP_HISTORY - 1
-            array.set(globexStartBars, idx, array.get(tempStartBars, idx))
-
-        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
-            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - globexVWAPCountActive)
-            if sessionIndexInHistory >= 0
-                int sessionStart = array.get(globexStarts, arrayIdx)
-                int globexSessionStartBar = array.get(globexStartBars, arrayIdx)
-                bool withinLookback = not na(globexSessionStartBar) and globexSessionStartBar <= bar_index and (bar_index - globexSessionStartBar) < 5000
-                bool sessionInFuture = sessionStart > time
-                if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and meetsGlobexVWAPTimeframe
-                    deleteLabel(globexLabels, arrayIdx)
-                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
-                    color labelColor = getVWAPColor(colorGlobexActive, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexVWAPCountActive - 1)
-                    bool isPrimarySession = "Globex" == primarySessionName
-                    int labelTimestamp = sessionStart + 86400000
-                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : "GLX" + str.tostring(positionInHistory + 1)) : "Globex " + str.format_time(labelTimestamp, "d MMM", "America/Chicago")
-                    label newLabel = label.new(globexSessionStartBar, high[bar_index - globexSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
-                    array.set(globexLabels, arrayIdx, newLabel)
-
-    // Shift Sydney accumulators and recreate labels if shifted
-    if sydneyShifted
-        // Preserve bar indices by matching session timestamps before shift
-        array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
-        for oldIdx = 0 to MAX_VWAP_HISTORY - 1
-            int oldSessionTime = array.get(sydneyStarts, oldIdx)
-            int oldBarIdx = array.get(sydneyStartBars, oldIdx)
-            if not na(oldSessionTime) and not na(oldBarIdx)
-                // Find this session in the new array
-                for newIdx = 0 to MAX_VWAP_HISTORY - 1
-                    int newSessionTime = array.get(currentSydneyStarts, newIdx)
-                    if newSessionTime == oldSessionTime
-                        array.set(tempStartBars, newIdx, oldBarIdx)
-                        break
-
-        // Shift accumulators left to maintain alignment
-        for i = 0 to MAX_VWAP_HISTORY - 2
-            int srcIdx = MAX_VWAP_HISTORY - 1 - i
-            int dstIdx = srcIdx - 1
-            array.set(sydneySumSrc, dstIdx, array.get(sydneySumSrc, srcIdx))
-            array.set(sydneySumVol, dstIdx, array.get(sydneySumVol, srcIdx))
-            array.set(sydneyVWAPs, dstIdx, array.get(sydneyVWAPs, srcIdx))
-        array.set(sydneySumSrc, MAX_VWAP_HISTORY - 1, 0.0)
-        array.set(sydneySumVol, MAX_VWAP_HISTORY - 1, 0.0)
-        array.set(sydneyVWAPs, MAX_VWAP_HISTORY - 1, na)
-
-        // Update startBars with preserved values
-        for idx = 0 to MAX_VWAP_HISTORY - 1
-            array.set(sydneyStartBars, idx, array.get(tempStartBars, idx))
-
-        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
-            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - sydneyVWAPCountActive)
-            if sessionIndexInHistory >= 0
-                int sessionStart = array.get(sydneyStarts, arrayIdx)
-                int sydneySessionStartBar = array.get(sydneyStartBars, arrayIdx)
-                bool withinLookback = not na(sydneySessionStartBar) and sydneySessionStartBar <= bar_index and (bar_index - sydneySessionStartBar) < 5000
-                bool sessionInFuture = sessionStart > time
-                if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and meetsSydneyVWAPTimeframe
-                    deleteLabel(sydneyLabels, arrayIdx)
-                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
-                    color labelColor = getVWAPColor(colorSydneyActive, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, sydneyVWAPCountActive - 1)
-                    bool isPrimarySession = "Sydney" == primarySessionName
-                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : "SYD" + str.tostring(positionInHistory + 1)) : "Sydney " + str.format_time(sessionStart, "d MMM", "Australia/Sydney")
-                    label newLabel = label.new(sydneySessionStartBar, high[bar_index - sydneySessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
-                    array.set(sydneyLabels, arrayIdx, newLabel)
-
-    // Shift Tokyo accumulators and recreate labels if shifted
-    if tokyoShifted
-        // Preserve bar indices by matching session timestamps before shift
-        array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
-        for oldIdx = 0 to MAX_VWAP_HISTORY - 1
-            int oldSessionTime = array.get(tokyoStarts, oldIdx)
-            int oldBarIdx = array.get(tokyoStartBars, oldIdx)
-            if not na(oldSessionTime) and not na(oldBarIdx)
-                // Find this session in the new array
-                for newIdx = 0 to MAX_VWAP_HISTORY - 1
-                    int newSessionTime = array.get(currentTokyoStarts, newIdx)
-                    if newSessionTime == oldSessionTime
-                        array.set(tempStartBars, newIdx, oldBarIdx)
-                        break
-
-        // Shift accumulators left to maintain alignment
-        for i = 0 to MAX_VWAP_HISTORY - 2
-            int srcIdx = MAX_VWAP_HISTORY - 1 - i
-            int dstIdx = srcIdx - 1
-            array.set(tokyoSumSrc, dstIdx, array.get(tokyoSumSrc, srcIdx))
-            array.set(tokyoSumVol, dstIdx, array.get(tokyoSumVol, srcIdx))
-            array.set(tokyoVWAPs, dstIdx, array.get(tokyoVWAPs, srcIdx))
-        array.set(tokyoSumSrc, MAX_VWAP_HISTORY - 1, 0.0)
-        array.set(tokyoSumVol, MAX_VWAP_HISTORY - 1, 0.0)
-        array.set(tokyoVWAPs, MAX_VWAP_HISTORY - 1, na)
-
-        // Update startBars with preserved values
-        for idx = 0 to MAX_VWAP_HISTORY - 1
-            array.set(tokyoStartBars, idx, array.get(tempStartBars, idx))
-
-        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
-            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - tokyoVWAPCountActive)
-            if sessionIndexInHistory >= 0
-                int sessionStart = array.get(tokyoStarts, arrayIdx)
-                int tokyoSessionStartBar = array.get(tokyoStartBars, arrayIdx)
-                bool withinLookback = not na(tokyoSessionStartBar) and tokyoSessionStartBar <= bar_index and (bar_index - tokyoSessionStartBar) < 5000
-                bool sessionInFuture = sessionStart > time
-                if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and meetsTokyoVWAPTimeframe
-                    deleteLabel(tokyoLabels, arrayIdx)
-                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
-                    color labelColor = getVWAPColor(colorTokyoActive, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, tokyoVWAPCountActive - 1)
-                    bool isPrimarySession = "Tokyo" == primarySessionName
-                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : "TKY" + str.tostring(positionInHistory + 1)) : "Tokyo " + str.format_time(sessionStart, "d MMM", "Asia/Tokyo")
-                    label newLabel = label.new(tokyoSessionStartBar, high[bar_index - tokyoSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
-                    array.set(tokyoLabels, arrayIdx, newLabel)
-
-    // Update tracking variables after processing shifts
-    if londonShifted
-        prevMostRecentLondonStart := array.get(londonStarts, MAX_VWAP_HISTORY - 1)
-    if nyShifted
-        prevMostRecentNYStart := array.get(nyStarts, MAX_VWAP_HISTORY - 1)
-    if globexShifted
-        prevMostRecentGlobexStart := array.get(globexStarts, MAX_VWAP_HISTORY - 1)
-    if sydneyShifted
-        prevMostRecentSydneyStart := array.get(sydneyStarts, MAX_VWAP_HISTORY - 1)
-    if tokyoShifted
-        prevMostRecentTokyoStart := array.get(tokyoStarts, MAX_VWAP_HISTORY - 1)
+                mgr.prevMostRecentStart := array.get(currentStarts, MAX_VWAP_HISTORY - 1)
 
 // Plot VWAPs - up to 5 historical sessions per type
+SessionManager londonMgr = array.get(sessionManagers, 0)
+SessionManager nyMgr = array.get(sessionManagers, 1)
+SessionManager globexMgr = array.get(sessionManagers, 2)
+SessionManager sydneyMgr = array.get(sessionManagers, 3)
+SessionManager tokyoMgr = array.get(sessionManagers, 4)
+
 bool skipLondonMostRecent = showWeeklyAnchorVWAP and primarySessionName == "London" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and meetsLondonVWAPTimeframe and showSessionVWAP and enableLondonActive and londonVWAPCountActive >= 1 and not skipLondonMostRecent ? array.get(londonVWAPs, MAX_VWAP_HISTORY - 1) : na, "London VWAP 1", color=getVWAPColor(colorLondonActive, 0, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, londonVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and londonMgr.meetsTimeframe and showSessionVWAP and londonMgr.enabled and londonMgr.historyCount >= 1 and not skipLondonMostRecent ? array.get(londonMgr.vwaps, MAX_VWAP_HISTORY - 1) : na, "London VWAP 1", color=getVWAPColor(londonMgr.col, 0, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, londonMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 bool skipNYMostRecent = showWeeklyAnchorVWAP and primarySessionName == "New York" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYorkActive and nyVWAPCountActive >= 1 and not skipNYMostRecent ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 1) : na, "NY VWAP 1", color=getVWAPColor(colorNewYorkActive, 0, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYorkActive and nyVWAPCountActive >= 2 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 2) : na, "NY VWAP 2", color=getVWAPColor(colorNewYorkActive, 1, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYorkActive and nyVWAPCountActive >= 3 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 3) : na, "NY VWAP 3", color=getVWAPColor(colorNewYorkActive, 2, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYorkActive and nyVWAPCountActive >= 4 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 4) : na, "NY VWAP 4", color=getVWAPColor(colorNewYorkActive, 3, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsNYVWAPTimeframe and showSessionVWAP and enableNewYorkActive and nyVWAPCountActive >= 5 ? array.get(nyVWAPs, MAX_VWAP_HISTORY - 5) : na, "NY VWAP 5", color=getVWAPColor(colorNewYorkActive, 4, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and nyMgr.meetsTimeframe and showSessionVWAP and nyMgr.enabled and nyMgr.historyCount >= 1 and not skipNYMostRecent ? array.get(nyMgr.vwaps, MAX_VWAP_HISTORY - 1) : na, "NY VWAP 1", color=getVWAPColor(nyMgr.col, 0, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and nyMgr.meetsTimeframe and showSessionVWAP and nyMgr.enabled and nyMgr.historyCount >= 2 ? array.get(nyMgr.vwaps, MAX_VWAP_HISTORY - 2) : na, "NY VWAP 2", color=getVWAPColor(nyMgr.col, 1, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and nyMgr.meetsTimeframe and showSessionVWAP and nyMgr.enabled and nyMgr.historyCount >= 3 ? array.get(nyMgr.vwaps, MAX_VWAP_HISTORY - 3) : na, "NY VWAP 3", color=getVWAPColor(nyMgr.col, 2, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and nyMgr.meetsTimeframe and showSessionVWAP and nyMgr.enabled and nyMgr.historyCount >= 4 ? array.get(nyMgr.vwaps, MAX_VWAP_HISTORY - 4) : na, "NY VWAP 4", color=getVWAPColor(nyMgr.col, 3, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and nyMgr.meetsTimeframe and showSessionVWAP and nyMgr.enabled and nyMgr.historyCount >= 5 ? array.get(nyMgr.vwaps, MAX_VWAP_HISTORY - 5) : na, "NY VWAP 5", color=getVWAPColor(nyMgr.col, 4, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 bool skipGlobexMostRecent = showWeeklyAnchorVWAP and primarySessionName == "Globex" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobexActive and globexVWAPCountActive >= 1 and not skipGlobexMostRecent ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 1) : na, "Globex VWAP 1", color=getVWAPColor(colorGlobexActive, 0, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobexActive and globexVWAPCountActive >= 2 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 2) : na, "Globex VWAP 2", color=getVWAPColor(colorGlobexActive, 1, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobexActive and globexVWAPCountActive >= 3 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 3) : na, "Globex VWAP 3", color=getVWAPColor(colorGlobexActive, 2, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobexActive and globexVWAPCountActive >= 4 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 4) : na, "Globex VWAP 4", color=getVWAPColor(colorGlobexActive, 3, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and meetsGlobexVWAPTimeframe and showSessionVWAP and enableGlobexActive and globexVWAPCountActive >= 5 ? array.get(globexVWAPs, MAX_VWAP_HISTORY - 5) : na, "Globex VWAP 5", color=getVWAPColor(colorGlobexActive, 4, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and globexMgr.meetsTimeframe and showSessionVWAP and globexMgr.enabled and globexMgr.historyCount >= 1 and not skipGlobexMostRecent ? array.get(globexMgr.vwaps, MAX_VWAP_HISTORY - 1) : na, "Globex VWAP 1", color=getVWAPColor(globexMgr.col, 0, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and globexMgr.meetsTimeframe and showSessionVWAP and globexMgr.enabled and globexMgr.historyCount >= 2 ? array.get(globexMgr.vwaps, MAX_VWAP_HISTORY - 2) : na, "Globex VWAP 2", color=getVWAPColor(globexMgr.col, 1, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and globexMgr.meetsTimeframe and showSessionVWAP and globexMgr.enabled and globexMgr.historyCount >= 3 ? array.get(globexMgr.vwaps, MAX_VWAP_HISTORY - 3) : na, "Globex VWAP 3", color=getVWAPColor(globexMgr.col, 2, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and globexMgr.meetsTimeframe and showSessionVWAP and globexMgr.enabled and globexMgr.historyCount >= 4 ? array.get(globexMgr.vwaps, MAX_VWAP_HISTORY - 4) : na, "Globex VWAP 4", color=getVWAPColor(globexMgr.col, 3, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and globexMgr.meetsTimeframe and showSessionVWAP and globexMgr.enabled and globexMgr.historyCount >= 5 ? array.get(globexMgr.vwaps, MAX_VWAP_HISTORY - 5) : na, "Globex VWAP 5", color=getVWAPColor(globexMgr.col, 4, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 bool skipSydneyMostRecent = showWeeklyAnchorVWAP and primarySessionName == "Sydney" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and meetsSydneyVWAPTimeframe and showSessionVWAP and enableSydneyActive and sydneyVWAPCountActive >= 1 and not skipSydneyMostRecent ? array.get(sydneyVWAPs, MAX_VWAP_HISTORY - 1) : na, "Sydney VWAP 1", color=getVWAPColor(colorSydneyActive, 0, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, sydneyVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and sydneyMgr.meetsTimeframe and showSessionVWAP and sydneyMgr.enabled and sydneyMgr.historyCount >= 1 and not skipSydneyMostRecent ? array.get(sydneyMgr.vwaps, MAX_VWAP_HISTORY - 1) : na, "Sydney VWAP 1", color=getVWAPColor(sydneyMgr.col, 0, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, sydneyMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 bool skipTokyoMostRecent = showWeeklyAnchorVWAP and primarySessionName == "Tokyo" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and meetsTokyoVWAPTimeframe and showSessionVWAP and enableTokyoActive and tokyoVWAPCountActive >= 1 and not skipTokyoMostRecent ? array.get(tokyoVWAPs, MAX_VWAP_HISTORY - 1) : na, "Tokyo VWAP 1", color=getVWAPColor(colorTokyoActive, 0, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, tokyoVWAPCountActive - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+plot(sessionBaseCondition and tokyoMgr.meetsTimeframe and showSessionVWAP and tokyoMgr.enabled and tokyoMgr.historyCount >= 1 and not skipTokyoMostRecent ? array.get(tokyoMgr.vwaps, MAX_VWAP_HISTORY - 1) : na, "Tokyo VWAP 1", color=getVWAPColor(tokyoMgr.col, 0, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, tokyoMgr.historyCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // WEEKLY ANCHOR VWAP CALCULATION (Multi-week support)
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // Get the session arrays for the anchor session type (for skip logic)
-array<int> anchorSessionStarts = switch primarySessionName
-    "London" => londonStarts
-    "New York" => nyStarts
-    "Globex" => globexStarts
-    "Sydney" => sydneyStarts
-    => tokyoStarts
+SessionManager primaryMgr = switch primarySessionName
+    "London" => londonMgr
+    "New York" => nyMgr
+    "Globex" => globexMgr
+    "Sydney" => sydneyMgr
+    => tokyoMgr
 
 if showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe
     string anchorTZ = getSessionTimezone(primarySessionName)
@@ -1493,19 +1179,12 @@ if showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe
 
                 // Check if this is the most recent week and matches the most recent daily session
                 if weekIdx == MAX_WEEKLY_HISTORY - 1
-                    currentSessionIsWeeklyAnchor := (weekStart == array.get(anchorSessionStarts, MAX_VWAP_HISTORY - 1))
+                    currentSessionIsWeeklyAnchor := (weekStart == array.get(primaryMgr.starts, MAX_VWAP_HISTORY - 1))
 
-                // Create label at week start (only if within count)
                 bool shouldShowLabel = weekIdx >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
                 if showSessionLabels and shouldShowLabel
-                    label oldLabel = array.get(weeklyAnchorLabels, weekIdx)
-                    if not na(oldLabel)
-                        label.delete(oldLabel)
                     int positionInWeeklyHistory = (MAX_WEEKLY_HISTORY - 1) - weekIdx
-                    color weeklyLabelColor = getVWAPColor(colorWeeklyAnchor, positionInWeeklyHistory, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1)
-                    string weeklyLabelText = compactLabels ? "W" + str.tostring(positionInWeeklyHistory + 1) : "Week " + str.tostring(weekofyear(weekStart, anchorTZ)) + " (" + primarySessionName + ")"
-                    label newLabel = label.new(bar_index, high, weeklyLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=weeklyLabelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
-                    array.set(weeklyAnchorLabels, weekIdx, newLabel)
+                    createAnchorLabel(weeklyAnchorLabels, weekIdx, weekStart, "W", positionInWeeklyHistory, colorWeeklyAnchor, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1, anchorTZ, primarySessionName)
 
             // Accumulate if we're at or after this week's start (apply RTH filter for stocks/indices)
             bool shouldAccumulateWeekly = not shouldFilterRTH or isNYSession
@@ -1520,21 +1199,13 @@ if showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe
                 float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
                 array.set(weeklyAnchorVWAPs, weekIdx, vwap)
 
-// Plot weekly anchor VWAPs (only plot the number specified by count)
-// Index 5 = most recent (when MAX=6), Index 4 = 2nd most recent, etc.
-bool shouldPlot0 = 0 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
-bool shouldPlot1 = 1 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
-bool shouldPlot2 = 2 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
-bool shouldPlot3 = 3 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
-bool shouldPlot4 = 4 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
-bool shouldPlot5 = 5 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
-
-plot(shouldPlot0 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 0) : na, "Weekly Anchor 1", color=getVWAPColor(colorWeeklyAnchor, 5, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlot1 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 1) : na, "Weekly Anchor 2", color=getVWAPColor(colorWeeklyAnchor, 4, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlot2 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 2) : na, "Weekly Anchor 3", color=getVWAPColor(colorWeeklyAnchor, 3, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlot3 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 3) : na, "Weekly Anchor 4", color=getVWAPColor(colorWeeklyAnchor, 2, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlot4 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 4) : na, "Weekly Anchor 5", color=getVWAPColor(colorWeeklyAnchor, 1, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlot5 and showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe ? array.get(weeklyAnchorVWAPs, 5) : na, "Weekly Anchor 6", color=getVWAPColor(colorWeeklyAnchor, 0, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+bool wklyBase = showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe
+plot(wklyBase and 0 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 0) : na, "Weekly Anchor 1", color=getVWAPColor(colorWeeklyAnchor, 5, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(wklyBase and 1 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 1) : na, "Weekly Anchor 2", color=getVWAPColor(colorWeeklyAnchor, 4, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(wklyBase and 2 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 2) : na, "Weekly Anchor 3", color=getVWAPColor(colorWeeklyAnchor, 3, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(wklyBase and 3 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 3) : na, "Weekly Anchor 4", color=getVWAPColor(colorWeeklyAnchor, 2, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(wklyBase and 4 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 4) : na, "Weekly Anchor 5", color=getVWAPColor(colorWeeklyAnchor, 1, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(wklyBase and 5 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 5) : na, "Weekly Anchor 6", color=getVWAPColor(colorWeeklyAnchor, 0, longTermAnchorColorDifferentiation, longTermAnchorMaxTransparency, longTermAnchorHueShift, longTermAnchorDesaturation, longTermAnchorBrightness, weeklyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // MONTHLY ANCHOR VWAP CALCULATION
@@ -1550,17 +1221,11 @@ if showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe
                 array.set(monthlyAnchorSumSrc, monthIdx, 0.0)
                 array.set(monthlyAnchorSumVol, monthIdx, 0.0)
                 if monthIdx == MAX_MONTHLY_HISTORY - 1
-                    currentSessionIsMonthlyAnchor := (monthStart == array.get(anchorSessionStarts, MAX_VWAP_HISTORY - 1))
+                    currentSessionIsMonthlyAnchor := (monthStart == array.get(primaryMgr.starts, MAX_VWAP_HISTORY - 1))
                 bool shouldShowLabel = monthIdx >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
                 if showSessionLabels and shouldShowLabel
-                    label oldLabel = array.get(monthlyAnchorLabels, monthIdx)
-                    if not na(oldLabel)
-                        label.delete(oldLabel)
                     int positionInMonthlyHistory = (MAX_MONTHLY_HISTORY - 1) - monthIdx
-                    color monthlyLabelColor = getVWAPColor(colorMonthlyAnchor, positionInMonthlyHistory, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1)
-                    string monthlyLabelText = compactLabels ? "M" + str.tostring(positionInMonthlyHistory + 1) : str.format("{0,date,MMM yyyy}", monthStart) + " (" + primarySessionName + ")"
-                    label newLabel = label.new(bar_index, high, monthlyLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=monthlyLabelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
-                    array.set(monthlyAnchorLabels, monthIdx, newLabel)
+                    createAnchorLabel(monthlyAnchorLabels, monthIdx, monthStart, "M", positionInMonthlyHistory, colorMonthlyAnchor, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1, anchorTZ, primarySessionName)
             if time >= monthStart
                 bool shouldAccumulateMonthly = not shouldFilterRTH or isNYSession
                 if shouldAccumulateMonthly
@@ -1573,19 +1238,13 @@ if showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe
                 float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
                 array.set(monthlyAnchorVWAPs, monthIdx, vwap)
 
-bool shouldPlotM0 = 0 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-bool shouldPlotM1 = 1 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-bool shouldPlotM2 = 2 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-bool shouldPlotM3 = 3 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-bool shouldPlotM4 = 4 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-bool shouldPlotM5 = 5 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-
-plot(shouldPlotM0 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 0) : na, "Monthly Anchor 1", color=getVWAPColor(colorMonthlyAnchor, 5, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM1 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 1) : na, "Monthly Anchor 2", color=getVWAPColor(colorMonthlyAnchor, 4, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM2 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 2) : na, "Monthly Anchor 3", color=getVWAPColor(colorMonthlyAnchor, 3, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM3 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 3) : na, "Monthly Anchor 4", color=getVWAPColor(colorMonthlyAnchor, 2, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM4 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 4) : na, "Monthly Anchor 5", color=getVWAPColor(colorMonthlyAnchor, 1, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotM5 and showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe ? array.get(monthlyAnchorVWAPs, 5) : na, "Monthly Anchor 6", color=getVWAPColor(colorMonthlyAnchor, 0, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+bool mnthBase = showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe
+plot(mnthBase and 0 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 0) : na, "Monthly Anchor 1", color=getVWAPColor(colorMonthlyAnchor, 5, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(mnthBase and 1 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 1) : na, "Monthly Anchor 2", color=getVWAPColor(colorMonthlyAnchor, 4, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(mnthBase and 2 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 2) : na, "Monthly Anchor 3", color=getVWAPColor(colorMonthlyAnchor, 3, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(mnthBase and 3 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 3) : na, "Monthly Anchor 4", color=getVWAPColor(colorMonthlyAnchor, 2, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(mnthBase and 4 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 4) : na, "Monthly Anchor 5", color=getVWAPColor(colorMonthlyAnchor, 1, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(mnthBase and 5 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 5) : na, "Monthly Anchor 6", color=getVWAPColor(colorMonthlyAnchor, 0, monthlyAnchorColorDifferentiation, monthlyAnchorMaxTransparency, monthlyAnchorHueShift, monthlyAnchorDesaturation, monthlyAnchorBrightness, monthlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // YEARLY ANCHOR VWAP CALCULATION
@@ -1601,17 +1260,11 @@ if showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe
                 array.set(yearlyAnchorSumSrc, yearIdx, 0.0)
                 array.set(yearlyAnchorSumVol, yearIdx, 0.0)
                 if yearIdx == MAX_YEARLY_HISTORY - 1
-                    currentSessionIsYearlyAnchor := (yearStart == array.get(anchorSessionStarts, MAX_VWAP_HISTORY - 1))
+                    currentSessionIsYearlyAnchor := (yearStart == array.get(primaryMgr.starts, MAX_VWAP_HISTORY - 1))
                 bool shouldShowLabel = yearIdx >= (MAX_YEARLY_HISTORY - yearlyAnchorCount)
                 if showSessionLabels and shouldShowLabel
-                    label oldLabel = array.get(yearlyAnchorLabels, yearIdx)
-                    if not na(oldLabel)
-                        label.delete(oldLabel)
                     int positionInYearlyHistory = (MAX_YEARLY_HISTORY - 1) - yearIdx
-                    color yearlyLabelColor = getVWAPColor(colorYearlyAnchor, positionInYearlyHistory, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation, yearlyAnchorBrightness, yearlyAnchorCount - 1)
-                    string yearlyLabelText = compactLabels ? "Y" + str.tostring(positionInYearlyHistory + 1) : str.format("{0,date,yyyy}", yearStart) + " (" + primarySessionName + ")"
-                    label newLabel = label.new(bar_index, high, yearlyLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=yearlyLabelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
-                    array.set(yearlyAnchorLabels, yearIdx, newLabel)
+                    createAnchorLabel(yearlyAnchorLabels, yearIdx, yearStart, "Y", positionInYearlyHistory, colorYearlyAnchor, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation, yearlyAnchorBrightness, yearlyAnchorCount - 1, anchorTZ, primarySessionName)
             if time >= yearStart
                 bool shouldAccumulateYearly = not shouldFilterRTH or isNYSession
                 if shouldAccumulateYearly
@@ -1624,11 +1277,9 @@ if showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe
                 float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
                 array.set(yearlyAnchorVWAPs, yearIdx, vwap)
 
-bool shouldPlotY0 = 0 >= (MAX_YEARLY_HISTORY - yearlyAnchorCount)
-bool shouldPlotY1 = 1 >= (MAX_YEARLY_HISTORY - yearlyAnchorCount)
-
-plot(shouldPlotY0 and showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe ? array.get(yearlyAnchorVWAPs, 0) : na, "Yearly Anchor 1", color=getVWAPColor(colorYearlyAnchor, 1, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation, yearlyAnchorBrightness, yearlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
-plot(shouldPlotY1 and showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe ? array.get(yearlyAnchorVWAPs, 1) : na, "Yearly Anchor 2", color=getVWAPColor(colorYearlyAnchor, 0, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation, yearlyAnchorBrightness, yearlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, style=plot.style_line, linestyle=sessionVWAPLineStyle)
+bool yrlyBase = showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe
+plot(yrlyBase and 0 >= (MAX_YEARLY_HISTORY - yearlyAnchorCount) ? array.get(yearlyAnchorVWAPs, 0) : na, "Yearly Anchor 1", color=getVWAPColor(colorYearlyAnchor, 1, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation, yearlyAnchorBrightness, yearlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(yrlyBase and 1 >= (MAX_YEARLY_HISTORY - yearlyAnchorCount) ? array.get(yearlyAnchorVWAPs, 1) : na, "Yearly Anchor 2", color=getVWAPColor(colorYearlyAnchor, 0, yearlyAnchorColorDifferentiation, yearlyAnchorMaxTransparency, yearlyAnchorHueShift, yearlyAnchorDesaturation, yearlyAnchorBrightness, yearlyAnchorCount - 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // SESSION LEVELS RENDERING (for active session only)
@@ -1662,44 +1313,44 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
 
     string labelSizeActual = getLabelSize(globalLabelSize)
 
-    // Round prices for map key consistency
-    float athRounded = roundToTick(ath)
-    float pyhRounded = roundToTick(pyh)
-    float pylRounded = roundToTick(pyl)
-    float pmhRounded = roundToTick(pmh)
-    float pmlRounded = roundToTick(pml)
-    float pwhRounded = roundToTick(pwh)
-    float pwlRounded = roundToTick(pwl)
-    float pdhRounded = roundToTick(pdh)
-    float pdlRounded = roundToTick(pdl)
-    float cyhRounded = roundToTick(cyh)
-    float cylRounded = roundToTick(cyl)
-    float cmhRounded = roundToTick(cmh)
-    float cmlRounded = roundToTick(cml)
-    float cwhRounded = roundToTick(cwh)
-    float cwlRounded = roundToTick(cwl)
-    float cdhRounded = roundToTick(cdh)
-    float cdlRounded = roundToTick(cdl)
+    // Convert prices to integer ticks for deduplication
+    int athTicks = priceToTicks(ath)
+    int pyhTicks = priceToTicks(pyh)
+    int pylTicks = priceToTicks(pyl)
+    int pmhTicks = priceToTicks(pmh)
+    int pmlTicks = priceToTicks(pml)
+    int pwhTicks = priceToTicks(pwh)
+    int pwlTicks = priceToTicks(pwl)
+    int pdhTicks = priceToTicks(pdh)
+    int pdlTicks = priceToTicks(pdl)
+    int cyhTicks = priceToTicks(cyh)
+    int cylTicks = priceToTicks(cyl)
+    int cmhTicks = priceToTicks(cmh)
+    int cmlTicks = priceToTicks(cml)
+    int cwhTicks = priceToTicks(cwh)
+    int cwlTicks = priceToTicks(cwl)
+    int cdhTicks = priceToTicks(cdh)
+    int cdlTicks = priceToTicks(cdl)
 
-    // Pivot points rounded
-    float pivotPRounded = roundToTick(pivotP)
-    float pivotR1Rounded = roundToTick(pivotR1)
-    float pivotR2Rounded = roundToTick(pivotR2)
-    float pivotR3Rounded = roundToTick(pivotR3)
-    float pivotS1Rounded = roundToTick(pivotS1)
-    float pivotS2Rounded = roundToTick(pivotS2)
-    float pivotS3Rounded = roundToTick(pivotS3)
+    // Pivot points in ticks
+    int pivotPTicks = priceToTicks(pivotP)
+    int pivotR1Ticks = priceToTicks(pivotR1)
+    int pivotR2Ticks = priceToTicks(pivotR2)
+    int pivotR3Ticks = priceToTicks(pivotR3)
+    int pivotS1Ticks = priceToTicks(pivotS1)
+    int pivotS2Ticks = priceToTicks(pivotS2)
+    int pivotS3Ticks = priceToTicks(pivotS3)
 
-    // Session levels rounded
-    float ibhRounded = roundToTick(initialBalanceHigh)
-    float iblRounded = roundToTick(initialBalanceLow)
-    float orhRounded = roundToTick(openRangeHigh)
-    float orlRounded = roundToTick(openRangeLow)
-    float openRounded = roundToTick(sessionOpen)
+    // Session levels in ticks
+    int ibhTicks = priceToTicks(initialBalanceHigh)
+    int iblTicks = priceToTicks(initialBalanceLow)
+    int orhTicks = priceToTicks(openRangeHigh)
+    int orlTicks = priceToTicks(openRangeLow)
+    int openTicks = priceToTicks(sessionOpen)
 
     // Build price->label map (merges duplicates with "/")
     // Priority: Session Levels > Pivot Points > Key Levels
-    var map<float, string> priceLabels = map.new<float, string>()
+    var map<int, string> priceLabels = map.new<int, string>()
     map.clear(priceLabels)
 
     // Session levels first (highest priority)
@@ -1770,75 +1421,75 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
         if showCDL
             addToMap(priceLabels, cdl, "CDL")
 
-    var array<float> renderedPrices = array.new<float>()
+    var array<int> renderedPrices = array.new<int>()
     array.clear(renderedPrices)
 
     // Initialize level arrays on first render
     if array.size(sessionLevels) == 0
-        array.push(sessionLevels, LevelRenderer.new("Open", showOpenPrice, sessionOpen, openRounded, openPriceStartBar, colorOpenPrice, sessionLevelsLineWidth, sessionLevelsLineStyle, na, na))
-        array.push(sessionLevels, LevelRenderer.new("ORH", showOpenRange, openRangeHigh, orhRounded, orhStartBar, colorORH, sessionLevelsLineWidth, sessionLevelsLineStyle, na, na))
-        array.push(sessionLevels, LevelRenderer.new("ORL", showOpenRange, openRangeLow, orlRounded, orlStartBar, colorORL, sessionLevelsLineWidth, sessionLevelsLineStyle, na, na))
-        array.push(sessionLevels, LevelRenderer.new("IBH", showInitialBalance, initialBalanceHigh, ibhRounded, ibhStartBar, colorIBH, sessionLevelsLineWidth, sessionLevelsLineStyle, na, na))
-        array.push(sessionLevels, LevelRenderer.new("IBL", showInitialBalance, initialBalanceLow, iblRounded, iblStartBar, colorIBL, sessionLevelsLineWidth, sessionLevelsLineStyle, na, na))
+        addLevel(sessionLevels, "Open", showOpenPrice, sessionOpen, openTicks, openPriceStartBar, colorOpenPrice, sessionLevelsLineWidth, sessionLevelsLineStyle)
+        addLevel(sessionLevels, "ORH", showOpenRange, openRangeHigh, orhTicks, orhStartBar, colorORH, sessionLevelsLineWidth, sessionLevelsLineStyle)
+        addLevel(sessionLevels, "ORL", showOpenRange, openRangeLow, orlTicks, orlStartBar, colorORL, sessionLevelsLineWidth, sessionLevelsLineStyle)
+        addLevel(sessionLevels, "IBH", showInitialBalance, initialBalanceHigh, ibhTicks, ibhStartBar, colorIBH, sessionLevelsLineWidth, sessionLevelsLineStyle)
+        addLevel(sessionLevels, "IBL", showInitialBalance, initialBalanceLow, iblTicks, iblStartBar, colorIBL, sessionLevelsLineWidth, sessionLevelsLineStyle)
 
-        array.push(pivotLevels, LevelRenderer.new("P", showPivotP, pivotP, pivotPRounded, startBar, pivotColorP, pivotLineWidth, pivotLineStyle, na, na))
-        array.push(pivotLevels, LevelRenderer.new("R1", showPivotR1, pivotR1, pivotR1Rounded, startBar, pivotColorR1, pivotLineWidth, pivotLineStyle, na, na))
-        array.push(pivotLevels, LevelRenderer.new("R2", showPivotR2, pivotR2, pivotR2Rounded, startBar, pivotColorR2, pivotLineWidth, pivotLineStyle, na, na))
-        array.push(pivotLevels, LevelRenderer.new("R3", showPivotR3, pivotR3, pivotR3Rounded, startBar, pivotColorR3, pivotLineWidth, pivotLineStyle, na, na))
-        array.push(pivotLevels, LevelRenderer.new("S1", showPivotS1, pivotS1, pivotS1Rounded, startBar, pivotColorS1, pivotLineWidth, pivotLineStyle, na, na))
-        array.push(pivotLevels, LevelRenderer.new("S2", showPivotS2, pivotS2, pivotS2Rounded, startBar, pivotColorS2, pivotLineWidth, pivotLineStyle, na, na))
-        array.push(pivotLevels, LevelRenderer.new("S3", showPivotS3, pivotS3, pivotS3Rounded, startBar, pivotColorS3, pivotLineWidth, pivotLineStyle, na, na))
+        addLevel(pivotLevels, "P", showPivotP, pivotP, pivotPTicks, startBar, pivotColorP, pivotLineWidth, pivotLineStyle)
+        addLevel(pivotLevels, "R1", showPivotR1, pivotR1, pivotR1Ticks, startBar, pivotColorR1, pivotLineWidth, pivotLineStyle)
+        addLevel(pivotLevels, "R2", showPivotR2, pivotR2, pivotR2Ticks, startBar, pivotColorR2, pivotLineWidth, pivotLineStyle)
+        addLevel(pivotLevels, "R3", showPivotR3, pivotR3, pivotR3Ticks, startBar, pivotColorR3, pivotLineWidth, pivotLineStyle)
+        addLevel(pivotLevels, "S1", showPivotS1, pivotS1, pivotS1Ticks, startBar, pivotColorS1, pivotLineWidth, pivotLineStyle)
+        addLevel(pivotLevels, "S2", showPivotS2, pivotS2, pivotS2Ticks, startBar, pivotColorS2, pivotLineWidth, pivotLineStyle)
+        addLevel(pivotLevels, "S3", showPivotS3, pivotS3, pivotS3Ticks, startBar, pivotColorS3, pivotLineWidth, pivotLineStyle)
 
-        array.push(keyLevels, LevelRenderer.new("ATH", showATH, ath, athRounded, startBar, colorATH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("PYH", showPYH, pyh, pyhRounded, startBar, colorPYH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("PYL", showPYL, pyl, pylRounded, startBar, colorPYL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("PMH", showPMH, pmh, pmhRounded, startBar, colorPMH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("PML", showPML, pml, pmlRounded, startBar, colorPML, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("PWH", showPWH, pwh, pwhRounded, startBar, colorPWH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("PWL", showPWL, pwl, pwlRounded, startBar, colorPWL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("PDH", showPDH, pdh, pdhRounded, startBar, colorPDH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("PDL", showPDL, pdl, pdlRounded, startBar, colorPDL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("CYH", showCYH, cyh, cyhRounded, startBar, colorCYH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("CYL", showCYL, cyl, cylRounded, startBar, colorCYL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("CMH", showCMH, cmh, cmhRounded, startBar, colorCMH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("CML", showCML, cml, cmlRounded, startBar, colorCML, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("CWH", showCWH, cwh, cwhRounded, startBar, colorCWH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("CWL", showCWL, cwl, cwlRounded, startBar, colorCWL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("CDH", showCDH, cdh, cdhRounded, startBar, colorCDH, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
-        array.push(keyLevels, LevelRenderer.new("CDL", showCDL, cdl, cdlRounded, startBar, colorCDL, keyLevelsLineWidth, keyLevelsLineStyle, na, na))
+        addLevel(keyLevels, "ATH", showATH, ath, athTicks, startBar, colorATH, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "PYH", showPYH, pyh, pyhTicks, startBar, colorPYH, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "PYL", showPYL, pyl, pylTicks, startBar, colorPYL, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "PMH", showPMH, pmh, pmhTicks, startBar, colorPMH, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "PML", showPML, pml, pmlTicks, startBar, colorPML, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "PWH", showPWH, pwh, pwhTicks, startBar, colorPWH, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "PWL", showPWL, pwl, pwlTicks, startBar, colorPWL, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "PDH", showPDH, pdh, pdhTicks, startBar, colorPDH, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "PDL", showPDL, pdl, pdlTicks, startBar, colorPDL, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "CYH", showCYH, cyh, cyhTicks, startBar, colorCYH, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "CYL", showCYL, cyl, cylTicks, startBar, colorCYL, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "CMH", showCMH, cmh, cmhTicks, startBar, colorCMH, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "CML", showCML, cml, cmlTicks, startBar, colorCML, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "CWH", showCWH, cwh, cwhTicks, startBar, colorCWH, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "CWL", showCWL, cwl, cwlTicks, startBar, colorCWL, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "CDH", showCDH, cdh, cdhTicks, startBar, colorCDH, keyLevelsLineWidth, keyLevelsLineStyle)
+        addLevel(keyLevels, "CDL", showCDL, cdl, cdlTicks, startBar, colorCDL, keyLevelsLineWidth, keyLevelsLineStyle)
     else
         // Update level data each bar
-        array.get(sessionLevels, 0).update(showOpenPrice, sessionOpen, openRounded, openPriceStartBar)
-        array.get(sessionLevels, 1).update(showOpenRange, openRangeHigh, orhRounded, orhStartBar)
-        array.get(sessionLevels, 2).update(showOpenRange, openRangeLow, orlRounded, orlStartBar)
-        array.get(sessionLevels, 3).update(showInitialBalance, initialBalanceHigh, ibhRounded, ibhStartBar)
-        array.get(sessionLevels, 4).update(showInitialBalance, initialBalanceLow, iblRounded, iblStartBar)
+        array.get(sessionLevels, 0).update(showOpenPrice, sessionOpen, openTicks, openPriceStartBar)
+        array.get(sessionLevels, 1).update(showOpenRange, openRangeHigh, orhTicks, orhStartBar)
+        array.get(sessionLevels, 2).update(showOpenRange, openRangeLow, orlTicks, orlStartBar)
+        array.get(sessionLevels, 3).update(showInitialBalance, initialBalanceHigh, ibhTicks, ibhStartBar)
+        array.get(sessionLevels, 4).update(showInitialBalance, initialBalanceLow, iblTicks, iblStartBar)
 
-        array.get(pivotLevels, 0).update(showPivotP, pivotP, pivotPRounded, startBar)
-        array.get(pivotLevels, 1).update(showPivotR1, pivotR1, pivotR1Rounded, startBar)
-        array.get(pivotLevels, 2).update(showPivotR2, pivotR2, pivotR2Rounded, startBar)
-        array.get(pivotLevels, 3).update(showPivotR3, pivotR3, pivotR3Rounded, startBar)
-        array.get(pivotLevels, 4).update(showPivotS1, pivotS1, pivotS1Rounded, startBar)
-        array.get(pivotLevels, 5).update(showPivotS2, pivotS2, pivotS2Rounded, startBar)
-        array.get(pivotLevels, 6).update(showPivotS3, pivotS3, pivotS3Rounded, startBar)
+        array.get(pivotLevels, 0).update(showPivotP, pivotP, pivotPTicks, startBar)
+        array.get(pivotLevels, 1).update(showPivotR1, pivotR1, pivotR1Ticks, startBar)
+        array.get(pivotLevels, 2).update(showPivotR2, pivotR2, pivotR2Ticks, startBar)
+        array.get(pivotLevels, 3).update(showPivotR3, pivotR3, pivotR3Ticks, startBar)
+        array.get(pivotLevels, 4).update(showPivotS1, pivotS1, pivotS1Ticks, startBar)
+        array.get(pivotLevels, 5).update(showPivotS2, pivotS2, pivotS2Ticks, startBar)
+        array.get(pivotLevels, 6).update(showPivotS3, pivotS3, pivotS3Ticks, startBar)
 
-        array.get(keyLevels, 0).update(showATH, ath, athRounded, startBar)
-        array.get(keyLevels, 1).update(showPYH, pyh, pyhRounded, startBar)
-        array.get(keyLevels, 2).update(showPYL, pyl, pylRounded, startBar)
-        array.get(keyLevels, 3).update(showPMH, pmh, pmhRounded, startBar)
-        array.get(keyLevels, 4).update(showPML, pml, pmlRounded, startBar)
-        array.get(keyLevels, 5).update(showPWH, pwh, pwhRounded, startBar)
-        array.get(keyLevels, 6).update(showPWL, pwl, pwlRounded, startBar)
-        array.get(keyLevels, 7).update(showPDH, pdh, pdhRounded, startBar)
-        array.get(keyLevels, 8).update(showPDL, pdl, pdlRounded, startBar)
-        array.get(keyLevels, 9).update(showCYH, cyh, cyhRounded, startBar)
-        array.get(keyLevels, 10).update(showCYL, cyl, cylRounded, startBar)
-        array.get(keyLevels, 11).update(showCMH, cmh, cmhRounded, startBar)
-        array.get(keyLevels, 12).update(showCML, cml, cmlRounded, startBar)
-        array.get(keyLevels, 13).update(showCWH, cwh, cwhRounded, startBar)
-        array.get(keyLevels, 14).update(showCWL, cwl, cwlRounded, startBar)
-        array.get(keyLevels, 15).update(showCDH, cdh, cdhRounded, startBar)
-        array.get(keyLevels, 16).update(showCDL, cdl, cdlRounded, startBar)
+        array.get(keyLevels, 0).update(showATH, ath, athTicks, startBar)
+        array.get(keyLevels, 1).update(showPYH, pyh, pyhTicks, startBar)
+        array.get(keyLevels, 2).update(showPYL, pyl, pylTicks, startBar)
+        array.get(keyLevels, 3).update(showPMH, pmh, pmhTicks, startBar)
+        array.get(keyLevels, 4).update(showPML, pml, pmlTicks, startBar)
+        array.get(keyLevels, 5).update(showPWH, pwh, pwhTicks, startBar)
+        array.get(keyLevels, 6).update(showPWL, pwl, pwlTicks, startBar)
+        array.get(keyLevels, 7).update(showPDH, pdh, pdhTicks, startBar)
+        array.get(keyLevels, 8).update(showPDL, pdl, pdlTicks, startBar)
+        array.get(keyLevels, 9).update(showCYH, cyh, cyhTicks, startBar)
+        array.get(keyLevels, 10).update(showCYL, cyl, cylTicks, startBar)
+        array.get(keyLevels, 11).update(showCMH, cmh, cmhTicks, startBar)
+        array.get(keyLevels, 12).update(showCML, cml, cmlTicks, startBar)
+        array.get(keyLevels, 13).update(showCWH, cwh, cwhTicks, startBar)
+        array.get(keyLevels, 14).update(showCWL, cwl, cwlTicks, startBar)
+        array.get(keyLevels, 15).update(showCDH, cdh, cdhTicks, startBar)
+        array.get(keyLevels, 16).update(showCDL, cdl, cdlTicks, startBar)
 
     // ═══════════════════════════════════════════════════════════════════════════════
     // SESSION LEVELS RENDERING (FIRST - highest priority for line style)
