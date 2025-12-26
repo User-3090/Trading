@@ -294,6 +294,36 @@ roundToTick(float price) =>
 priceToTicks(float price) =>
     syminfo.mintick > 0 ? int(math.round(price / syminfo.mintick)) : int(price)
 
+//══════════════════════════════════════════════════════════════════════════════════
+// HOLIDAY HANDLING
+//══════════════════════════════════════════════════════════════════════════════════
+
+var array<int> stockFullHolidays = array.from(20250101,20250120,20250217,20250418,20250526,20250619,20250704,20250901,20251127,20251225,20260101,20260119,20260216,20260403,20260525,20260619,20260703,20260907,20261126,20261225,20270101,20270118,20270215,20270326,20270531,20270618,20270705,20270906,20271125,20271224,20280117,20280221,20280414,20280529,20280619,20280704,20280904,20281123,20281225)
+var array<int> stockEarlyClose = array.from(20250703,20251128,20251224,20261127,20261224,20271126,20280703,20281124)
+var array<int> futuresFullHolidays = array.from(20250101,20250120,20250217,20250418,20250526,20250619,20250704,20250901,20251013,20251111,20251127,20251225,20260101,20260119,20260216,20260403,20260525,20260619,20260703,20260907,20261012,20261111,20261126,20261225)
+var array<int> futuresEarlyClose = array.from(20250417,20250523,20250703,20251128,20251224,20251231,20260402,20260522,20260702,20261127,20261224)
+
+timestampToYYYYMMDD(int ts, string tz) =>
+    int y = year(ts, tz)
+    int m = month(ts, tz)
+    int d = dayofmonth(ts, tz)
+    y * 10000 + m * 100 + d
+
+isFullHoliday(int ts, string tz, bool isStock) =>
+    int dateInt = timestampToYYYYMMDD(ts, tz)
+    array<int> holidays = isStock ? stockFullHolidays : futuresFullHolidays
+    array.includes(holidays, dateInt)
+
+isEarlyClose(int ts, string tz, bool isStock) =>
+    int dateInt = timestampToYYYYMMDD(ts, tz)
+    array<int> earlyCloses = isStock ? stockEarlyClose : futuresEarlyClose
+    array.includes(earlyCloses, dateInt)
+
+isTradingDay(int ts, string tz, string session, bool isStock) =>
+    int dow = dayofweek(ts, tz)
+    bool isWeekday = session == "Globex" ? (dow == dayofweek.sunday or (dow >= dayofweek.monday and dow <= dayofweek.friday)) : (dow >= dayofweek.monday and dow <= dayofweek.friday)
+    isWeekday and not isFullHoliday(ts, tz, isStock)
+
 updateBox(box boxRef, int x1, float y1, int x2, float y2, color bg) =>
     if na(boxRef)
         box.new(x1, y1, x2, y2, border_color=na, bgcolor=bg)
@@ -504,6 +534,7 @@ getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
 
     // Get session timezone to ensure date calculations are consistent
     string tz = getSessionTimezone(session)
+    bool isStockType = syminfo.type == "stock"
 
     int currentY = year(timenow, tz)
     int currentM = month(timenow, tz)
@@ -550,13 +581,9 @@ getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
         int d = dayofmonth(targetMidnight, tz)
         int dow = dayofweek(targetMidnight, tz)
 
-        bool isTradingDay = false
-        if session == "Globex"
-            isTradingDay := dow == dayofweek.sunday or (dow >= dayofweek.monday and dow <= dayofweek.friday)
-        else
-            isTradingDay := dow >= dayofweek.monday and dow <= dayofweek.friday
+        bool isValidTradingDay = isTradingDay(targetMidnight, tz, session, isStockType)
 
-        if isTradingDay
+        if isValidTradingDay
             // For Globex: session active on day D starts evening of day D-1, EXCEPT Sunday
             int ts = na
             if session == "Globex"
@@ -590,6 +617,7 @@ getSessionEndsArray(string session, int sessionsBack) =>
 // Find first valid trading day of a month (returns day 1-31, or na if none found in 14 days)
 getFirstTradingDayOfMonth(string session, int targetYear, int targetMonth) =>
     string tz = getSessionTimezone(session)
+    bool isStockType = syminfo.type == "stock"
     int foundDay = na
     for dayOffset = 0 to 13
         int testDay = dayOffset + 1
@@ -600,8 +628,7 @@ getFirstTradingDayOfMonth(string session, int targetYear, int targetMonth) =>
         int testMonth = month(testTs, tz)
         if testYear != targetYear or testMonth != targetMonth
             break
-        int dow = dayofweek(testTs, tz)
-        bool isValidTradingDay = session == "Globex" ? (dow == dayofweek.sunday or (dow >= dayofweek.monday and dow <= dayofweek.friday)) : (dow >= dayofweek.monday and dow <= dayofweek.friday)
+        bool isValidTradingDay = isTradingDay(testTs, tz, session, isStockType)
         if isValidTradingDay
             foundDay := testDay
             break
@@ -640,13 +667,14 @@ getAnchorStarts(string period, string session, int count) =>
         int targetDayOfWeek = session == "Globex" ? dayofweek.sunday : dayofweek.monday
         int collected = 0
         int daysBack = 0
+        bool isStockType = syminfo.type == "stock"
         while collected < count and daysBack < 730
             int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBack * 86400000)
             int y = year(targetMidnight, tz)
             int m = month(targetMidnight, tz)
             int d = dayofmonth(targetMidnight, tz)
             int dow = dayofweek(targetMidnight, tz)
-            if dow == targetDayOfWeek
+            if dow == targetDayOfWeek and isTradingDay(targetMidnight, tz, session, isStockType)
                 int anchorStart = getSessionStartForDate(session, y, m, d)
                 array.unshift(starts, anchorStart)
                 collected := collected + 1
@@ -973,8 +1001,14 @@ for i = 0 to 4
             int sessionEnd = array.get(sessionEndsArray, arrayIdx)
 
             if not na(sessionStart) and not na(sessionEnd)
-                bool isInThisSession = time >= sessionStart and time < sessionEnd
-                bool sessionJustStarted = time >= sessionStart and time[1] < sessionStart
+                // Skip sessions that fall on holidays
+                string sessionTZ = getSessionTimezone(sessionName)
+                // For Globex, check the next day (active trading day), not the session start day
+                int holidayCheckTimestamp = sessionName == "Globex" ? sessionStart + 86400000 : sessionStart
+                bool sessionIsHoliday = isFullHoliday(holidayCheckTimestamp, sessionTZ, isStock)
+
+                bool isInThisSession = time >= sessionStart and time < sessionEnd and not sessionIsHoliday
+                bool sessionJustStarted = time >= sessionStart and time[1] < sessionStart and not sessionIsHoliday
 
                 if sessionJustStarted
                     array.set(sessionStartBars, i, bar_index)
@@ -1067,11 +1101,27 @@ for i = 0 to 4
                     float vwap = currentSumVol > 0 ? currentSumSrc / currentSumVol : na
                     array.set(mgr.vwaps, arrayIdx, vwap)
 
-                int visibleSessionIndex = arrayIdx - (MAX_VWAP_HISTORY - historyCountUser)
-                bool isVisibleToUser = visibleSessionIndex >= 0
-                if isSessionStart and sessionBaseCondition and mgr.meetsTimeframe and showSessionLabels and showSessionVWAP and isVisibleToUser
+                // Check if this anchor is on a holiday - if so, skip completely
+                string sessionTZ = getSessionTimezone(mgr.name)
+                int holidayCheckTS = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
+                bool anchorIsHoliday = isFullHoliday(holidayCheckTS, sessionTZ, isStock)
+
+                // Count how many non-holiday sessions exist from most recent up to now
+                int nonHolidayRank = 0
+                if not anchorIsHoliday
+                    for countIdx = MAX_VWAP_HISTORY - 1 to arrayIdx
+                        int countStart = array.get(mgr.starts, countIdx)
+                        if not na(countStart)
+                            int countHolidayTS = mgr.name == "Globex" ? countStart + 86400000 : countStart
+                            if not isFullHoliday(countHolidayTS, sessionTZ, isStock)
+                                nonHolidayRank += 1
+
+                // Only show if: not holiday AND within user's requested count
+                bool shouldShow = not anchorIsHoliday and nonHolidayRank <= historyCountUser
+
+                if isSessionStart and sessionBaseCondition and mgr.meetsTimeframe and showSessionLabels and showSessionVWAP and shouldShow
                     deleteLabel(mgr.labels, arrayIdx)
-                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
+                    int positionInHistory = nonHolidayRank - 1
                     color labelColor = getVWAPColor(mgr.col, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, historyCountUser - 1)
                     bool isPrimarySession = mgr.name == primarySessionName
                     int labelTimestamp = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
@@ -1101,21 +1151,39 @@ if barstate.isconfirmed and not barstate.isfirst
                 shiftSessionArrays(mgr.starts, currentStarts, mgr.startBars, mgr.sumSrc, mgr.sumVol, mgr.vwaps)
 
                 for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
-                    int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - mgr.historyCount)
-                    if sessionIndexInHistory >= 0
-                        int sessionStart = array.get(mgr.starts, arrayIdx)
-                        int mgrSessionStartBar = array.get(mgr.startBars, arrayIdx)
-                        bool withinLookback = not na(mgrSessionStartBar) and mgrSessionStartBar <= bar_index and (bar_index - mgrSessionStartBar) < 5000
-                        bool sessionInFuture = sessionStart > time
-                        if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and mgr.meetsTimeframe
-                            deleteLabel(mgr.labels, arrayIdx)
-                            int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
-                            color labelColor = getVWAPColor(mgr.col, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, mgr.historyCount - 1)
-                            bool isPrimarySession = mgr.name == primarySessionName
-                            int labelTimestamp = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
-                            string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(mgr.name) + str.tostring(positionInHistory + 1)) : mgr.name + " " + str.format_time(labelTimestamp, "d MMM", getSessionTimezone(mgr.name))
-                            label newLabel = label.new(mgrSessionStartBar, high[bar_index - mgrSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
-                            array.set(mgr.labels, arrayIdx, newLabel)
+                    int sessionStart = array.get(mgr.starts, arrayIdx)
+                    int mgrSessionStartBar = array.get(mgr.startBars, arrayIdx)
+
+                    // Check if this anchor is on a holiday - if so, skip completely
+                    string shiftSessionTZ = getSessionTimezone(mgr.name)
+                    int shiftHolidayCheckTS = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
+                    bool shiftAnchorIsHoliday = isFullHoliday(shiftHolidayCheckTS, shiftSessionTZ, isStock)
+
+                    // Count how many non-holiday sessions exist from most recent up to now
+                    int shiftNonHolidayRank = 0
+                    if not shiftAnchorIsHoliday
+                        for countIdx = MAX_VWAP_HISTORY - 1 to arrayIdx
+                            int countStart = array.get(mgr.starts, countIdx)
+                            if not na(countStart)
+                                int countHolidayTS = mgr.name == "Globex" ? countStart + 86400000 : countStart
+                                if not isFullHoliday(countHolidayTS, shiftSessionTZ, isStock)
+                                    shiftNonHolidayRank += 1
+
+                    // Only show if: not holiday AND within user's requested count
+                    bool shiftShouldShow = not shiftAnchorIsHoliday and shiftNonHolidayRank <= mgr.historyCount
+
+                    bool withinLookback = not na(mgrSessionStartBar) and mgrSessionStartBar <= bar_index and (bar_index - mgrSessionStartBar) < 5000
+                    bool sessionInFuture = sessionStart > time
+
+                    if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and mgr.meetsTimeframe and shiftShouldShow
+                        deleteLabel(mgr.labels, arrayIdx)
+                        int positionInHistory = shiftNonHolidayRank - 1
+                        color labelColor = getVWAPColor(mgr.col, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, mgr.historyCount - 1)
+                        bool isPrimarySession = mgr.name == primarySessionName
+                        int labelTimestamp = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
+                        string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(mgr.name) + str.tostring(positionInHistory + 1)) : mgr.name + " " + str.format_time(labelTimestamp, "d MMM", getSessionTimezone(mgr.name))
+                        label newLabel = label.new(mgrSessionStartBar, high[bar_index - mgrSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                        array.set(mgr.labels, arrayIdx, newLabel)
 
                 mgr.prevMostRecentStart := array.get(currentStarts, MAX_VWAP_HISTORY - 1)
 
@@ -1551,3 +1619,17 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
     // Render key levels using array-based approach
     for level in keyLevels
         level.render(showKeyLevelsCondition, true, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter)
+
+//══════════════════════════════════════════════════════════════════════════════════
+// HOLIDAY DATA (US Markets 2025-2028)
+//══════════════════════════════════════════════════════════════════════════════════
+// Format: YYYYMMDD as integer
+// Stocks Full: NYSE/Nasdaq closed
+// Stocks Early: NYSE/Nasdaq close 1pm ET
+// Futures Full: CME Globex closed
+// Futures Early: CME Globex close 12pm CT
+// Source data: market_type,event_type,date
+// stocks,full_holiday,2025-01-01|2025-01-20|2025-02-17|2025-04-18|2025-05-26|2025-06-19|2025-07-04|2025-09-01|2025-11-27|2025-12-25|2026-01-01|2026-01-19|2026-02-16|2026-04-03|2026-05-25|2026-06-19|2026-07-03|2026-09-07|2026-11-26|2026-12-25|2027-01-01|2027-01-18|2027-02-15|2027-03-26|2027-05-31|2027-06-18|2027-07-05|2027-09-06|2027-11-25|2027-12-24|2028-01-17|2028-02-21|2028-04-14|2028-05-29|2028-06-19|2028-07-04|2028-09-04|2028-11-23|2028-12-25
+// stocks,early_close,2025-07-03|2025-11-28|2025-12-24|2026-11-27|2026-12-24|2027-11-26|2028-07-03|2028-11-24
+// futures,full_holiday,2025-01-01|2025-01-20|2025-02-17|2025-04-18|2025-05-26|2025-06-19|2025-07-04|2025-09-01|2025-10-13|2025-11-11|2025-11-27|2025-12-25|2026-01-01|2026-01-19|2026-02-16|2026-04-03|2026-05-25|2026-06-19|2026-07-03|2026-09-07|2026-10-12|2026-11-11|2026-11-26|2026-12-25
+// futures,early_close,2025-04-17|2025-05-23|2025-07-03|2025-11-28|2025-12-24|2025-12-31|2026-04-02|2026-05-22|2026-07-02|2026-11-27|2026-12-24
