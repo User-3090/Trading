@@ -529,15 +529,10 @@ getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
     else
         todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD)
 
+    // Always start from today to include upcoming session (look-ahead)
     int mostRecentY = currentY
     int mostRecentM = currentM
     int mostRecentD = currentD
-
-    if timenow < todaySessionStart
-        int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
-        mostRecentY := year(yesterdayMidnight, tz)
-        mostRecentM := month(yesterdayMidnight, tz)
-        mostRecentD := dayofmonth(yesterdayMidnight, tz)
 
     int sessionsCollected = 0
     int daysBackOffset = 0
@@ -873,12 +868,32 @@ var array<int> globexEnds = array.new<int>()
 var array<int> sydneyEnds = array.new<int>()
 var array<int> tokyoEnds = array.new<int>()
 
+// Track most recent session starts to detect shifts
+var int prevMostRecentLondonStart = na
+var int prevMostRecentNYStart = na
+var int prevMostRecentGlobexStart = na
+var int prevMostRecentSydneyStart = na
+var int prevMostRecentTokyoStart = na
+
+// Track session start bars for label recreation
+var array<int> londonStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+var array<int> nyStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+var array<int> globexStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+var array<int> sydneyStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+var array<int> tokyoStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+
 if barstate.isfirst
     londonStarts := getSessionStartsArray("London", MAX_VWAP_HISTORY)
     nyStarts := getSessionStartsArray("New York", MAX_VWAP_HISTORY)
     globexStarts := getSessionStartsArray("Globex", MAX_VWAP_HISTORY)
     sydneyStarts := getSessionStartsArray("Sydney", MAX_VWAP_HISTORY)
     tokyoStarts := getSessionStartsArray("Tokyo", MAX_VWAP_HISTORY)
+
+    prevMostRecentLondonStart := array.get(londonStarts, MAX_VWAP_HISTORY - 1)
+    prevMostRecentNYStart := array.get(nyStarts, MAX_VWAP_HISTORY - 1)
+    prevMostRecentGlobexStart := array.get(globexStarts, MAX_VWAP_HISTORY - 1)
+    prevMostRecentSydneyStart := array.get(sydneyStarts, MAX_VWAP_HISTORY - 1)
+    prevMostRecentTokyoStart := array.get(tokyoStarts, MAX_VWAP_HISTORY - 1)
 
     londonEnds := getSessionEndsArray("London", MAX_VWAP_HISTORY)
     nyEnds := getSessionEndsArray("New York", MAX_VWAP_HISTORY)
@@ -939,6 +954,7 @@ var float initialBalanceHigh = na
 var float initialBalanceLow = na
 var int sessionStartBar = na
 var int sessionStartTime = na
+var int sessionEndTime = na
 
 var int openPriceBar = na
 var int orhBar = na
@@ -961,29 +977,46 @@ for i = 0 to 4
             2 => globexStarts
             3 => sydneyStarts
             => tokyoStarts
-        int mostRecentSessionStart = array.get(sessionStartsArray, MAX_VWAP_HISTORY - 1)
 
-        bool thisSessionChange = time >= mostRecentSessionStart and time[1] < mostRecentSessionStart
+        array<int> sessionEndsArray = switch i
+            0 => londonEnds
+            1 => nyEnds
+            2 => globexEnds
+            3 => sydneyEnds
+            => tokyoEnds
 
-        if thisSessionChange
-            array.set(sessionStartBars, i, bar_index)
-            array.set(sessionStartTimes, i, mostRecentSessionStart)
+        // Find which session from this type is active at current time (for historical replay)
+        for arrayIdx = MAX_VWAP_HISTORY - 1 to 0
+            int sessionStart = array.get(sessionStartsArray, arrayIdx)
+            int sessionEnd = array.get(sessionEndsArray, arrayIdx)
 
-            activeSessionIndex := i
-            activeSessionName := sessionName
+            if not na(sessionStart) and not na(sessionEnd)
+                bool isInThisSession = time >= sessionStart and time < sessionEnd
+                bool sessionJustStarted = time >= sessionStart and time[1] < sessionStart
 
-            sessionOpen := open
-            openRangeHigh := high
-            openRangeLow := low
-            initialBalanceHigh := high
-            initialBalanceLow := low
-            sessionStartBar := bar_index
-            sessionStartTime := mostRecentSessionStart
-            openPriceBar := bar_index
-            orhBar := bar_index
-            orlBar := bar_index
-            ibhBar := bar_index
-            iblBar := bar_index
+                if sessionJustStarted
+                    array.set(sessionStartBars, i, bar_index)
+                    array.set(sessionStartTimes, i, sessionStart)
+
+                    activeSessionIndex := i
+                    activeSessionName := sessionName
+
+                    sessionOpen := open
+                    openRangeHigh := high
+                    openRangeLow := low
+                    initialBalanceHigh := high
+                    initialBalanceLow := low
+                    sessionStartBar := bar_index
+                    sessionStartTime := sessionStart
+                    sessionEndTime := sessionEnd
+                    openPriceBar := bar_index
+                    orhBar := bar_index
+                    orlBar := bar_index
+                    ibhBar := bar_index
+                    iblBar := bar_index
+
+                if isInThisSession
+                    break
 
 if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTime)
     array<int> activeSessionEnds = switch activeSessionIndex
@@ -992,9 +1025,10 @@ if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTim
         2 => globexEnds
         3 => sydneyEnds
         => tokyoEnds
-    int currentSessionEnd = array.get(activeSessionEnds, MAX_VWAP_HISTORY - 1)
 
-    bool stillInSession = time >= sessionStartTime and time < currentSessionEnd
+    // Use stored session end time (set at session start) to handle edge case where
+    // active session gets dropped from array after MAX_VWAP_HISTORY shifts
+    bool stillInSession = not na(sessionEndTime) and time >= sessionStartTime and time < sessionEndTime
 
     if stillInSession
         int elapsedMinutes = math.round((time - sessionStartTime) / 60000)
@@ -1030,8 +1064,10 @@ var array<label> tokyoLabels = array.new<label>(MAX_VWAP_HISTORY, na)
 
 for i = 0 to 4
     if array.get(sessionEnabled, i)
-        // Get configuration for this session type
-        int historyCount = i == 0 ? londonVWAPCountActive : i == 1 ? nyVWAPCountActive : i == 2 ? globexVWAPCountActive : i == 3 ? sydneyVWAPCountActive : tokyoVWAPCountActive
+        // Get configuration for this session type (user's visible count)
+        int historyCountUser = i == 0 ? londonVWAPCountActive : i == 1 ? nyVWAPCountActive : i == 2 ? globexVWAPCountActive : i == 3 ? sydneyVWAPCountActive : tokyoVWAPCountActive
+        // Add buffer for future session AND potential holidays (use all available slots to ensure we get enough trading sessions)
+        int historyCountCalc = MAX_VWAP_HISTORY
         array<int> sessionStartsArray = i == 0 ? londonStarts : i == 1 ? nyStarts : i == 2 ? globexStarts : i == 3 ? sydneyStarts : tokyoStarts
         array<float> sumSrcArray = i == 0 ? londonSumSrc : i == 1 ? nySumSrc : i == 2 ? globexSumSrc : i == 3 ? sydneySumSrc : tokyoSumSrc
         array<float> sumVolArray = i == 0 ? londonSumVol : i == 1 ? nySumVol : i == 2 ? globexSumVol : i == 3 ? sydneySumVol : tokyoSumVol
@@ -1049,48 +1085,62 @@ for i = 0 to 4
             int nextSessionStart = arrayIdx < MAX_VWAP_HISTORY - 1 ? array.get(sessionStartsArray, arrayIdx + 1) : int(na)
 
             // Check if we're at the start of this session
-            bool isSessionStart = time >= sessionStart and time[1] < sessionStart
+            bool isSessionStart = not na(sessionStart) and time >= sessionStart and time[1] < sessionStart
 
             // Check if this VWAP is within the configured history count
             // Array layout: [0=oldest ... 9=newest] with MAX_VWAP_HISTORY=10
             // If historyCount=1: only arrayIdx=9 is visible (sessionIndexInHistory >= 0)
             // If historyCount=2: arrayIdx=8,9 are visible
             // If historyCount=5: arrayIdx=5,6,7,8,9 are visible
-            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - historyCount)
+            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - historyCountCalc)
             bool isInConfiguredRange = sessionIndexInHistory >= 0
 
             // VWAPs should calculate as long as they're in the configured range AND after their session started
             // They continue calculating even after the next session starts (unlike the old logic)
-            bool shouldCalculate = time >= sessionStart and isInConfiguredRange
+            // Skip future sessions (look-ahead) until they actually start
+            bool sessionInFuture = not na(sessionStart) and sessionStart > time
+            bool shouldCalculate = not na(sessionStart) and time >= sessionStart and isInConfiguredRange and not sessionInFuture
 
-            // Reset accumulators on session start (always, regardless of RTH)
-            if isSessionStart and isInConfiguredRange
+            // Only reset accumulators if session has actual volume (skip holidays/gaps entirely)
+            if isSessionStart and isInConfiguredRange and not na(volume) and volume > 0
                 array.set(sumSrcArray, arrayIdx, 0.0)
                 array.set(sumVolArray, arrayIdx, 0.0)
 
+                // Track session start bar
+                array<int> startBarsArray = i == 0 ? londonStartBars : i == 1 ? nyStartBars : i == 2 ? globexStartBars : i == 3 ? sydneyStartBars : tokyoStartBars
+                array.set(startBarsArray, arrayIdx, bar_index)
+
             if shouldCalculate
-                // Get current accumulators for this session
-                float currentSumSrc = array.get(sumSrcArray, arrayIdx)
-                float currentSumVol = array.get(sumVolArray, arrayIdx)
+                // Only calculate if session has a bar index (proves it actually started with data)
+                // This prevents holiday/gap sessions from accumulating data from bars after the gap
+                array<int> checkStartBars = i == 0 ? londonStartBars : i == 1 ? nyStartBars : i == 2 ? globexStartBars : i == 3 ? sydneyStartBars : tokyoStartBars
+                int sessionBarIdx = array.get(checkStartBars, arrayIdx)
 
-                // Accumulate: only filter NY session to RTH if enabled, all other sessions use full data
-                bool isNYSessionVWAP = sessionName == "New York"
-                bool shouldAccumulate = not isNYSessionVWAP or not shouldFilterRTH or isNYSession
-                if shouldAccumulate
-                    currentSumSrc += (ohlc4 * volume)
-                    currentSumVol += volume
-                    array.set(sumSrcArray, arrayIdx, currentSumSrc)
-                    array.set(sumVolArray, arrayIdx, currentSumVol)
+                if not na(sessionBarIdx)
+                    // Get current accumulators for this session
+                    float currentSumSrc = array.get(sumSrcArray, arrayIdx)
+                    float currentSumVol = array.get(sumVolArray, arrayIdx)
 
-                // Calculate VWAP from current accumulators (after accumulation)
-                float vwap = currentSumVol > 0 ? currentSumSrc / currentSumVol : na
-                array.set(vwapArray, arrayIdx, vwap)
+                    // Accumulate: only filter NY session to RTH if enabled, all other sessions use full data
+                    bool isNYSessionVWAP = sessionName == "New York"
+                    bool shouldAccumulate = not isNYSessionVWAP or not shouldFilterRTH or isNYSession
+                    if shouldAccumulate and not na(ohlc4) and not na(volume)
+                        currentSumSrc += (ohlc4 * volume)
+                        currentSumVol += volume
+                        array.set(sumSrcArray, arrayIdx, currentSumSrc)
+                        array.set(sumVolArray, arrayIdx, currentSumVol)
 
-                // Create session label at session start ONLY if within configured history count and timeframe
-                if isSessionStart and sessionBaseCondition and meetsThisSessionVWAPTimeframe and showSessionLabels and showSessionVWAP and isInConfiguredRange
+                    // Calculate VWAP from current accumulators (after accumulation)
+                    float vwap = currentSumVol > 0 ? currentSumSrc / currentSumVol : na
+                    array.set(vwapArray, arrayIdx, vwap)
+
+                // Create session label at session start ONLY if within user's visible count and timeframe
+                int visibleSessionIndex = arrayIdx - (MAX_VWAP_HISTORY - historyCountUser)
+                bool isVisibleToUser = visibleSessionIndex >= 0
+                if isSessionStart and sessionBaseCondition and meetsThisSessionVWAPTimeframe and showSessionLabels and showSessionVWAP and isVisibleToUser
                     deleteLabel(labelArray, arrayIdx)
                     int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
-                    color labelColor = getVWAPColor(sessionColor, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, historyCount - 1)
+                    color labelColor = getVWAPColor(sessionColor, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, historyCountUser - 1)
                     bool isPrimarySession = sessionName == primarySessionName
                     // For Globex, show the trading day (session end day) not the start day
                     int labelTimestamp = sessionName == "Globex" ? sessionStart + 86400000 : sessionStart
@@ -1104,6 +1154,290 @@ for i = 0 to 4
             if not isInConfiguredRange
                 deleteLabel(labelArray, arrayIdx)
                 array.set(labelArray, arrayIdx, na)
+
+// Detect array shifts and shift accumulators + recreate labels with updated position numbers
+// Run on confirmed bars only to avoid re-execution on every real-time tick
+if barstate.isconfirmed and not barstate.isfirst
+    // Recalculate session arrays to detect if new sessions have been added
+    array<int> currentLondonStarts = getSessionStartsArray("London", MAX_VWAP_HISTORY)
+    array<int> currentNYStarts = getSessionStartsArray("New York", MAX_VWAP_HISTORY)
+    array<int> currentGlobexStarts = getSessionStartsArray("Globex", MAX_VWAP_HISTORY)
+    array<int> currentSydneyStarts = getSessionStartsArray("Sydney", MAX_VWAP_HISTORY)
+    array<int> currentTokyoStarts = getSessionStartsArray("Tokyo", MAX_VWAP_HISTORY)
+
+    array<int> currentLondonEnds = getSessionEndsArray("London", MAX_VWAP_HISTORY)
+    array<int> currentNYEnds = getSessionEndsArray("New York", MAX_VWAP_HISTORY)
+    array<int> currentGlobexEnds = getSessionEndsArray("Globex", MAX_VWAP_HISTORY)
+    array<int> currentSydneyEnds = getSessionEndsArray("Sydney", MAX_VWAP_HISTORY)
+    array<int> currentTokyoEnds = getSessionEndsArray("Tokyo", MAX_VWAP_HISTORY)
+
+    bool londonShifted = enableLondonActive and not na(prevMostRecentLondonStart) and array.get(currentLondonStarts, MAX_VWAP_HISTORY - 1) != prevMostRecentLondonStart
+    bool nyShifted = enableNewYorkActive and not na(prevMostRecentNYStart) and array.get(currentNYStarts, MAX_VWAP_HISTORY - 1) != prevMostRecentNYStart
+    bool globexShifted = enableGlobexActive and not na(prevMostRecentGlobexStart) and array.get(currentGlobexStarts, MAX_VWAP_HISTORY - 1) != prevMostRecentGlobexStart
+    bool sydneyShifted = enableSydneyActive and not na(prevMostRecentSydneyStart) and array.get(currentSydneyStarts, MAX_VWAP_HISTORY - 1) != prevMostRecentSydneyStart
+    bool tokyoShifted = enableTokyoActive and not na(prevMostRecentTokyoStart) and array.get(currentTokyoStarts, MAX_VWAP_HISTORY - 1) != prevMostRecentTokyoStart
+
+    // Update session arrays if any shifted
+    if londonShifted
+        londonStarts := currentLondonStarts
+        londonEnds := currentLondonEnds
+    if nyShifted
+        nyStarts := currentNYStarts
+        nyEnds := currentNYEnds
+    if globexShifted
+        globexStarts := currentGlobexStarts
+        globexEnds := currentGlobexEnds
+    if sydneyShifted
+        sydneyStarts := currentSydneyStarts
+        sydneyEnds := currentSydneyEnds
+    if tokyoShifted
+        tokyoStarts := currentTokyoStarts
+        tokyoEnds := currentTokyoEnds
+
+    // Shift London accumulators and recreate labels if shifted
+    if londonShifted
+        // Preserve bar indices by matching session timestamps before shift
+        array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+        for oldIdx = 0 to MAX_VWAP_HISTORY - 1
+            int oldSessionTime = array.get(londonStarts, oldIdx)
+            int oldBarIdx = array.get(londonStartBars, oldIdx)
+            if not na(oldSessionTime) and not na(oldBarIdx)
+                // Find this session in the new array
+                for newIdx = 0 to MAX_VWAP_HISTORY - 1
+                    int newSessionTime = array.get(currentLondonStarts, newIdx)
+                    if newSessionTime == oldSessionTime
+                        array.set(tempStartBars, newIdx, oldBarIdx)
+                        break
+
+        // Shift accumulators left to maintain alignment with shifted session array
+        for i = 0 to MAX_VWAP_HISTORY - 2
+            int srcIdx = MAX_VWAP_HISTORY - 1 - i
+            int dstIdx = srcIdx - 1
+            array.set(londonSumSrc, dstIdx, array.get(londonSumSrc, srcIdx))
+            array.set(londonSumVol, dstIdx, array.get(londonSumVol, srcIdx))
+            array.set(londonVWAPs, dstIdx, array.get(londonVWAPs, srcIdx))
+        // Clear newest slot (will be filled when new session starts)
+        array.set(londonSumSrc, MAX_VWAP_HISTORY - 1, 0.0)
+        array.set(londonSumVol, MAX_VWAP_HISTORY - 1, 0.0)
+        array.set(londonVWAPs, MAX_VWAP_HISTORY - 1, na)
+
+        // Update startBars with preserved values
+        for idx = 0 to MAX_VWAP_HISTORY - 1
+            array.set(londonStartBars, idx, array.get(tempStartBars, idx))
+
+        // Recreate labels with updated position numbers
+        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
+            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - londonVWAPCountActive)
+            if sessionIndexInHistory >= 0
+                int sessionStart = array.get(londonStarts, arrayIdx)
+                int londonSessionStartBar = array.get(londonStartBars, arrayIdx)
+                bool withinLookback = not na(londonSessionStartBar) and londonSessionStartBar <= bar_index and (bar_index - londonSessionStartBar) < 5000
+                bool sessionInFuture = sessionStart > time
+                if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and meetsLondonVWAPTimeframe
+                    deleteLabel(londonLabels, arrayIdx)
+                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
+                    color labelColor = getVWAPColor(colorLondonActive, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, londonVWAPCountActive - 1)
+                    bool isPrimarySession = "London" == primarySessionName
+                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : "LON" + str.tostring(positionInHistory + 1)) : "London " + str.format_time(sessionStart, "d MMM", "Europe/London")
+                    label newLabel = label.new(londonSessionStartBar, high[bar_index - londonSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                    array.set(londonLabels, arrayIdx, newLabel)
+
+    // Shift NY accumulators and recreate labels if shifted
+    if nyShifted
+        // Preserve bar indices by matching session timestamps before shift
+        array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+        for oldIdx = 0 to MAX_VWAP_HISTORY - 1
+            int oldSessionTime = array.get(nyStarts, oldIdx)
+            int oldBarIdx = array.get(nyStartBars, oldIdx)
+            if not na(oldSessionTime) and not na(oldBarIdx)
+                // Find this session in the new array
+                for newIdx = 0 to MAX_VWAP_HISTORY - 1
+                    int newSessionTime = array.get(currentNYStarts, newIdx)
+                    if newSessionTime == oldSessionTime
+                        array.set(tempStartBars, newIdx, oldBarIdx)
+                        break
+
+        // Shift accumulators left to maintain alignment
+        for i = 0 to MAX_VWAP_HISTORY - 2
+            int srcIdx = MAX_VWAP_HISTORY - 1 - i
+            int dstIdx = srcIdx - 1
+            array.set(nySumSrc, dstIdx, array.get(nySumSrc, srcIdx))
+            array.set(nySumVol, dstIdx, array.get(nySumVol, srcIdx))
+            array.set(nyVWAPs, dstIdx, array.get(nyVWAPs, srcIdx))
+        array.set(nySumSrc, MAX_VWAP_HISTORY - 1, 0.0)
+        array.set(nySumVol, MAX_VWAP_HISTORY - 1, 0.0)
+        array.set(nyVWAPs, MAX_VWAP_HISTORY - 1, na)
+
+        // Update startBars with preserved values
+        for idx = 0 to MAX_VWAP_HISTORY - 1
+            array.set(nyStartBars, idx, array.get(tempStartBars, idx))
+
+        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
+            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - nyVWAPCountActive)
+            if sessionIndexInHistory >= 0
+                int sessionStart = array.get(nyStarts, arrayIdx)
+                int nySessionStartBar = array.get(nyStartBars, arrayIdx)
+                bool withinLookback = not na(nySessionStartBar) and nySessionStartBar <= bar_index and (bar_index - nySessionStartBar) < 5000
+                bool sessionInFuture = sessionStart > time
+                if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and meetsNYVWAPTimeframe
+                    deleteLabel(nyLabels, arrayIdx)
+                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
+                    color labelColor = getVWAPColor(colorNewYorkActive, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, nyVWAPCountActive - 1)
+                    bool isPrimarySession = "New York" == primarySessionName
+                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : "NY" + str.tostring(positionInHistory + 1)) : "New York " + str.format_time(sessionStart, "d MMM", "America/New_York")
+                    label newLabel = label.new(nySessionStartBar, high[bar_index - nySessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                    array.set(nyLabels, arrayIdx, newLabel)
+
+    // Shift Globex accumulators and recreate labels if shifted
+    if globexShifted
+        // Preserve bar indices by matching session timestamps before shift
+        array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+        for oldIdx = 0 to MAX_VWAP_HISTORY - 1
+            int oldSessionTime = array.get(globexStarts, oldIdx)
+            int oldBarIdx = array.get(globexStartBars, oldIdx)
+            if not na(oldSessionTime) and not na(oldBarIdx)
+                // Find this session in the new array
+                for newIdx = 0 to MAX_VWAP_HISTORY - 1
+                    int newSessionTime = array.get(currentGlobexStarts, newIdx)
+                    if newSessionTime == oldSessionTime
+                        array.set(tempStartBars, newIdx, oldBarIdx)
+                        break
+
+        // Shift accumulators left to maintain alignment
+        for i = 0 to MAX_VWAP_HISTORY - 2
+            int srcIdx = MAX_VWAP_HISTORY - 1 - i
+            int dstIdx = srcIdx - 1
+            array.set(globexSumSrc, dstIdx, array.get(globexSumSrc, srcIdx))
+            array.set(globexSumVol, dstIdx, array.get(globexSumVol, srcIdx))
+            array.set(globexVWAPs, dstIdx, array.get(globexVWAPs, srcIdx))
+        array.set(globexSumSrc, MAX_VWAP_HISTORY - 1, 0.0)
+        array.set(globexSumVol, MAX_VWAP_HISTORY - 1, 0.0)
+        array.set(globexVWAPs, MAX_VWAP_HISTORY - 1, na)
+
+        // Update startBars with preserved values
+        for idx = 0 to MAX_VWAP_HISTORY - 1
+            array.set(globexStartBars, idx, array.get(tempStartBars, idx))
+
+        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
+            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - globexVWAPCountActive)
+            if sessionIndexInHistory >= 0
+                int sessionStart = array.get(globexStarts, arrayIdx)
+                int globexSessionStartBar = array.get(globexStartBars, arrayIdx)
+                bool withinLookback = not na(globexSessionStartBar) and globexSessionStartBar <= bar_index and (bar_index - globexSessionStartBar) < 5000
+                bool sessionInFuture = sessionStart > time
+                if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and meetsGlobexVWAPTimeframe
+                    deleteLabel(globexLabels, arrayIdx)
+                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
+                    color labelColor = getVWAPColor(colorGlobexActive, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, globexVWAPCountActive - 1)
+                    bool isPrimarySession = "Globex" == primarySessionName
+                    int labelTimestamp = sessionStart + 86400000
+                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : "GLX" + str.tostring(positionInHistory + 1)) : "Globex " + str.format_time(labelTimestamp, "d MMM", "America/Chicago")
+                    label newLabel = label.new(globexSessionStartBar, high[bar_index - globexSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                    array.set(globexLabels, arrayIdx, newLabel)
+
+    // Shift Sydney accumulators and recreate labels if shifted
+    if sydneyShifted
+        // Preserve bar indices by matching session timestamps before shift
+        array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+        for oldIdx = 0 to MAX_VWAP_HISTORY - 1
+            int oldSessionTime = array.get(sydneyStarts, oldIdx)
+            int oldBarIdx = array.get(sydneyStartBars, oldIdx)
+            if not na(oldSessionTime) and not na(oldBarIdx)
+                // Find this session in the new array
+                for newIdx = 0 to MAX_VWAP_HISTORY - 1
+                    int newSessionTime = array.get(currentSydneyStarts, newIdx)
+                    if newSessionTime == oldSessionTime
+                        array.set(tempStartBars, newIdx, oldBarIdx)
+                        break
+
+        // Shift accumulators left to maintain alignment
+        for i = 0 to MAX_VWAP_HISTORY - 2
+            int srcIdx = MAX_VWAP_HISTORY - 1 - i
+            int dstIdx = srcIdx - 1
+            array.set(sydneySumSrc, dstIdx, array.get(sydneySumSrc, srcIdx))
+            array.set(sydneySumVol, dstIdx, array.get(sydneySumVol, srcIdx))
+            array.set(sydneyVWAPs, dstIdx, array.get(sydneyVWAPs, srcIdx))
+        array.set(sydneySumSrc, MAX_VWAP_HISTORY - 1, 0.0)
+        array.set(sydneySumVol, MAX_VWAP_HISTORY - 1, 0.0)
+        array.set(sydneyVWAPs, MAX_VWAP_HISTORY - 1, na)
+
+        // Update startBars with preserved values
+        for idx = 0 to MAX_VWAP_HISTORY - 1
+            array.set(sydneyStartBars, idx, array.get(tempStartBars, idx))
+
+        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
+            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - sydneyVWAPCountActive)
+            if sessionIndexInHistory >= 0
+                int sessionStart = array.get(sydneyStarts, arrayIdx)
+                int sydneySessionStartBar = array.get(sydneyStartBars, arrayIdx)
+                bool withinLookback = not na(sydneySessionStartBar) and sydneySessionStartBar <= bar_index and (bar_index - sydneySessionStartBar) < 5000
+                bool sessionInFuture = sessionStart > time
+                if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and meetsSydneyVWAPTimeframe
+                    deleteLabel(sydneyLabels, arrayIdx)
+                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
+                    color labelColor = getVWAPColor(colorSydneyActive, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, sydneyVWAPCountActive - 1)
+                    bool isPrimarySession = "Sydney" == primarySessionName
+                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : "SYD" + str.tostring(positionInHistory + 1)) : "Sydney " + str.format_time(sessionStart, "d MMM", "Australia/Sydney")
+                    label newLabel = label.new(sydneySessionStartBar, high[bar_index - sydneySessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                    array.set(sydneyLabels, arrayIdx, newLabel)
+
+    // Shift Tokyo accumulators and recreate labels if shifted
+    if tokyoShifted
+        // Preserve bar indices by matching session timestamps before shift
+        array<int> tempStartBars = array.new<int>(MAX_VWAP_HISTORY, na)
+        for oldIdx = 0 to MAX_VWAP_HISTORY - 1
+            int oldSessionTime = array.get(tokyoStarts, oldIdx)
+            int oldBarIdx = array.get(tokyoStartBars, oldIdx)
+            if not na(oldSessionTime) and not na(oldBarIdx)
+                // Find this session in the new array
+                for newIdx = 0 to MAX_VWAP_HISTORY - 1
+                    int newSessionTime = array.get(currentTokyoStarts, newIdx)
+                    if newSessionTime == oldSessionTime
+                        array.set(tempStartBars, newIdx, oldBarIdx)
+                        break
+
+        // Shift accumulators left to maintain alignment
+        for i = 0 to MAX_VWAP_HISTORY - 2
+            int srcIdx = MAX_VWAP_HISTORY - 1 - i
+            int dstIdx = srcIdx - 1
+            array.set(tokyoSumSrc, dstIdx, array.get(tokyoSumSrc, srcIdx))
+            array.set(tokyoSumVol, dstIdx, array.get(tokyoSumVol, srcIdx))
+            array.set(tokyoVWAPs, dstIdx, array.get(tokyoVWAPs, srcIdx))
+        array.set(tokyoSumSrc, MAX_VWAP_HISTORY - 1, 0.0)
+        array.set(tokyoSumVol, MAX_VWAP_HISTORY - 1, 0.0)
+        array.set(tokyoVWAPs, MAX_VWAP_HISTORY - 1, na)
+
+        // Update startBars with preserved values
+        for idx = 0 to MAX_VWAP_HISTORY - 1
+            array.set(tokyoStartBars, idx, array.get(tempStartBars, idx))
+
+        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
+            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - tokyoVWAPCountActive)
+            if sessionIndexInHistory >= 0
+                int sessionStart = array.get(tokyoStarts, arrayIdx)
+                int tokyoSessionStartBar = array.get(tokyoStartBars, arrayIdx)
+                bool withinLookback = not na(tokyoSessionStartBar) and tokyoSessionStartBar <= bar_index and (bar_index - tokyoSessionStartBar) < 5000
+                bool sessionInFuture = sessionStart > time
+                if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and meetsTokyoVWAPTimeframe
+                    deleteLabel(tokyoLabels, arrayIdx)
+                    int positionInHistory = (MAX_VWAP_HISTORY - 1) - arrayIdx
+                    color labelColor = getVWAPColor(colorTokyoActive, positionInHistory, vwapColorDifferentiationActive, vwapMaxTransparencyActive, vwapHueShiftActive, vwapDesaturationActive, vwapBrightnessActive, tokyoVWAPCountActive - 1)
+                    bool isPrimarySession = "Tokyo" == primarySessionName
+                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : "TKY" + str.tostring(positionInHistory + 1)) : "Tokyo " + str.format_time(sessionStart, "d MMM", "Asia/Tokyo")
+                    label newLabel = label.new(tokyoSessionStartBar, high[bar_index - tokyoSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                    array.set(tokyoLabels, arrayIdx, newLabel)
+
+    // Update tracking variables after processing shifts
+    if londonShifted
+        prevMostRecentLondonStart := array.get(londonStarts, MAX_VWAP_HISTORY - 1)
+    if nyShifted
+        prevMostRecentNYStart := array.get(nyStarts, MAX_VWAP_HISTORY - 1)
+    if globexShifted
+        prevMostRecentGlobexStart := array.get(globexStarts, MAX_VWAP_HISTORY - 1)
+    if sydneyShifted
+        prevMostRecentSydneyStart := array.get(sydneyStarts, MAX_VWAP_HISTORY - 1)
+    if tokyoShifted
+        prevMostRecentTokyoStart := array.get(tokyoStarts, MAX_VWAP_HISTORY - 1)
 
 // Plot VWAPs - up to 5 historical sessions per type
 bool skipLondonMostRecent = showWeeklyAnchorVWAP and primarySessionName == "London" and currentSessionIsWeeklyAnchor
