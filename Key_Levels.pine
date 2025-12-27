@@ -79,8 +79,6 @@ colorNewYorkStock = input.color(#0000FF, "", inline="SS_NY_STK", group="🕒 Ses
 colorNewYorkStockEnd = input.color(#0080FF, "", inline="SS_NY_STK", group="🕒 Sessions • VWAP Anchors • Daily • Stocks")
 nyVWAPCountStock = input.int(3, "History", inline="SS_NY_STK", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily • Stocks", tooltip="Daily NY anchors count")
 
-
-
 // Non-stock (futures, crypto, etc.) session settings
 enableGlobex = input.bool(true, "Globex", inline="SS_GLX", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
 colorGlobex = input.color(#4CAF50, "", inline="SS_GLX", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
@@ -107,9 +105,7 @@ colorNewYork = input.color(#0000FF, "", inline="SS_NY", group="🕒 Sessions •
 colorNewYorkEnd = input.color(#0080FF, "", inline="SS_NY", group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments")
 nyVWAPCount = input.int(2, "History", inline="SS_NY", minval=1, maxval=5, group="🕒 Sessions • VWAP Anchors • Daily • Other Instruments", tooltip="Daily NY anchors count")
 
-
-
-// Select which settings to use based on symbol type
+// Select settings based on symbol type
 bool isStock = syminfo.type == "stock"
 bool enableGlobexActive = isStock ? enableGlobexStock : enableGlobex
 color colorGlobexActive = isStock ? colorGlobexStock : colorGlobex
@@ -275,112 +271,74 @@ showPDL = input.bool(true, "", inline="KL_PD", group="📐 Levels • Key Levels
 colorPDL = input.color(#b51b00, "Low", inline="KL_PD", group="📐 Levels • Key Levels • Day")
 
 
+// Constants for VWAP history (must be defined before helper functions that use them)
+const int MAX_VWAP_HISTORY = 10
+const int MAX_WEEKLY_HISTORY = 6
+const int MAX_MONTHLY_HISTORY = 6
+const int MAX_YEARLY_HISTORY = 2
 
 // HELPER FUNCTIONS
 
+getLabelSize(string s) => s == "Tiny" ? size.tiny : s == "Small" ? size.small : s == "Large" ? size.large : s == "Huge" ? size.huge : size.normal
+getLineStyle(string s) => s == "Solid" ? line.style_solid : s == "Dashed" ? line.style_dashed : line.style_dotted
 
-getLabelSize(string sizeStr) =>
-    sizeStr == "Tiny" ? size.tiny : sizeStr == "Small" ? size.small : sizeStr == "Large" ? size.large : sizeStr == "Huge" ? size.huge : size.normal
+// Helper for VWAP plot value - returns na if conditions not met
+vwapVal(bool base, bool meetsTF, bool enabled, int histCount, int minHist, array<float> vwaps, int idx, bool skipMostRecent) =>
+    base and meetsTF and enabled and histCount >= minHist and (minHist > 1 or not skipMostRecent) ? array.get(vwaps, MAX_VWAP_HISTORY - minHist) : na
 
-getLineStyle(string styleStr) =>
-    styleStr == "Solid" ? line.style_solid : styleStr == "Dashed" ? line.style_dashed : line.style_dotted
-
+// Helper for anchor VWAP plot value (weekly/monthly/yearly)
+anchorVal(bool base, int idx, int maxHist, int count, array<float> vwaps) =>
+    base and idx >= (maxHist - count) ? array.get(vwaps, idx) : na
 labelBgColor(color c) => color.new(c, 100)
-
-roundToTick(float price) =>
-    syminfo.mintick > 0 ? math.round(price / syminfo.mintick) * syminfo.mintick : price
-
-priceToTicks(float price) =>
-    syminfo.mintick > 0 ? int(math.round(price / syminfo.mintick)) : int(price)
+priceToTicks(float p) => syminfo.mintick > 0 ? int(math.round(p / syminfo.mintick)) : int(p)
 
 //══════════════════════════════════════════════════════════════════════════════════
-// HOLIDAY HANDLING
+// HOLIDAY HANDLING (O(1) lookup via maps)
 //══════════════════════════════════════════════════════════════════════════════════
 
-var array<int> stockFullHolidays = array.from(20250101,20250120,20250217,20250418,20250526,20250619,20250704,20250901,20251127,20251225,20260101,20260119,20260216,20260403,20260525,20260619,20260703,20260907,20261126,20261225,20270101,20270118,20270215,20270326,20270531,20270618,20270705,20270906,20271125,20271224,20280117,20280221,20280414,20280529,20280619,20280704,20280904,20281123,20281225)
-var array<int> stockEarlyClose = array.from(20250703,20251128,20251224,20261127,20261224,20271126,20280703,20281124)
-var array<int> futuresFullHolidays = array.from(20250101,20250120,20250217,20250418,20250526,20250619,20250704,20250901,20251013,20251111,20251127,20251225,20260101,20260119,20260216,20260403,20260525,20260619,20260703,20260907,20261012,20261111,20261126,20261225)
-var array<int> futuresEarlyClose = array.from(20250417,20250523,20250703,20251128,20251224,20251231,20260402,20260522,20260702,20261127,20261224)
+var map<int, bool> stockHolidayMap = map.new<int, bool>()
+var map<int, bool> futuresHolidayMap = map.new<int, bool>()
 
-timestampToYYYYMMDD(int ts, string tz) =>
-    int y = year(ts, tz)
-    int m = month(ts, tz)
-    int d = dayofmonth(ts, tz)
-    y * 10000 + m * 100 + d
+if barstate.isfirst
+    for d in array.from(20250101,20250120,20250217,20250418,20250526,20250619,20250704,20250901,20251127,20251225,20260101,20260119,20260216,20260403,20260525,20260619,20260703,20260907,20261126,20261225,20270101,20270118,20270215,20270326,20270531,20270618,20270705,20270906,20271125,20271224,20280117,20280221,20280414,20280529,20280619,20280704,20280904,20281123,20281225)
+        stockHolidayMap.put(d, true)
+    for d in array.from(20250101,20250120,20250217,20250418,20250526,20250619,20250704,20250901,20251013,20251111,20251127,20251225,20260101,20260119,20260216,20260403,20260525,20260619,20260703,20260907,20261012,20261111,20261126,20261225)
+        futuresHolidayMap.put(d, true)
 
-isFullHoliday(int ts, string tz, bool isStock) =>
-    int dateInt = timestampToYYYYMMDD(ts, tz)
-    array<int> holidays = isStock ? stockFullHolidays : futuresFullHolidays
-    array.includes(holidays, dateInt)
-
-isEarlyClose(int ts, string tz, bool isStock) =>
-    int dateInt = timestampToYYYYMMDD(ts, tz)
-    array<int> earlyCloses = isStock ? stockEarlyClose : futuresEarlyClose
-    array.includes(earlyCloses, dateInt)
-
-isTradingDay(int ts, string tz, string session, bool isStock) =>
+toYMD(int ts, string tz) => year(ts, tz) * 10000 + month(ts, tz) * 100 + dayofmonth(ts, tz)
+isFullHoliday(int ts, string tz, bool stk) => stk ? stockHolidayMap.contains(toYMD(ts, tz)) : futuresHolidayMap.contains(toYMD(ts, tz))
+isTradingDay(int ts, string tz, string sess, bool stk) =>
     int dow = dayofweek(ts, tz)
-    bool isWeekday = session == "Globex" ? (dow == dayofweek.sunday or (dow >= dayofweek.monday and dow <= dayofweek.friday)) : (dow >= dayofweek.monday and dow <= dayofweek.friday)
-    isWeekday and not isFullHoliday(ts, tz, isStock)
+    (sess == "Globex" ? dow == dayofweek.sunday or dow >= dayofweek.monday and dow <= dayofweek.friday : dow >= dayofweek.monday and dow <= dayofweek.friday) and not isFullHoliday(ts, tz, stk)
 
-updateBox(box boxRef, int x1, float y1, int x2, float y2, color bg) =>
-    if na(boxRef)
+updateBox(box b, int x1, float y1, int x2, float y2, color bg) =>
+    if na(b)
         box.new(x1, y1, x2, y2, border_color=na, bgcolor=bg)
     else
-        box.set_lefttop(boxRef, x1, y1)
-        box.set_rightbottom(boxRef, x2, y2)
-        boxRef
+        box.set_lefttop(b, x1, y1), box.set_rightbottom(b, x2, y2), b
 
-// RGB to HSL conversion
 rgbToHsl(float r, float g, float b) =>
-    float rNorm = r / 255.0
-    float gNorm = g / 255.0
-    float bNorm = b / 255.0
-
-    float maxVal = math.max(rNorm, math.max(gNorm, bNorm))
-    float minVal = math.min(rNorm, math.min(gNorm, bNorm))
-    float delta = maxVal - minVal
-
-    float h = 0.0
-    float s = 0.0
-    float l = (maxVal + minVal) / 2.0
-
-    if delta != 0
-        s := l > 0.5 ? delta / (2.0 - maxVal - minVal) : delta / (maxVal + minVal)
-
-        if maxVal == rNorm
-            h := ((gNorm - bNorm) / delta + (gNorm < bNorm ? 6.0 : 0.0)) / 6.0
-        else if maxVal == gNorm
-            h := ((bNorm - rNorm) / delta + 2.0) / 6.0
-        else
-            h := ((rNorm - gNorm) / delta + 4.0) / 6.0
-
+    float rN = r / 255, float gN = g / 255, float bN = b / 255
+    float mx = math.max(rN, math.max(gN, bN)), float mn = math.min(rN, math.min(gN, bN)), float d = mx - mn
+    float h = 0.0, float s = 0.0, float l = (mx + mn) / 2
+    if d != 0
+        s := l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn)
+        h := mx == rN ? ((gN - bN) / d + (gN < bN ? 6 : 0)) / 6 : mx == gN ? ((bN - rN) / d + 2) / 6 : ((rN - gN) / d + 4) / 6
     [h, s, l]
 
-// HSL to RGB conversion helper
 hueToRgb(float p, float q, float t) =>
-    float tAdj = t < 0.0 ? t + 1.0 : (t > 1.0 ? t - 1.0 : t)
-    float result = tAdj < 1.0/6.0 ? p + (q - p) * 6.0 * tAdj :
-                  (tAdj < 1.0/2.0 ? q :
-                  (tAdj < 2.0/3.0 ? p + (q - p) * (2.0/3.0 - tAdj) * 6.0 : p))
-    result
+    float tA = t < 0 ? t + 1 : t > 1 ? t - 1 : t
+    tA < 1.0/6 ? p + (q - p) * 6 * tA : tA < 0.5 ? q : tA < 2.0/3 ? p + (q - p) * (2.0/3 - tA) * 6 : p
 
-// HSL to RGB conversion
 hslToRgb(float h, float s, float l) =>
     if s == 0
-        [int(l * 255.0), int(l * 255.0), int(l * 255.0)]
+        [int(l * 255), int(l * 255), int(l * 255)]
     else
-        float q = l < 0.5 ? l * (1.0 + s) : l + s - l * s
-        float p = 2.0 * l - q
-        [int(hueToRgb(p, q, h + 1.0/3.0) * 255.0), int(hueToRgb(p, q, h) * 255.0), int(hueToRgb(p, q, h - 1.0/3.0) * 255.0)]
+        float q = l < 0.5 ? l * (1 + s) : l + s - l * s, float p = 2 * l - q
+        [int(hueToRgb(p, q, h + 1.0/3) * 255), int(hueToRgb(p, q, h) * 255), int(hueToRgb(p, q, h - 1.0/3) * 255)]
 
-// Check if level price is within ATR distance from current price
-isWithinATR(float levelPrice, float currentPrice, float threshold, bool filterEnabled) =>
-    not filterEnabled or na(levelPrice) or math.abs(levelPrice - currentPrice) <= threshold
-
-// Get compact session abbreviation for daily sessions
-getSessionAbbr(string sessionName) =>
-    sessionName == "London" ? "LN" : sessionName == "New York" ? "NY" : sessionName == "Globex" ? "GLX" : sessionName == "Sydney" ? "SYD" : "TKY"
+isWithinATR(float lp, float cp, float th, bool on) => not on or na(lp) or math.abs(lp - cp) <= th
+getSessionAbbr(string s) => s == "London" ? "LN" : s == "New York" ? "NY" : s == "Globex" ? "GLX" : s == "Sydney" ? "SYD" : "TKY"
 
 // LEVEL RENDERER UDT
 
@@ -434,339 +392,156 @@ method update(LevelRenderer this, bool enabled, float price, int priceTicks, int
     this.startBar := startBar
     true
 
-deleteLabel(array<label> labelArray, int idx) =>
-    label oldLabel = array.get(labelArray, idx)
-    if not na(oldLabel)
-        label.delete(oldLabel)
+deleteLabel(array<label> arr, int idx) =>
+    label old = array.get(arr, idx)
+    if not na(old)
+        label.delete(old)
 
-
-
-// Hue cycling interpolation between start and end colors through HSL color space
-getVWAPColor(color startColor, color endColor, int positionInHistory, int maxPos) =>
-    if positionInHistory == 0 or maxPos == 0
-        startColor
+getVWAPColor(color c1, color c2, int pos, int maxP) =>
+    if pos == 0 or maxP == 0
+        c1
     else
-        // Interpolation factor (0.0 = start, 1.0 = end)
-        float t = maxPos > 0 ? math.min(positionInHistory / float(maxPos), 1.0) : 0.0
+        float t = maxP > 0 ? math.min(pos / float(maxP), 1.0) : 0.0
+        [h1, s1, l1] = rgbToHsl(color.r(c1), color.g(c1), color.b(c1))
+        [h2, s2, l2] = rgbToHsl(color.r(c2), color.g(c2), color.b(c2))
+        float hD = h2 - h1
+        hD := hD > 0.5 ? hD - 1 : hD < -0.5 ? hD + 1 : hD
+        float h = h1 + hD * t
+        h := h < 0 ? h + 1 : h > 1 ? h - 1 : h
+        [nR, nG, nB] = hslToRgb(h, s1 + (s2 - s1) * t, l1 + (l2 - l1) * t)
+        color.rgb(nR, nG, nB, int(color.t(c1) + (color.t(c2) - color.t(c1)) * t))
 
-        // Convert start color to HSL
-        float r1 = color.r(startColor) / 255.0
-        float g1 = color.g(startColor) / 255.0
-        float b1 = color.b(startColor) / 255.0
-        [h1, s1, l1] = rgbToHsl(r1 * 255.0, g1 * 255.0, b1 * 255.0)
+getSessionTimezone(string s) => s == "London" ? "Europe/London" : s == "New York" or s == "Globex" ? "America/New_York" : s == "Sydney" ? "Australia/Sydney" : "Asia/Tokyo"
+getSessionStartHour(string s) => s == "London" ? 8 : s == "New York" ? 9 : s == "Globex" ? 18 : s == "Sydney" ? 10 : 9
+getSessionStartMinute(string s) => s == "New York" ? 30 : 0
+getSessionEndHour(string s) => s == "London" ? 16 : s == "New York" ? 16 : s == "Globex" ? 17 : s == "Sydney" ? 16 : 15
+getSessionEndMinute(string s) => s == "London" ? 30 : 0
 
-        // Convert end color to HSL
-        float r2 = color.r(endColor) / 255.0
-        float g2 = color.g(endColor) / 255.0
-        float b2 = color.b(endColor) / 255.0
-        [h2, s2, l2] = rgbToHsl(r2 * 255.0, g2 * 255.0, b2 * 255.0)
+getSessionStartForDate(string s, int y, int m, int d) => timestamp(getSessionTimezone(s), y, m, d, getSessionStartHour(s), getSessionStartMinute(s))
+getSessionEndForDate(string s, int y, int m, int d) =>
+    int ts = timestamp(getSessionTimezone(s), y, m, d, getSessionEndHour(s), getSessionEndMinute(s))
+    s == "Globex" ? ts + MS_PER_DAY : ts
 
-        // Interpolate hue around color wheel (shortest path)
-        float hDiff = h2 - h1
-        if hDiff > 0.5
-            hDiff := hDiff - 1.0
-        else if hDiff < -0.5
-            hDiff := hDiff + 1.0
-        float h = h1 + hDiff * t
-        h := h < 0.0 ? h + 1.0 : (h > 1.0 ? h - 1.0 : h)
-
-        // Interpolate saturation and lightness
-        float s = s1 + (s2 - s1) * t
-        float l = l1 + (l2 - l1) * t
-
-        // Convert back to RGB
-        [newR, newG, newB] = hslToRgb(h, s, l)
-
-        // Interpolate transparency
-        float a1 = color.t(startColor)
-        float a2 = color.t(endColor)
-        int a = int(a1 + (a2 - a1) * t)
-
-        color.rgb(newR, newG, newB, a)
-
-// Session time definitions in session's local timezone
-// LSE: 8:00 AM - 4:30 PM GMT
-// NYSE/CME: 9:30 AM - 4:00 PM EST
-// CME Globex: 6:00 PM - 5:00 PM ET (next day, spans 2 calendar days)
-// ASX: 10:00 AM - 4:00 PM AEDT
-// TSE: 9:00 AM - 3:00 PM JST
-
-getSessionTimezone(string session) =>
-    session == "London" ? "Europe/London" : session == "New York" ? "America/New_York" : session == "Globex" ? "America/New_York" : session == "Sydney" ? "Australia/Sydney" : "Asia/Tokyo"
-
-getSessionStartHour(string session) =>
-    session == "London" ? 8 : session == "New York" ? 9 : session == "Globex" ? 18 : session == "Sydney" ? 10 : 9
-
-getSessionStartMinute(string session) =>
-    session == "New York" ? 30 : 0
-
-getSessionEndHour(string session) =>
-    session == "London" ? 16 : session == "New York" ? 16 : session == "Globex" ? 17 : session == "Sydney" ? 16 : 15
-
-getSessionEndMinute(string session) =>
-    session == "London" ? 30 : 0
-
-// Calculate session start timestamp for a specific date (calendar-based, pre-calculated)
-getSessionStartForDate(string session, int y, int m, int d) =>
-    string tz = getSessionTimezone(session)
-    int sessionHour = getSessionStartHour(session)
-    int sessionMinute = getSessionStartMinute(session)
-    timestamp(tz, y, m, d, sessionHour, sessionMinute)
-
-// Calculate session end timestamp for a specific date
-// Note: For Globex, end is on NEXT calendar day (starts 6 PM, ends 5 PM next day)
-getSessionEndForDate(string session, int y, int m, int d) =>
-    string tz = getSessionTimezone(session)
-    int sessionHour = getSessionEndHour(session)
-    int sessionMinute = getSessionEndMinute(session)
-    // Globex spans two days: starts evening, ends next afternoon
-    if session == "Globex"
-        // Add 24 hours in milliseconds to base timestamp instead of incrementing day
-        int baseTimestamp = timestamp(tz, y, m, d, sessionHour, sessionMinute)
-        baseTimestamp + MS_PER_DAY
-    else
-        timestamp(tz, y, m, d, sessionHour, sessionMinute)
-
-// Common helper to collect session timestamps (start or end) for last N sessions
-// CRITICAL: Collects trading days but avoids duplicate timestamps
-// - Tracks each day's session timestamp
-// - For Globex: Mon-Fri all map to same Sunday start, so we deduplicate
 getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
-    var array<int> timestamps = array.new<int>()
-    array.clear(timestamps)
-
-    // Get session timezone to ensure date calculations are consistent
+    var array<int> ts = array.new<int>()
+    array.clear(ts)
     string tz = getSessionTimezone(session)
-    bool isStockType = syminfo.type == "stock"
-
-    int currentY = year(timenow, tz)
-    int currentM = month(timenow, tz)
-    int currentD = dayofmonth(timenow, tz)
-    int currentDayOfWeek = dayofweek(timenow, tz)
-
-    // Adjust weekend to Friday; Globex trades Sunday so don't adjust Sunday for Globex
-    if currentDayOfWeek == dayofweek.saturday
-        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - MS_PER_DAY
-        currentY := year(fridayMidnight, tz)
-        currentM := month(fridayMidnight, tz)
-        currentD := dayofmonth(fridayMidnight, tz)
-    else if currentDayOfWeek == dayofweek.sunday and session != "Globex"
-        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
-        currentY := year(fridayMidnight, tz)
-        currentM := month(fridayMidnight, tz)
-        currentD := dayofmonth(fridayMidnight, tz)
-
-    // For Globex on Mon-Fri, the session for "today" actually starts yesterday evening
-    // So we need to check yesterday's session start time
-    int todaySessionStart = na
-    if session == "Globex" and currentDayOfWeek >= dayofweek.monday and currentDayOfWeek <= dayofweek.friday
-        int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - MS_PER_DAY
-        int prevY = year(yesterdayMidnight, tz)
-        int prevM = month(yesterdayMidnight, tz)
-        int prevD = dayofmonth(yesterdayMidnight, tz)
-        todaySessionStart := getSessionStartForDate(session, prevY, prevM, prevD)
-    else
-        todaySessionStart := getSessionStartForDate(session, currentY, currentM, currentD)
-
-    // Always start from today to include upcoming session (look-ahead)
-    int mostRecentY = currentY
-    int mostRecentM = currentM
-    int mostRecentD = currentD
-
-    int sessionsCollected = 0
-    int daysBackOffset = 0
-    int lastTimestamp = na
-
-    while sessionsCollected < sessionsBack and daysBackOffset < 730
-        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBackOffset * MS_PER_DAY)
-        int y = year(targetMidnight, tz)
-        int m = month(targetMidnight, tz)
-        int d = dayofmonth(targetMidnight, tz)
-        int dow = dayofweek(targetMidnight, tz)
-
-        bool isValidTradingDay = isTradingDay(targetMidnight, tz, session, isStockType)
-
-        if isValidTradingDay
-            // For Globex: session active on day D starts evening of day D-1, EXCEPT Sunday
-            int ts = na
-            if session == "Globex"
-                if dow == dayofweek.sunday
-                    ts := isStart ? getSessionStartForDate(session, y, m, d) : getSessionEndForDate(session, y, m, d)
-                else
-                    int prevDayMidnight = timestamp(tz, y, m, d, 0, 0) - MS_PER_DAY
-                    int prevY = year(prevDayMidnight, tz)
-                    int prevM = month(prevDayMidnight, tz)
-                    int prevD = dayofmonth(prevDayMidnight, tz)
-                    ts := isStart ? getSessionStartForDate(session, prevY, prevM, prevD) : getSessionEndForDate(session, prevY, prevM, prevD)
+    bool stk = syminfo.type == "stock"
+    int cY = year(timenow, tz), int cM = month(timenow, tz), int cD = dayofmonth(timenow, tz), int cDow = dayofweek(timenow, tz)
+    if cDow == dayofweek.saturday
+        int fri = timestamp(tz, cY, cM, cD, 0, 0) - MS_PER_DAY
+        cY := year(fri, tz), cM := month(fri, tz), cD := dayofmonth(fri, tz)
+    else if cDow == dayofweek.sunday and session != "Globex"
+        int fri = timestamp(tz, cY, cM, cD, 0, 0) - 172800000
+        cY := year(fri, tz), cM := month(fri, tz), cD := dayofmonth(fri, tz)
+    int collected = 0, int offset = 0, int lastTs = na, int maxDays = math.max(sessionsBack * 2 + 5, 25)
+    while collected < sessionsBack and offset < maxDays
+        int mid = timestamp(tz, cY, cM, cD, 0, 0) - offset * MS_PER_DAY
+        int y = year(mid, tz), int m = month(mid, tz), int d = dayofmonth(mid, tz), int dow = dayofweek(mid, tz)
+        if isTradingDay(mid, tz, session, stk)
+            int t = na
+            if session == "Globex" and dow != dayofweek.sunday
+                int prev = mid - MS_PER_DAY
+                t := isStart ? getSessionStartForDate(session, year(prev, tz), month(prev, tz), dayofmonth(prev, tz)) : getSessionEndForDate(session, year(prev, tz), month(prev, tz), dayofmonth(prev, tz))
             else
-                ts := isStart ? getSessionStartForDate(session, y, m, d) : getSessionEndForDate(session, y, m, d)
+                t := isStart ? getSessionStartForDate(session, y, m, d) : getSessionEndForDate(session, y, m, d)
+            if na(lastTs) or t != lastTs
+                array.unshift(ts, t), lastTs := t, collected += 1
+        offset += 1
+    ts
 
-            if na(lastTimestamp) or ts != lastTimestamp
-                array.unshift(timestamps, ts)
-                lastTimestamp := ts
-                sessionsCollected := sessionsCollected + 1
-
-        daysBackOffset := daysBackOffset + 1
-
-    timestamps
-
-getSessionStartsArray(string session, int sessionsBack) =>
-    getSessionTimestampsArray(session, sessionsBack, true)
-
-getSessionEndsArray(string session, int sessionsBack) =>
-    getSessionTimestampsArray(session, sessionsBack, false)
+getSessionStartsArray(string s, int n) => getSessionTimestampsArray(s, n, true)
+getSessionEndsArray(string s, int n) => getSessionTimestampsArray(s, n, false)
 
 
-// Find first valid trading day of a month (returns day 1-31, or na if none found in 14 days)
-getFirstTradingDayOfMonth(string session, int targetYear, int targetMonth) =>
+getFirstTradingDayOfMonth(string session, int tY, int tM) =>
     string tz = getSessionTimezone(session)
-    bool isStockType = syminfo.type == "stock"
-    int foundDay = na
-    for dayOffset = 0 to 13
-        int testDay = dayOffset + 1
-        if testDay > 31
+    bool stk = syminfo.type == "stock"
+    int fd = na
+    for i = 1 to 10
+        int t = timestamp(tz, tY, tM, i, 0, 0)
+        if year(t, tz) != tY or month(t, tz) != tM
             break
-        int testTs = timestamp(tz, targetYear, targetMonth, testDay, 0, 0)
-        int testYear = year(testTs, tz)
-        int testMonth = month(testTs, tz)
-        if testYear != targetYear or testMonth != targetMonth
-            break
-        bool isValidTradingDay = isTradingDay(testTs, tz, session, isStockType)
-        if isValidTradingDay
-            foundDay := testDay
-            break
-    foundDay
+        if isTradingDay(t, tz, session, stk)
+            fd := i, break
+    fd
 
-// Generic anchor start timestamps - handles weekly, monthly, yearly periods
-getAnchorStarts(string period, string session, int count) =>
+getAnchorStarts(string period, string session, int maxSize) =>
     var array<int> starts = array.new<int>()
     array.clear(starts)
     string tz = getSessionTimezone(session)
-    int currentY = year(timenow, tz)
-    int currentM = month(timenow, tz)
-    int currentD = dayofmonth(timenow, tz)
-
+    int cY = year(timenow, tz), int cM = month(timenow, tz), int cD = dayofmonth(timenow, tz)
     if period == "W"
-        int currentDayOfWeek = dayofweek(timenow, tz)
-        if currentDayOfWeek == dayofweek.saturday
-            int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - MS_PER_DAY
-            currentY := year(fridayMidnight, tz)
-            currentM := month(fridayMidnight, tz)
-            currentD := dayofmonth(fridayMidnight, tz)
-        else if currentDayOfWeek == dayofweek.sunday and session != "Globex"
-            int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 172800000
-            currentY := year(fridayMidnight, tz)
-            currentM := month(fridayMidnight, tz)
-            currentD := dayofmonth(fridayMidnight, tz)
-        int todaySessionStart = getSessionStartForDate(session, currentY, currentM, currentD)
-        int mostRecentY = currentY
-        int mostRecentM = currentM
-        int mostRecentD = currentD
-        if timenow < todaySessionStart
-            int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - MS_PER_DAY
-            mostRecentY := year(yesterdayMidnight, tz)
-            mostRecentM := month(yesterdayMidnight, tz)
-            mostRecentD := dayofmonth(yesterdayMidnight, tz)
-        int targetDayOfWeek = session == "Globex" ? dayofweek.sunday : dayofweek.monday
-        int collected = 0
-        int daysBack = 0
-        bool isStockType = syminfo.type == "stock"
-        while collected < count and daysBack < 730
-            int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBack * 86400000)
-            int y = year(targetMidnight, tz)
-            int m = month(targetMidnight, tz)
-            int d = dayofmonth(targetMidnight, tz)
-            int dow = dayofweek(targetMidnight, tz)
-            if dow == targetDayOfWeek and isTradingDay(targetMidnight, tz, session, isStockType)
-                int anchorStart = getSessionStartForDate(session, y, m, d)
-                array.unshift(starts, anchorStart)
-                collected := collected + 1
-            daysBack := daysBack + 1
+        int cDow = dayofweek(timenow, tz)
+        if cDow == dayofweek.saturday
+            int fri = timestamp(tz, cY, cM, cD, 0, 0) - MS_PER_DAY
+            cY := year(fri, tz), cM := month(fri, tz), cD := dayofmonth(fri, tz)
+        else if cDow == dayofweek.sunday and session != "Globex"
+            int fri = timestamp(tz, cY, cM, cD, 0, 0) - 172800000
+            cY := year(fri, tz), cM := month(fri, tz), cD := dayofmonth(fri, tz)
+        if timenow < getSessionStartForDate(session, cY, cM, cD)
+            int yest = timestamp(tz, cY, cM, cD, 0, 0) - MS_PER_DAY
+            cY := year(yest, tz), cM := month(yest, tz), cD := dayofmonth(yest, tz)
+        int tDow = session == "Globex" ? dayofweek.sunday : dayofweek.monday
+        bool stk = syminfo.type == "stock"
+        int curMid = timestamp(tz, cY, cM, cD, 0, 0)
+        int daysTo = (dayofweek(curMid, tz) - tDow + 7) % 7
+        int tgtMid = curMid - daysTo * MS_PER_DAY
+        int col = 0, int wk = 0
+        while col < maxSize and wk < maxSize + 4
+            int mid = tgtMid - wk * 7 * MS_PER_DAY
+            if isTradingDay(mid, tz, session, stk)
+                array.unshift(starts, getSessionStartForDate(session, year(mid, tz), month(mid, tz), dayofmonth(mid, tz)))
+                col += 1
+            wk += 1
     else if period == "M"
-        if na(currentY) or na(currentM)
-            for i = 0 to count - 1
-                array.unshift(starts, na)
-        else
-            for i = 0 to count - 1
-                int targetM = currentM - i
-                int targetY = currentY
-                while targetM < 1
-                    targetM := targetM + 12
-                    targetY := targetY - 1
-                int firstDay = getFirstTradingDayOfMonth(session, targetY, targetM)
-                if not na(firstDay)
-                    int anchorStart = getSessionStartForDate(session, targetY, targetM, firstDay)
-                    array.unshift(starts, anchorStart)
-                else
-                    array.unshift(starts, na)
+        for i = 0 to maxSize - 1
+            int tM = cM - i, int tY = cY
+            while tM < 1
+                tM += 12, tY -= 1
+            int fd = getFirstTradingDayOfMonth(session, tY, tM)
+            array.unshift(starts, not na(fd) ? getSessionStartForDate(session, tY, tM, fd) : na)
     else if period == "Y"
-        if na(currentY)
-            for i = 0 to count - 1
-                array.unshift(starts, na)
-        else
-            for i = 0 to count - 1
-                int targetY = currentY - i
-                int firstDay = getFirstTradingDayOfMonth(session, targetY, 1)
-                if not na(firstDay)
-                    int anchorStart = getSessionStartForDate(session, targetY, 1, firstDay)
-                    array.unshift(starts, anchorStart)
-                else
-                    array.unshift(starts, na)
+        for i = 0 to maxSize - 1
+            int tY = cY - i
+            int fd = getFirstTradingDayOfMonth(session, tY, 1)
+            array.unshift(starts, not na(fd) ? getSessionStartForDate(session, tY, 1, fd) : na)
     starts
 
-// Create anchor label helper
-createAnchorLabel(array<label> labelArray, int idx, int anchorStart, string period, int positionInHistory, color anchorColor, color anchorColorEnd, int maxCount, string anchorTZ, string sessionName) =>
-    if not na(anchorStart)
-        label oldLabel = array.get(labelArray, idx)
-        if not na(oldLabel)
-            label.delete(oldLabel)
-        color labelColor = getVWAPColor(anchorColor, anchorColorEnd, positionInHistory, maxCount - 1)
-        string labelText = ""
-        if period == "W"
-            labelText := compactLabels ? "W" + str.tostring(positionInHistory + 1) : "Week " + str.tostring(weekofyear(anchorStart, anchorTZ)) + " (" + sessionName + ")"
-        else if period == "M"
-            labelText := compactLabels ? "M" + str.tostring(positionInHistory + 1) : str.format("{0,date,MMM yyyy}", anchorStart) + " (" + sessionName + ")"
-        else if period == "Y"
-            labelText := compactLabels ? "Y" + str.tostring(positionInHistory + 1) : str.tostring(year(anchorStart, anchorTZ)) + " (" + sessionName + ")"
-        label newLabel = label.new(bar_index, high, labelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down)
-        array.set(labelArray, idx, newLabel)
+createAnchorLabel(array<label> arr, int idx, int start, string p, int pos, color c1, color c2, int maxC, string tz, string sess) =>
+    if not na(start)
+        label old = array.get(arr, idx)
+        if not na(old)
+            label.delete(old)
+        string txt = p == "W" ? (compactLabels ? "W" : "Week " + str.tostring(weekofyear(start, tz)) + " (" + sess + ")") : p == "M" ? (compactLabels ? "M" : str.format("{0,date,MMM yyyy}", start) + " (" + sess + ")") : (compactLabels ? "Y" : str.tostring(year(start, tz)) + " (" + sess + ")")
+        txt := compactLabels ? txt + str.tostring(pos + 1) : txt
+        array.set(arr, idx, label.new(bar_index, high, txt, xloc=xloc.bar_index, yloc=yloc.abovebar, color=getVWAPColor(c1, c2, pos, maxC - 1), textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down))
 
-// Convert period string to minutes
-periodToMinutes(string period) =>
-    period == "1m" ? 1 : period == "2m" ? 2 : period == "3m" ? 3 : period == "5m" ? 5 : period == "15m" ? 15 : period == "30m" ? 30 : period == "1h" ? 60 : period == "65m" ? 65 : period == "2h" ? 120 : period == "4h" ? 240 : period == "1D" ? 1440 : 99999
+periodToMinutes(string p) => p == "1m" ? 1 : p == "2m" ? 2 : p == "3m" ? 3 : p == "5m" ? 5 : p == "15m" ? 15 : p == "30m" ? 30 : p == "1h" ? 60 : p == "65m" ? 65 : p == "2h" ? 120 : p == "4h" ? 240 : p == "1D" ? 1440 : 99999
+getTimeframeMinutes() => timeframe.in_seconds() >= 86400 ? (timeframe.in_seconds() / 86400) * 1440 : timeframe.in_seconds() / 60
 
-// Get timeframe in minutes for comparison
-getTimeframeMinutes() =>
-    int tfSeconds = timeframe.in_seconds()
-    if tfSeconds >= 86400
-        // Daily or larger timeframes return as days
-        int days = tfSeconds / 86400
-        days * 1440  // Convert days to minutes
-    else
-        tfSeconds / 60
+addToMap(map<int, string> m, float price, string lbl) =>
+    int k = priceToTicks(price)
+    string ex = map.contains(m, k) ? map.get(m, k) : ""
+    map.put(m, k, ex != "" ? ex + "/" + lbl : lbl)
 
-// Add level to priceLabels map with duplicate detection
-addToMap(map<int, string> priceMap, float price, string label) =>
-    int key = priceToTicks(price)
-    string existing = map.contains(priceMap, key) ? map.get(priceMap, key) : ""
-    if existing != ""
-        map.put(priceMap, key, existing + "/" + label)
-    else
-        map.put(priceMap, key, label)
+// Conditional addToMap - only adds if show is true
+addIf(map<int, string> m, bool show, float price, string lbl) =>
+    if show
+        addToMap(m, price, lbl)
 
 // DISPLAY CONDITIONS & ATR FILTERING
 
-float atrValue = request.security(syminfo.tickerid, "D", ta.atr(atrPeriod), lookahead=barmerge.lookahead_on)
-float atrThreshold = atrValue * atrMultiplier
+// Check timeframe conditions first (needed for ATR gate)
+int currentTfMinutes = timeframe.in_seconds() >= 86400 ? (timeframe.in_seconds() / 86400) * 1440 : timeframe.in_seconds() / 60
+bool meetsMaxTimeframe = keyLevelsMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(keyLevelsMaxTimeframe)
+bool showKeyLevelsCondition = showKeyLevels and meetsMaxTimeframe
+
+// Only fetch ATR if filtering is enabled AND key levels will be shown
+float atrValue = useATRFilter and showKeyLevelsCondition ? request.security(syminfo.tickerid, "D", ta.atr(atrPeriod), lookahead=barmerge.lookahead_on) : na
+float atrThreshold = useATRFilter and showKeyLevelsCondition ? atrValue * atrMultiplier : na
 
 bool isFutures = syminfo.type == "futures"
-
-// Check timeframe conditions
-int currentTfMinutes = getTimeframeMinutes()
-bool meetsMaxTimeframe = keyLevelsMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(keyLevelsMaxTimeframe)
-
-// Check if key levels should be shown (max timeframe filter only)
-bool showKeyLevelsCondition = showKeyLevels and meetsMaxTimeframe
 
 // Determine primary session name (used for long-term anchor and primary session logic)
 string primarySessionName = longTermAnchorSession == "Auto" ? (syminfo.type == "stock" ? "New York" : "Globex") : longTermAnchorSession
@@ -786,18 +561,38 @@ bool meetsTokyoVWAPTimeframe = primarySessionName == "Tokyo" ? meetsLongTermAnch
 
 // Check timeframe conditions for session levels and pivot features
 bool meetsSessionLevelsMaxTimeframe = sessionLevelsMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(sessionLevelsMaxTimeframe)
+
+// Session levels visibility (separate from VWAPs)
+bool showSessionLevels = showSessionLevelsInput == "Always" or (showSessionLevelsInput == "Futures Only" and syminfo.type == "futures")
+bool sessionLevelsVisible = showSessionLevels and sessionBaseCondition and meetsSessionLevelsMaxTimeframe
+
+// Combined visibility checks for VWAP computation: session enabled AND meets timeframe AND VWAP features enabled
+// These don't change per bar, so no need for var (already compile-time constant per chart load)
+bool shouldComputeLondonVWAP = enableLondonActive and meetsLondonVWAPTimeframe and sessionBaseCondition and showSessionVWAP
+bool shouldComputeNYVWAP = enableNewYorkActive and meetsNYVWAPTimeframe and sessionBaseCondition and showSessionVWAP
+bool shouldComputeGlobexVWAP = enableGlobexActive and meetsGlobexVWAPTimeframe and sessionBaseCondition and showSessionVWAP
+bool shouldComputeSydneyVWAP = enableSydneyActive and meetsSydneyVWAPTimeframe and sessionBaseCondition and showSessionVWAP
+bool shouldComputeTokyoVWAP = enableTokyoActive and meetsTokyoVWAPTimeframe and sessionBaseCondition and showSessionVWAP
+bool anySessionVWAPEnabled = shouldComputeLondonVWAP or shouldComputeNYVWAP or shouldComputeGlobexVWAP or shouldComputeSydneyVWAP or shouldComputeTokyoVWAP
+
+// Session timestamp computation needed if VWAPs OR session levels are visible
+bool shouldComputeLondon = shouldComputeLondonVWAP or (sessionLevelsVisible and enableLondonActive)
+bool shouldComputeNY = shouldComputeNYVWAP or (sessionLevelsVisible and enableNewYorkActive)
+bool shouldComputeGlobex = shouldComputeGlobexVWAP or (sessionLevelsVisible and enableGlobexActive)
+bool shouldComputeSydney = shouldComputeSydneyVWAP or (sessionLevelsVisible and enableSydneyActive)
+bool shouldComputeTokyo = shouldComputeTokyoVWAP or (sessionLevelsVisible and enableTokyoActive)
+
+// Session detection needed if VWAPs OR session levels are visible
+bool needSessionDetection = anySessionVWAPEnabled or sessionLevelsVisible
 bool meetsPivotMaxTimeframe = pivotMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(pivotMaxTimeframe)
 bool showPivotsCondition = showPivots and meetsPivotMaxTimeframe
 
 // NY session filter for stocks and equity indices (RTH = 9:30 AM - 4:00 PM ET, bars before 4:00 PM)
-int nyHour = hour(time, "America/New_York")
-int nyMinute = minute(time, "America/New_York")
-int nyDayOfWeek = dayofweek(time, "America/New_York")
-bool isWeekday = nyDayOfWeek >= dayofweek.monday and nyDayOfWeek <= dayofweek.friday
-bool isNYSession = isWeekday and ((nyHour == 9 and nyMinute >= 30) or (nyHour > 9 and nyHour < 16))
+// Precompute RTH filter condition once (doesn't change per bar)
 bool isEquityIndex = syminfo.type == "futures" and (str.contains(syminfo.ticker, "ES") or str.contains(syminfo.ticker, "MES") or str.contains(syminfo.ticker, "NQ") or str.contains(syminfo.ticker, "MNQ") or str.contains(syminfo.ticker, "RTY") or str.contains(syminfo.ticker, "M2K") or str.contains(syminfo.ticker, "YM") or str.contains(syminfo.ticker, "MYM"))
 bool shouldFilterRTH = (rthOnlyForStocks and syminfo.type == "stock") or (rthOnlyForIndices and isEquityIndex)
-bool isRTHBar = not shouldFilterRTH or isNYSession
+// Only compute expensive timezone conversions when RTH filtering is active
+bool isNYSession = not shouldFilterRTH ? true : (dayofweek(time, "America/New_York") >= dayofweek.monday and dayofweek(time, "America/New_York") <= dayofweek.friday and ((hour(time, "America/New_York") == 9 and minute(time, "America/New_York") >= 30) or (hour(time, "America/New_York") > 9 and hour(time, "America/New_York") < 16)))
 
 // Check timeframe condition for weekly anchors
 bool meetsWeeklyAnchorMaxTimeframe = weeklyAnchorMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(weeklyAnchorMaxTimeframe)
@@ -808,58 +603,40 @@ bool meetsYearlyAnchorMinTimeframe = yearlyAnchorMinTimeframe == "None" or curre
 bool meetsYearlyAnchorMaxTimeframe = yearlyAnchorMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(yearlyAnchorMaxTimeframe)
 bool meetsYearlyAnchorTimeframe = meetsYearlyAnchorMinTimeframe and meetsYearlyAnchorMaxTimeframe
 
-// KEY LEVELS DATA - Conditional requests for performance
-var float pdh = na, var float pdl = na
-var float pwh = na, var float pwl = na
-var float pmh = na, var float pml = na
-var float pyh = na, var float pyl = na
+// KEY LEVELS DATA - Fetch via request.security (runs once per bar, cached by Pine)
+// Use direct assignment for cleaner code - Pine optimizes repeated security calls
+var float pdh = na, var float pdl = na, var float cdh = na, var float cdl = na
+var float pwh = na, var float pwl = na, var float cwh = na, var float cwl = na
+var float pmh = na, var float pml = na, var float cmh = na, var float cml = na
+var float pyh = na, var float pyl = na, var float cyh = na, var float cyl = na
 
-// Current period levels (developing periods)
-var float cdh = na, var float cdl = na
-var float cwh = na, var float cwl = na
-var float cmh = na, var float cml = na
-var float cyh = na, var float cyl = na
-
-// Fetch previous and current period levels in single calls
-if barstate.isconfirmed and showKeyLevelsCondition and (showPDH or showPDL or showCDH or showCDL)
+// Only fetch on last bar or first bar to minimize security call overhead during initial load
+bool shouldFetchLevels = barstate.islast or barstate.isfirst
+if shouldFetchLevels and showKeyLevelsCondition and (showPDH or showPDL or showCDH or showCDL)
     [_pdh, _pdl, _cdh, _cdl] = request.security(syminfo.tickerid, "D", [high[1], low[1], high, low], lookahead=barmerge.lookahead_on)
     pdh := _pdh, pdl := _pdl, cdh := _cdh, cdl := _cdl
-else if showKeyLevelsCondition and (showCDH or showCDL)
-    [_cdh, _cdl] = request.security(syminfo.tickerid, "D", [high, low], lookahead=barmerge.lookahead_on)
-    cdh := _cdh, cdl := _cdl
 
-if barstate.isconfirmed and showKeyLevelsCondition and (showPWH or showPWL or showCWH or showCWL)
+if shouldFetchLevels and showKeyLevelsCondition and (showPWH or showPWL or showCWH or showCWL)
     [_pwh, _pwl, _cwh, _cwl] = request.security(syminfo.tickerid, "W", [high[1], low[1], high, low], lookahead=barmerge.lookahead_on)
     pwh := _pwh, pwl := _pwl, cwh := _cwh, cwl := _cwl
-else if showKeyLevelsCondition and (showCWH or showCWL)
-    [_cwh, _cwl] = request.security(syminfo.tickerid, "W", [high, low], lookahead=barmerge.lookahead_on)
-    cwh := _cwh, cwl := _cwl
 
-if barstate.isconfirmed and showKeyLevelsCondition and (showPMH or showPML or showCMH or showCML)
+if shouldFetchLevels and showKeyLevelsCondition and (showPMH or showPML or showCMH or showCML)
     [_pmh, _pml, _cmh, _cml] = request.security(syminfo.tickerid, "M", [high[1], low[1], high, low], lookahead=barmerge.lookahead_on)
     pmh := _pmh, pml := _pml, cmh := _cmh, cml := _cml
-else if showKeyLevelsCondition and (showCMH or showCML)
-    [_cmh, _cml] = request.security(syminfo.tickerid, "M", [high, low], lookahead=barmerge.lookahead_on)
-    cmh := _cmh, cml := _cml
 
-if barstate.isconfirmed and showKeyLevelsCondition and (showPYH or showPYL or showCYH or showCYL)
+if shouldFetchLevels and showKeyLevelsCondition and (showPYH or showPYL or showCYH or showCYL)
     [_pyh, _pyl, _cyh, _cyl] = request.security(syminfo.tickerid, "12M", [high[1], low[1], high, low], lookahead=barmerge.lookahead_on)
     pyh := _pyh, pyl := _pyl, cyh := _cyh, cyl := _cyl
-else if showKeyLevelsCondition and (showCYH or showCYL)
-    [_cyh, _cyl] = request.security(syminfo.tickerid, "12M", [high, low], lookahead=barmerge.lookahead_on)
-    cyh := _cyh, cyl := _cyl
 
 var float ath = na
 if showKeyLevelsCondition and showATH
     ath := na(ath) ? high : math.max(ath, high)
 
-// PIVOT POINTS (from previous day's HLC)
+// PIVOT POINTS (from previous day's HLC) - only fetch if pivots will be displayed
 var float dailyHigh = na, var float dailyLow = na, var float dailyClose = na
-if barstate.isconfirmed
+if shouldFetchLevels and showPivotsCondition
     [_dailyHigh, _dailyLow, _dailyClose] = request.security(syminfo.tickerid, "D", [high[1], low[1], close[1]], lookahead=barmerge.lookahead_on)
-    dailyHigh := _dailyHigh
-    dailyLow := _dailyLow
-    dailyClose := _dailyClose
+    dailyHigh := _dailyHigh, dailyLow := _dailyLow, dailyClose := _dailyClose
 
 float dailyRange = dailyHigh - dailyLow
 float pivotP = (dailyHigh + dailyLow + dailyClose) / 3
@@ -876,13 +653,9 @@ var array<LevelRenderer> sessionLevels = array.new<LevelRenderer>()
 
 // MULTI-SESSION INFRASTRUCTURE
 
-const int MAX_VWAP_HISTORY = 10
-const int MAX_WEEKLY_HISTORY = 6
-const int MAX_MONTHLY_HISTORY = 6
-const int MAX_YEARLY_HISTORY = 2
-
 type SessionManager
     string name
+    string timezone
     bool enabled
     color col
     color colEnd
@@ -897,6 +670,20 @@ type SessionManager
     int prevMostRecentStart
     bool meetsTimeframe
     array<color> preCalcColors
+    array<int> holidayRanks
+
+calcHolidayRanks(array<int> starts, string sessionName, bool isStockType) =>
+    array<int> ranks = array.new<int>(MAX_VWAP_HISTORY, 0)
+    string tz = getSessionTimezone(sessionName)
+    int rank = 0
+    for idx = MAX_VWAP_HISTORY - 1 to 0
+        int sessionStart = array.get(starts, idx)
+        if not na(sessionStart)
+            int checkTS = sessionName == "Globex" ? sessionStart + 86400000 : sessionStart
+            if not isFullHoliday(checkTS, tz, isStockType)
+                rank += 1
+                array.set(ranks, idx, rank)
+    ranks
 
 // Shift session VWAP arrays left when new session detected
 shiftSessionArrays(array<int> oldStarts, array<int> newStarts, array<int> startBars, array<float> sumSrc, array<float> sumVol, array<float> vwaps) =>
@@ -924,128 +711,99 @@ shiftSessionArrays(array<int> oldStarts, array<int> newStarts, array<int> startB
 
 var array<SessionManager> sessionManagers = array.new<SessionManager>()
 
+// Helper to create empty arrays for disabled sessions (avoids expensive timestamp computation)
+emptyIntArray() => array.new<int>(MAX_VWAP_HISTORY, na)
+
 if barstate.isfirst
-    array.push(sessionManagers, SessionManager.new("London", enableLondonActive, colorLondonActive, colorLondonActiveEnd, londonVWAPCountActive, getSessionStartsArray("London", MAX_VWAP_HISTORY), getSessionEndsArray("London", MAX_VWAP_HISTORY), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsLondonVWAPTimeframe, array.new<color>(MAX_VWAP_HISTORY)))
-    array.push(sessionManagers, SessionManager.new("New York", enableNewYorkActive, colorNewYorkActive, colorNewYorkActiveEnd, nyVWAPCountActive, getSessionStartsArray("New York", MAX_VWAP_HISTORY), getSessionEndsArray("New York", MAX_VWAP_HISTORY), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsNYVWAPTimeframe, array.new<color>(MAX_VWAP_HISTORY)))
-    array.push(sessionManagers, SessionManager.new("Globex", enableGlobexActive, colorGlobexActive, colorGlobexActiveEnd, globexVWAPCountActive, getSessionStartsArray("Globex", MAX_VWAP_HISTORY), getSessionEndsArray("Globex", MAX_VWAP_HISTORY), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsGlobexVWAPTimeframe, array.new<color>(MAX_VWAP_HISTORY)))
-    array.push(sessionManagers, SessionManager.new("Sydney", enableSydneyActive, colorSydneyActive, colorSydneyActiveEnd, sydneyVWAPCountActive, getSessionStartsArray("Sydney", MAX_VWAP_HISTORY), getSessionEndsArray("Sydney", MAX_VWAP_HISTORY), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsSydneyVWAPTimeframe, array.new<color>(MAX_VWAP_HISTORY)))
-    array.push(sessionManagers, SessionManager.new("Tokyo", enableTokyoActive, colorTokyoActive, colorTokyoActiveEnd, tokyoVWAPCountActive, getSessionStartsArray("Tokyo", MAX_VWAP_HISTORY), getSessionEndsArray("Tokyo", MAX_VWAP_HISTORY), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsTokyoVWAPTimeframe, array.new<color>(MAX_VWAP_HISTORY)))
+    array<int> londonStarts = shouldComputeLondon ? getSessionStartsArray("London", MAX_VWAP_HISTORY) : emptyIntArray()
+    array<int> nyStarts = shouldComputeNY ? getSessionStartsArray("New York", MAX_VWAP_HISTORY) : emptyIntArray()
+    array<int> globexStarts = shouldComputeGlobex ? getSessionStartsArray("Globex", MAX_VWAP_HISTORY) : emptyIntArray()
+    array<int> sydneyStarts = shouldComputeSydney ? getSessionStartsArray("Sydney", MAX_VWAP_HISTORY) : emptyIntArray()
+    array<int> tokyoStarts = shouldComputeTokyo ? getSessionStartsArray("Tokyo", MAX_VWAP_HISTORY) : emptyIntArray()
+
+    array.push(sessionManagers, SessionManager.new("London", "Europe/London", enableLondonActive, colorLondonActive, colorLondonActiveEnd, londonVWAPCountActive, londonStarts, shouldComputeLondon ? getSessionEndsArray("London", MAX_VWAP_HISTORY) : emptyIntArray(), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsLondonVWAPTimeframe, array.new<color>(MAX_VWAP_HISTORY), shouldComputeLondon ? calcHolidayRanks(londonStarts, "London", isStock) : emptyIntArray()))
+    array.push(sessionManagers, SessionManager.new("New York", "America/New_York", enableNewYorkActive, colorNewYorkActive, colorNewYorkActiveEnd, nyVWAPCountActive, nyStarts, shouldComputeNY ? getSessionEndsArray("New York", MAX_VWAP_HISTORY) : emptyIntArray(), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsNYVWAPTimeframe, array.new<color>(MAX_VWAP_HISTORY), shouldComputeNY ? calcHolidayRanks(nyStarts, "New York", isStock) : emptyIntArray()))
+    array.push(sessionManagers, SessionManager.new("Globex", "America/New_York", enableGlobexActive, colorGlobexActive, colorGlobexActiveEnd, globexVWAPCountActive, globexStarts, shouldComputeGlobex ? getSessionEndsArray("Globex", MAX_VWAP_HISTORY) : emptyIntArray(), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsGlobexVWAPTimeframe, array.new<color>(MAX_VWAP_HISTORY), shouldComputeGlobex ? calcHolidayRanks(globexStarts, "Globex", isStock) : emptyIntArray()))
+    array.push(sessionManagers, SessionManager.new("Sydney", "Australia/Sydney", enableSydneyActive, colorSydneyActive, colorSydneyActiveEnd, sydneyVWAPCountActive, sydneyStarts, shouldComputeSydney ? getSessionEndsArray("Sydney", MAX_VWAP_HISTORY) : emptyIntArray(), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsSydneyVWAPTimeframe, array.new<color>(MAX_VWAP_HISTORY), shouldComputeSydney ? calcHolidayRanks(sydneyStarts, "Sydney", isStock) : emptyIntArray()))
+    array.push(sessionManagers, SessionManager.new("Tokyo", "Asia/Tokyo", enableTokyoActive, colorTokyoActive, colorTokyoActiveEnd, tokyoVWAPCountActive, tokyoStarts, shouldComputeTokyo ? getSessionEndsArray("Tokyo", MAX_VWAP_HISTORY) : emptyIntArray(), array.new<int>(MAX_VWAP_HISTORY, na), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, 0.0), array.new<float>(MAX_VWAP_HISTORY, na), array.new<label>(MAX_VWAP_HISTORY, na), na, meetsTokyoVWAPTimeframe, array.new<color>(MAX_VWAP_HISTORY), shouldComputeTokyo ? calcHolidayRanks(tokyoStarts, "Tokyo", isStock) : emptyIntArray()))
 
     for i = 0 to 4
         SessionManager mgr = array.get(sessionManagers, i)
-        mgr.prevMostRecentStart := array.get(mgr.starts, MAX_VWAP_HISTORY - 1)
-        for pos = 0 to MAX_VWAP_HISTORY - 1
-            color preCalc = getVWAPColor(mgr.col, mgr.colEnd, pos, mgr.historyCount - 1)
-            array.set(mgr.preCalcColors, pos, preCalc)
+        if mgr.enabled and mgr.meetsTimeframe
+            mgr.prevMostRecentStart := array.get(mgr.starts, MAX_VWAP_HISTORY - 1)
+            for pos = 0 to MAX_VWAP_HISTORY - 1
+                array.set(mgr.preCalcColors, pos, getVWAPColor(mgr.col, mgr.colEnd, pos, mgr.historyCount - 1))
 
-var array<int> weeklyAnchorStartsArray = array.new<int>(MAX_WEEKLY_HISTORY, na)
-var array<float> weeklyAnchorSumSrc = array.new<float>(MAX_WEEKLY_HISTORY, 0.0)
-var array<float> weeklyAnchorSumVol = array.new<float>(MAX_WEEKLY_HISTORY, 0.0)
-var array<float> weeklyAnchorVWAPs = array.new<float>(MAX_WEEKLY_HISTORY, na)
-var array<label> weeklyAnchorLabels = array.new<label>(MAX_WEEKLY_HISTORY, na)
-var bool currentSessionIsWeeklyAnchor = false
-var array<color> weeklyColors = array.new<color>(MAX_WEEKLY_HISTORY)
+var array<int> weeklyAnchorStartsArray = array.new<int>(MAX_WEEKLY_HISTORY, na), var array<float> weeklyAnchorSumSrc = array.new<float>(MAX_WEEKLY_HISTORY, 0.0), var array<float> weeklyAnchorSumVol = array.new<float>(MAX_WEEKLY_HISTORY, 0.0)
+var array<float> weeklyAnchorVWAPs = array.new<float>(MAX_WEEKLY_HISTORY, na), var array<label> weeklyAnchorLabels = array.new<label>(MAX_WEEKLY_HISTORY, na), var array<color> weeklyColors = array.new<color>(MAX_WEEKLY_HISTORY)
+var bool currentSessionIsWeeklyAnchor = false, var bool currentSessionIsMonthlyAnchor = false, var bool currentSessionIsYearlyAnchor = false
+var array<int> monthlyAnchorStartsArray = array.new<int>(MAX_MONTHLY_HISTORY, na), var array<float> monthlyAnchorSumSrc = array.new<float>(MAX_MONTHLY_HISTORY, 0.0), var array<float> monthlyAnchorSumVol = array.new<float>(MAX_MONTHLY_HISTORY, 0.0)
+var array<float> monthlyAnchorVWAPs = array.new<float>(MAX_MONTHLY_HISTORY, na), var array<label> monthlyAnchorLabels = array.new<label>(MAX_MONTHLY_HISTORY, na), var array<color> monthlyColors = array.new<color>(MAX_MONTHLY_HISTORY)
+var array<int> yearlyAnchorStartsArray = array.new<int>(MAX_YEARLY_HISTORY, na), var array<float> yearlyAnchorSumSrc = array.new<float>(MAX_YEARLY_HISTORY, 0.0), var array<float> yearlyAnchorSumVol = array.new<float>(MAX_YEARLY_HISTORY, 0.0)
+var array<float> yearlyAnchorVWAPs = array.new<float>(MAX_YEARLY_HISTORY, na), var array<label> yearlyAnchorLabels = array.new<label>(MAX_YEARLY_HISTORY, na), var array<color> yearlyColors = array.new<color>(MAX_YEARLY_HISTORY)
 
-var array<int> monthlyAnchorStartsArray = array.new<int>(MAX_MONTHLY_HISTORY, na)
-var array<float> monthlyAnchorSumSrc = array.new<float>(MAX_MONTHLY_HISTORY, 0.0)
-var array<float> monthlyAnchorSumVol = array.new<float>(MAX_MONTHLY_HISTORY, 0.0)
-var array<float> monthlyAnchorVWAPs = array.new<float>(MAX_MONTHLY_HISTORY, na)
-var array<label> monthlyAnchorLabels = array.new<label>(MAX_MONTHLY_HISTORY, na)
-var bool currentSessionIsMonthlyAnchor = false
-var array<color> monthlyColors = array.new<color>(MAX_MONTHLY_HISTORY)
-
-var array<int> yearlyAnchorStartsArray = array.new<int>(MAX_YEARLY_HISTORY, na)
-var array<float> yearlyAnchorSumSrc = array.new<float>(MAX_YEARLY_HISTORY, 0.0)
-var array<float> yearlyAnchorSumVol = array.new<float>(MAX_YEARLY_HISTORY, 0.0)
-var array<float> yearlyAnchorVWAPs = array.new<float>(MAX_YEARLY_HISTORY, na)
-var array<label> yearlyAnchorLabels = array.new<label>(MAX_YEARLY_HISTORY, na)
-var bool currentSessionIsYearlyAnchor = false
-var array<color> yearlyColors = array.new<color>(MAX_YEARLY_HISTORY)
+// Combined visibility checks for anchor VWAPs (enabled AND meets timeframe)
+bool shouldComputeWeekly = showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe
+bool shouldComputeMonthly = showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe
+bool shouldComputeYearly = showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe
+bool anyAnchorEnabled = shouldComputeWeekly or shouldComputeMonthly or shouldComputeYearly
+string primarySessionTZ = getSessionTimezone(primarySessionName)
 
 if barstate.isfirst
-    weeklyAnchorStartsArray := getAnchorStarts("W", primarySessionName, MAX_WEEKLY_HISTORY)
-    for pos = 0 to MAX_WEEKLY_HISTORY - 1
-        array.set(weeklyColors, pos, getVWAPColor(colorWeeklyAnchor, colorWeeklyAnchorEnd, pos, weeklyAnchorCount - 1))
-    if showMonthlyAnchorVWAP
+    if shouldComputeWeekly
+        weeklyAnchorStartsArray := getAnchorStarts("W", primarySessionName, MAX_WEEKLY_HISTORY)
+        for pos = 0 to MAX_WEEKLY_HISTORY - 1
+            array.set(weeklyColors, pos, getVWAPColor(colorWeeklyAnchor, colorWeeklyAnchorEnd, pos, weeklyAnchorCount - 1))
+    if shouldComputeMonthly
         monthlyAnchorStartsArray := getAnchorStarts("M", primarySessionName, MAX_MONTHLY_HISTORY)
         for pos = 0 to MAX_MONTHLY_HISTORY - 1
             array.set(monthlyColors, pos, getVWAPColor(colorMonthlyAnchor, colorMonthlyAnchorEnd, pos, monthlyAnchorCount - 1))
-    if showYearlyAnchorVWAP
+    if shouldComputeYearly
         yearlyAnchorStartsArray := getAnchorStarts("Y", primarySessionName, MAX_YEARLY_HISTORY)
         for pos = 0 to MAX_YEARLY_HISTORY - 1
             array.set(yearlyColors, pos, getVWAPColor(colorYearlyAnchor, colorYearlyAnchorEnd, pos, yearlyAnchorCount - 1))
 
-var int activeSessionIndex = na
-
-var float sessionOpen = na
-var float openRangeHigh = na
-var float openRangeLow = na
-var float initialBalanceHigh = na
-var float initialBalanceLow = na
-var int sessionStartBar = na
-var int sessionStartTime = na
-var int sessionEndTime = na
-
-var int openPriceBar = na
-var int orhBar = na
-var int orlBar = na
-var int ibhBar = na
-var int iblBar = na
+var int activeSessionIndex = na, var int sessionStartBar = na, var int sessionStartTime = na, var int sessionEndTime = na
+var float sessionOpen = na, var float openRangeHigh = na, var float openRangeLow = na, var float initialBalanceHigh = na, var float initialBalanceLow = na
+var int openPriceBar = na, var int orhBar = na, var int orlBar = na, var int ibhBar = na, var int iblBar = na
 
 int openRangeMinutes = periodToMinutes(openRangeLength)
 int ibMinutes = periodToMinutes(initialBalanceLength)
 
 // UNIFIED SESSION DETECTION (Calendar-based)
-
-for i = 0 to 4
-    SessionManager mgr = array.get(sessionManagers, i)
-    if mgr.enabled
-        string sessionName = mgr.name
-        array<int> sessionStartsArray = mgr.starts
-        array<int> sessionEndsArray = mgr.ends
-
-        // Find which session from this type is active at current time (for historical replay)
-        for arrayIdx = MAX_VWAP_HISTORY - 1 to 0
-            int sessionStart = array.get(sessionStartsArray, arrayIdx)
-            int sessionEnd = array.get(sessionEndsArray, arrayIdx)
-
-            if not na(sessionStart) and not na(sessionEnd)
-                // Skip sessions that fall on holidays
-                string sessionTZ = getSessionTimezone(sessionName)
-                // For Globex, check the next day (active trading day), not the session start day
-                int holidayCheckTimestamp = na
-                if sessionName == "Globex"
-                    holidayCheckTimestamp := timestamp(sessionTZ,
-                                                       year(sessionStart, sessionTZ),
-                                                       month(sessionStart, sessionTZ),
-                                                       dayofmonth(sessionStart, sessionTZ) + 1,
-                                                       0, 0)
-                else
-                    holidayCheckTimestamp := sessionStart
-                bool sessionIsHoliday = isFullHoliday(holidayCheckTimestamp, sessionTZ, isStock)
-
-                bool isInThisSession = time >= sessionStart and time < sessionEnd and not sessionIsHoliday
-                bool sessionJustStarted = time >= sessionStart and time[1] < sessionStart and not sessionIsHoliday
-
-                if sessionJustStarted
-                    activeSessionIndex := i
-
-                    sessionOpen := open
-                    openRangeHigh := high
-                    openRangeLow := low
-                    initialBalanceHigh := high
-                    initialBalanceLow := low
-                    sessionStartBar := bar_index
-                    sessionStartTime := sessionStart
-                    sessionEndTime := sessionEnd
-                    openPriceBar := bar_index
-                    orhBar := bar_index
-                    orlBar := bar_index
-                    ibhBar := bar_index
-                    iblBar := bar_index
-
-                if isInThisSession
-                    break
+// Skip entirely if neither session VWAPs nor session levels are visible
+// Optimized: only check most recent session slot per manager, break on first match
+if needSessionDetection and not na(time)
+    bool foundSession = false
+    for i = 0 to 4
+        if foundSession
+            break
+        SessionManager mgr = array.get(sessionManagers, i)
+        if not mgr.enabled
+            continue
+        int sessionStart = array.get(mgr.starts, MAX_VWAP_HISTORY - 1)
+        int sessionEnd = array.get(mgr.ends, MAX_VWAP_HISTORY - 1)
+        if na(sessionStart) or na(sessionEnd) or time < sessionStart or time >= sessionEnd
+            continue
+        int holidayRank = array.get(mgr.holidayRanks, MAX_VWAP_HISTORY - 1)
+        if holidayRank > 0
+            bool sessionJustStarted = time[1] < sessionStart
+            if sessionJustStarted
+                activeSessionIndex := i
+                sessionOpen := open
+                openRangeHigh := high
+                openRangeLow := low
+                initialBalanceHigh := high
+                initialBalanceLow := low
+                sessionStartBar := bar_index
+                sessionStartTime := sessionStart
+                sessionEndTime := sessionEnd
+                openPriceBar := bar_index
+                orhBar := bar_index
+                orlBar := bar_index
+                ibhBar := bar_index
+                iblBar := bar_index
+            foundSession := true
 
 if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTime)
     SessionManager activeMgr = array.get(sessionManagers, activeSessionIndex)
@@ -1074,146 +832,123 @@ if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTim
                 iblBar := bar_index
 
 // MULTI-SESSION VWAP CALCULATIONS
+// Optimized: skip bars before oldest tracked session, cache per-bar values
+// Cache showLabelsOnStart - doesn't change per bar
+bool showLabelsOnStart = sessionBaseCondition and showSessionLabels and showSessionVWAP
 
-for i = 0 to 4
-    SessionManager mgr = array.get(sessionManagers, i)
-    if mgr.enabled
+// Global early skip: find earliest session start across all enabled managers (computed once)
+var int globalOldestSessionStart = na
+var int globalOldestAnchorStart = na
+if barstate.isfirst
+    if anySessionVWAPEnabled
+        for i = 0 to 4
+            SessionManager mgr = array.get(sessionManagers, i)
+            if mgr.enabled and mgr.meetsTimeframe
+                int startIdx = MAX_VWAP_HISTORY - mgr.historyCount
+                int oldest = array.get(mgr.starts, startIdx)
+                if not na(oldest) and (na(globalOldestSessionStart) or oldest < globalOldestSessionStart)
+                    globalOldestSessionStart := oldest
+    if anyAnchorEnabled
+        int wkOldest = shouldComputeWeekly ? array.get(weeklyAnchorStartsArray, MAX_WEEKLY_HISTORY - weeklyAnchorCount) : na
+        int mnOldest = shouldComputeMonthly ? array.get(monthlyAnchorStartsArray, MAX_MONTHLY_HISTORY - monthlyAnchorCount) : na
+        int yrOldest = shouldComputeYearly ? array.get(yearlyAnchorStartsArray, MAX_YEARLY_HISTORY - yearlyAnchorCount) : na
+        if not na(wkOldest)
+            globalOldestAnchorStart := wkOldest
+        if not na(mnOldest) and (na(globalOldestAnchorStart) or mnOldest < globalOldestAnchorStart)
+            globalOldestAnchorStart := mnOldest
+        if not na(yrOldest) and (na(globalOldestAnchorStart) or yrOldest < globalOldestAnchorStart)
+            globalOldestAnchorStart := yrOldest
+
+// Per-bar cached values
+float barOhlc4Vol = not na(ohlc4) and not na(volume) ? ohlc4 * volume : na
+bool hasVolume = not na(volume) and volume > 0
+int prevTime = nz(time[1], 0)
+bool skipVWAPBar = not na(globalOldestSessionStart) and time < globalOldestSessionStart
+bool skipAnchorBar = not na(globalOldestAnchorStart) and time < globalOldestAnchorStart
+
+if anySessionVWAPEnabled and not na(barOhlc4Vol) and not skipVWAPBar
+    for i = 0 to 4
+        SessionManager mgr = array.get(sessionManagers, i)
+        if not mgr.enabled or not mgr.meetsTimeframe
+            continue
         int historyCountUser = mgr.historyCount
-        // Only calculate VWAPs that will be displayed (historyCount)
-        // When user changes historyCount, entire script reloads from beginning
-        // After array shift, the newest historyCount sessions continue calculating correctly
-        int historyCountCalc = historyCountUser
+        int startIdx = MAX_VWAP_HISTORY - historyCountUser
+        int oldestStart = array.get(mgr.starts, startIdx)
+        if not na(oldestStart) and time < oldestStart
+            continue
+        bool isNYSessionVWAP = mgr.name == "New York"
+        bool shouldAccumulate = not isNYSessionVWAP or not shouldFilterRTH or isNYSession
 
-        // Loop through all tracked sessions (MAX_VWAP_HISTORY)
-        for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
+        for arrayIdx = startIdx to MAX_VWAP_HISTORY - 1
             int sessionStart = array.get(mgr.starts, arrayIdx)
-            int nextSessionStart = arrayIdx < MAX_VWAP_HISTORY - 1 ? array.get(mgr.starts, arrayIdx + 1) : int(na)
-            bool isSessionStart = not na(sessionStart) and time >= sessionStart and time[1] < sessionStart
-            int sessionIndexInHistory = arrayIdx - (MAX_VWAP_HISTORY - historyCountCalc)
-            bool isInConfiguredRange = sessionIndexInHistory >= 0
-            bool sessionInFuture = not na(sessionStart) and sessionStart > time
-            bool shouldCalculate = not na(sessionStart) and time >= sessionStart and isInConfiguredRange and not sessionInFuture
+            if na(sessionStart) or sessionStart > time
+                continue
 
-            if isSessionStart and isInConfiguredRange and not na(volume) and volume > 0
+            bool isSessionStart = prevTime < sessionStart
+            if isSessionStart and hasVolume
                 array.set(mgr.sumSrc, arrayIdx, 0.0)
                 array.set(mgr.sumVol, arrayIdx, 0.0)
                 array.set(mgr.startBars, arrayIdx, bar_index)
 
-            if shouldCalculate
-                int sessionBarIdx = array.get(mgr.startBars, arrayIdx)
+            int sessionBarIdx = array.get(mgr.startBars, arrayIdx)
+            if not na(sessionBarIdx) and shouldAccumulate
+                float currentSumSrc = array.get(mgr.sumSrc, arrayIdx) + barOhlc4Vol
+                float currentSumVol = array.get(mgr.sumVol, arrayIdx) + volume
+                array.set(mgr.sumSrc, arrayIdx, currentSumSrc)
+                array.set(mgr.sumVol, arrayIdx, currentSumVol)
+                array.set(mgr.vwaps, arrayIdx, currentSumVol > 0 ? currentSumSrc / currentSumVol : na)
 
-                if not na(sessionBarIdx)
-                    float currentSumSrc = array.get(mgr.sumSrc, arrayIdx)
-                    float currentSumVol = array.get(mgr.sumVol, arrayIdx)
-
-                    bool isNYSessionVWAP = mgr.name == "New York"
-                    bool shouldAccumulate = not isNYSessionVWAP or not shouldFilterRTH or isNYSession
-                    if shouldAccumulate and not na(ohlc4) and not na(volume)
-                        currentSumSrc += (ohlc4 * volume)
-                        currentSumVol += volume
-                        array.set(mgr.sumSrc, arrayIdx, currentSumSrc)
-                        array.set(mgr.sumVol, arrayIdx, currentSumVol)
-
-                    float vwap = currentSumVol > 0 ? currentSumSrc / currentSumVol : na
-                    array.set(mgr.vwaps, arrayIdx, vwap)
-
-                // Check if this anchor is on a holiday - if so, skip completely
-                string sessionTZ = getSessionTimezone(mgr.name)
-                int holidayCheckTS = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
-                bool anchorIsHoliday = isFullHoliday(holidayCheckTS, sessionTZ, isStock)
-
-                // Count how many non-holiday sessions exist from most recent up to now
-                int nonHolidayRank = 0
-                if not anchorIsHoliday
-                    for countIdx = MAX_VWAP_HISTORY - 1 to arrayIdx
-                        int countStart = array.get(mgr.starts, countIdx)
-                        if not na(countStart)
-                            int countHolidayTS = mgr.name == "Globex" ? countStart + 86400000 : countStart
-                            if not isFullHoliday(countHolidayTS, sessionTZ, isStock)
-                                nonHolidayRank += 1
-
-                // Only show if: not holiday AND within user's requested count
-                bool shouldShow = not anchorIsHoliday and nonHolidayRank <= historyCountUser
-
-                if isSessionStart and sessionBaseCondition and mgr.meetsTimeframe and showSessionLabels and showSessionVWAP and shouldShow
+            if isSessionStart and showLabelsOnStart
+                int nonHolidayRank = array.get(mgr.holidayRanks, arrayIdx)
+                if nonHolidayRank > 0 and nonHolidayRank <= historyCountUser
                     deleteLabel(mgr.labels, arrayIdx)
                     int positionInHistory = nonHolidayRank - 1
-                    color labelColor = getVWAPColor(mgr.col, mgr.colEnd, positionInHistory, historyCountUser - 1)
-                    bool isPrimarySession = mgr.name == primarySessionName
-                    int labelTimestamp = na
-                    if mgr.name == "Globex"
-                        string labelTZ = getSessionTimezone(mgr.name)
-                        labelTimestamp := timestamp(labelTZ,
-                                                    year(sessionStart, labelTZ),
-                                                    month(sessionStart, labelTZ),
-                                                    dayofmonth(sessionStart, labelTZ) + 1,
-                                                    0, 0)
-                    else
-                        labelTimestamp := sessionStart
-                    string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(mgr.name) + str.tostring(positionInHistory + 1)) : mgr.name + " " + str.format_time(labelTimestamp, "d MMM", getSessionTimezone(mgr.name))
-                    label newLabel = label.new(bar_index, high, sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down)
-                    array.set(mgr.labels, arrayIdx, newLabel)
-
-            if not isInConfiguredRange
-                deleteLabel(mgr.labels, arrayIdx)
-                array.set(mgr.labels, arrayIdx, na)
+                    color labelColor = array.get(mgr.preCalcColors, positionInHistory)
+                    int labelTS = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
+                    bool isPrimary = mgr.name == primarySessionName
+                    string txt = compactLabels ? (isPrimary ? "D" : getSessionAbbr(mgr.name)) + str.tostring(positionInHistory + 1) : mgr.name + " " + str.format_time(labelTS, "d MMM", mgr.timezone)
+                    array.set(mgr.labels, arrayIdx, label.new(bar_index, high, txt, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down))
 
 // Detect array shifts and shift accumulators + recreate labels with updated position numbers
-if barstate.isconfirmed and not barstate.isfirst
+// Only check on last bar to avoid expensive getSessionStartsArray calls on every historical bar
+if barstate.islast and anySessionVWAPEnabled
     for i = 0 to 4
         SessionManager mgr = array.get(sessionManagers, i)
-        if mgr.enabled
+        if mgr.enabled and mgr.meetsTimeframe
             array<int> currentStarts = getSessionStartsArray(mgr.name, MAX_VWAP_HISTORY)
-            array<int> currentEnds = getSessionEndsArray(mgr.name, MAX_VWAP_HISTORY)
-
-            bool shifted = not na(mgr.prevMostRecentStart) and array.get(currentStarts, MAX_VWAP_HISTORY - 1) != mgr.prevMostRecentStart
+            int newestStart = array.get(currentStarts, MAX_VWAP_HISTORY - 1)
+            bool shifted = not na(mgr.prevMostRecentStart) and not na(newestStart) and newestStart != mgr.prevMostRecentStart
 
             if shifted
+                array<int> currentEnds = getSessionEndsArray(mgr.name, MAX_VWAP_HISTORY)
                 mgr.starts := currentStarts
                 mgr.ends := currentEnds
+                mgr.holidayRanks := calcHolidayRanks(currentStarts, mgr.name, isStock)
+                mgr.prevMostRecentStart := newestStart
                 shiftSessionArrays(mgr.starts, currentStarts, mgr.startBars, mgr.sumSrc, mgr.sumVol, mgr.vwaps)
 
-                // Recalculate colors after shift to keep alignment
                 for pos = 0 to MAX_VWAP_HISTORY - 1
-                    color preCalc = getVWAPColor(mgr.col, mgr.colEnd, pos, mgr.historyCount - 1)
-                    array.set(mgr.preCalcColors, pos, preCalc)
+                    array.set(mgr.preCalcColors, pos, getVWAPColor(mgr.col, mgr.colEnd, pos, mgr.historyCount - 1))
 
                 for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
                     int sessionStart = array.get(mgr.starts, arrayIdx)
                     int mgrSessionStartBar = array.get(mgr.startBars, arrayIdx)
 
-                    // Check if this anchor is on a holiday - if so, skip completely
-                    string shiftSessionTZ = getSessionTimezone(mgr.name)
-                    int shiftHolidayCheckTS = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
-                    bool shiftAnchorIsHoliday = isFullHoliday(shiftHolidayCheckTS, shiftSessionTZ, isStock)
-
-                    // Count how many non-holiday sessions exist from most recent up to now
-                    int shiftNonHolidayRank = 0
-                    if not shiftAnchorIsHoliday
-                        for countIdx = MAX_VWAP_HISTORY - 1 to arrayIdx
-                            int countStart = array.get(mgr.starts, countIdx)
-                            if not na(countStart)
-                                int countHolidayTS = mgr.name == "Globex" ? countStart + 86400000 : countStart
-                                if not isFullHoliday(countHolidayTS, shiftSessionTZ, isStock)
-                                    shiftNonHolidayRank += 1
-
-                    // Only show if: not holiday AND within user's requested count
+                    int shiftNonHolidayRank = array.get(mgr.holidayRanks, arrayIdx)
+                    bool shiftAnchorIsHoliday = shiftNonHolidayRank == 0
                     bool shiftShouldShow = not shiftAnchorIsHoliday and shiftNonHolidayRank <= mgr.historyCount
 
                     bool withinLookback = not na(mgrSessionStartBar) and mgrSessionStartBar <= bar_index and (bar_index - mgrSessionStartBar) < 5000
-                    bool sessionInFuture = sessionStart > time
 
-                    if not na(sessionStart) and withinLookback and time >= sessionStart and not sessionInFuture and showSessionLabels and showSessionVWAP and sessionBaseCondition and mgr.meetsTimeframe and shiftShouldShow
+                    if not na(sessionStart) and withinLookback and time >= sessionStart and sessionStart <= time and showSessionLabels and showSessionVWAP and sessionBaseCondition and shiftShouldShow
                         deleteLabel(mgr.labels, arrayIdx)
                         int positionInHistory = shiftNonHolidayRank - 1
                         color labelColor = getVWAPColor(mgr.col, mgr.colEnd, positionInHistory, mgr.historyCount - 1)
                         bool isPrimarySession = mgr.name == primarySessionName
                         int labelTimestamp = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
-                        string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(mgr.name) + str.tostring(positionInHistory + 1)) : mgr.name + " " + str.format_time(labelTimestamp, "d MMM", getSessionTimezone(mgr.name))
+                        string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(mgr.name) + str.tostring(positionInHistory + 1)) : mgr.name + " " + str.format_time(labelTimestamp, "d MMM", mgr.timezone)
                         label newLabel = label.new(mgrSessionStartBar, high[bar_index - mgrSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down)
                         array.set(mgr.labels, arrayIdx, newLabel)
-
-                mgr.prevMostRecentStart := array.get(currentStarts, MAX_VWAP_HISTORY - 1)
 
 // Plot VWAPs - up to 5 historical sessions per type
 SessionManager londonMgr = array.get(sessionManagers, 0)
@@ -1222,34 +957,32 @@ SessionManager globexMgr = array.get(sessionManagers, 2)
 SessionManager sydneyMgr = array.get(sessionManagers, 3)
 SessionManager tokyoMgr = array.get(sessionManagers, 4)
 
-bool skipLondonMostRecent = showWeeklyAnchorVWAP and primarySessionName == "London" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and londonMgr.meetsTimeframe and showSessionVWAP and londonMgr.enabled and londonMgr.historyCount >= 1 and not skipLondonMostRecent ? array.get(londonMgr.vwaps, MAX_VWAP_HISTORY - 1) : na, "London VWAP 1", color=array.get(londonMgr.preCalcColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+bool vwapBase = sessionBaseCondition and showSessionVWAP
+bool skipLN = showWeeklyAnchorVWAP and primarySessionName == "London" and currentSessionIsWeeklyAnchor
+bool skipNY = showWeeklyAnchorVWAP and primarySessionName == "New York" and currentSessionIsWeeklyAnchor
+bool skipGLX = showWeeklyAnchorVWAP and primarySessionName == "Globex" and currentSessionIsWeeklyAnchor
+bool skipSYD = showWeeklyAnchorVWAP and primarySessionName == "Sydney" and currentSessionIsWeeklyAnchor
+bool skipTKY = showWeeklyAnchorVWAP and primarySessionName == "Tokyo" and currentSessionIsWeeklyAnchor
 
-bool skipNYMostRecent = showWeeklyAnchorVWAP and primarySessionName == "New York" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and nyMgr.meetsTimeframe and showSessionVWAP and nyMgr.enabled and nyMgr.historyCount >= 1 and not skipNYMostRecent ? array.get(nyMgr.vwaps, MAX_VWAP_HISTORY - 1) : na, "NY VWAP 1", color=array.get(nyMgr.preCalcColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and nyMgr.meetsTimeframe and showSessionVWAP and nyMgr.enabled and nyMgr.historyCount >= 2 ? array.get(nyMgr.vwaps, MAX_VWAP_HISTORY - 2) : na, "NY VWAP 2", color=array.get(nyMgr.preCalcColors, 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and nyMgr.meetsTimeframe and showSessionVWAP and nyMgr.enabled and nyMgr.historyCount >= 3 ? array.get(nyMgr.vwaps, MAX_VWAP_HISTORY - 3) : na, "NY VWAP 3", color=array.get(nyMgr.preCalcColors, 2), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and nyMgr.meetsTimeframe and showSessionVWAP and nyMgr.enabled and nyMgr.historyCount >= 4 ? array.get(nyMgr.vwaps, MAX_VWAP_HISTORY - 4) : na, "NY VWAP 4", color=array.get(nyMgr.preCalcColors, 3), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and nyMgr.meetsTimeframe and showSessionVWAP and nyMgr.enabled and nyMgr.historyCount >= 5 ? array.get(nyMgr.vwaps, MAX_VWAP_HISTORY - 5) : na, "NY VWAP 5", color=array.get(nyMgr.preCalcColors, 4), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, londonMgr.meetsTimeframe, londonMgr.enabled, londonMgr.historyCount, 1, londonMgr.vwaps, 0, skipLN), "London VWAP 1", color=array.get(londonMgr.preCalcColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
-bool skipGlobexMostRecent = showWeeklyAnchorVWAP and primarySessionName == "Globex" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and globexMgr.meetsTimeframe and showSessionVWAP and globexMgr.enabled and globexMgr.historyCount >= 1 and not skipGlobexMostRecent ? array.get(globexMgr.vwaps, MAX_VWAP_HISTORY - 1) : na, "Globex VWAP 1", color=array.get(globexMgr.preCalcColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and globexMgr.meetsTimeframe and showSessionVWAP and globexMgr.enabled and globexMgr.historyCount >= 2 ? array.get(globexMgr.vwaps, MAX_VWAP_HISTORY - 2) : na, "Globex VWAP 2", color=array.get(globexMgr.preCalcColors, 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and globexMgr.meetsTimeframe and showSessionVWAP and globexMgr.enabled and globexMgr.historyCount >= 3 ? array.get(globexMgr.vwaps, MAX_VWAP_HISTORY - 3) : na, "Globex VWAP 3", color=array.get(globexMgr.preCalcColors, 2), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and globexMgr.meetsTimeframe and showSessionVWAP and globexMgr.enabled and globexMgr.historyCount >= 4 ? array.get(globexMgr.vwaps, MAX_VWAP_HISTORY - 4) : na, "Globex VWAP 4", color=array.get(globexMgr.preCalcColors, 3), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(sessionBaseCondition and globexMgr.meetsTimeframe and showSessionVWAP and globexMgr.enabled and globexMgr.historyCount >= 5 ? array.get(globexMgr.vwaps, MAX_VWAP_HISTORY - 5) : na, "Globex VWAP 5", color=array.get(globexMgr.preCalcColors, 4), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, nyMgr.meetsTimeframe, nyMgr.enabled, nyMgr.historyCount, 1, nyMgr.vwaps, 0, skipNY), "NY VWAP 1", color=array.get(nyMgr.preCalcColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, nyMgr.meetsTimeframe, nyMgr.enabled, nyMgr.historyCount, 2, nyMgr.vwaps, 1, false), "NY VWAP 2", color=array.get(nyMgr.preCalcColors, 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, nyMgr.meetsTimeframe, nyMgr.enabled, nyMgr.historyCount, 3, nyMgr.vwaps, 2, false), "NY VWAP 3", color=array.get(nyMgr.preCalcColors, 2), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, nyMgr.meetsTimeframe, nyMgr.enabled, nyMgr.historyCount, 4, nyMgr.vwaps, 3, false), "NY VWAP 4", color=array.get(nyMgr.preCalcColors, 3), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, nyMgr.meetsTimeframe, nyMgr.enabled, nyMgr.historyCount, 5, nyMgr.vwaps, 4, false), "NY VWAP 5", color=array.get(nyMgr.preCalcColors, 4), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
-bool skipSydneyMostRecent = showWeeklyAnchorVWAP and primarySessionName == "Sydney" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and sydneyMgr.meetsTimeframe and showSessionVWAP and sydneyMgr.enabled and sydneyMgr.historyCount >= 1 and not skipSydneyMostRecent ? array.get(sydneyMgr.vwaps, MAX_VWAP_HISTORY - 1) : na, "Sydney VWAP 1", color=array.get(sydneyMgr.preCalcColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, globexMgr.meetsTimeframe, globexMgr.enabled, globexMgr.historyCount, 1, globexMgr.vwaps, 0, skipGLX), "Globex VWAP 1", color=array.get(globexMgr.preCalcColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, globexMgr.meetsTimeframe, globexMgr.enabled, globexMgr.historyCount, 2, globexMgr.vwaps, 1, false), "Globex VWAP 2", color=array.get(globexMgr.preCalcColors, 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, globexMgr.meetsTimeframe, globexMgr.enabled, globexMgr.historyCount, 3, globexMgr.vwaps, 2, false), "Globex VWAP 3", color=array.get(globexMgr.preCalcColors, 2), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, globexMgr.meetsTimeframe, globexMgr.enabled, globexMgr.historyCount, 4, globexMgr.vwaps, 3, false), "Globex VWAP 4", color=array.get(globexMgr.preCalcColors, 3), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, globexMgr.meetsTimeframe, globexMgr.enabled, globexMgr.historyCount, 5, globexMgr.vwaps, 4, false), "Globex VWAP 5", color=array.get(globexMgr.preCalcColors, 4), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
-bool skipTokyoMostRecent = showWeeklyAnchorVWAP and primarySessionName == "Tokyo" and currentSessionIsWeeklyAnchor
-plot(sessionBaseCondition and tokyoMgr.meetsTimeframe and showSessionVWAP and tokyoMgr.enabled and tokyoMgr.historyCount >= 1 and not skipTokyoMostRecent ? array.get(tokyoMgr.vwaps, MAX_VWAP_HISTORY - 1) : na, "Tokyo VWAP 1", color=array.get(tokyoMgr.preCalcColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(vwapVal(vwapBase, sydneyMgr.meetsTimeframe, sydneyMgr.enabled, sydneyMgr.historyCount, 1, sydneyMgr.vwaps, 0, skipSYD), "Sydney VWAP 1", color=array.get(sydneyMgr.preCalcColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// WEEKLY ANCHOR VWAP CALCULATION (Multi-week support)
-// ═══════════════════════════════════════════════════════════════════════════════
+plot(vwapVal(vwapBase, tokyoMgr.meetsTimeframe, tokyoMgr.enabled, tokyoMgr.historyCount, 1, tokyoMgr.vwaps, 0, skipTKY), "Tokyo VWAP 1", color=array.get(tokyoMgr.preCalcColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
-// Get the session arrays for the anchor session type (for skip logic)
+// WEEKLY/MONTHLY/YEARLY ANCHOR VWAP CALCULATIONS
 SessionManager primaryMgr = switch primarySessionName
     "London" => londonMgr
     "New York" => nyMgr
@@ -1257,140 +990,97 @@ SessionManager primaryMgr = switch primarySessionName
     "Sydney" => sydneyMgr
     => tokyoMgr
 
-if showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe
-    string anchorTZ = getSessionTimezone(primarySessionName)
-
-    // Process each week in the array
-    for weekIdx = 0 to MAX_WEEKLY_HISTORY - 1
+if shouldComputeWeekly and not na(barOhlc4Vol) and not skipAnchorBar
+    bool shouldAccumulateWeekly = not shouldFilterRTH or isNYSession
+    int wkStartIdx = MAX_WEEKLY_HISTORY - weeklyAnchorCount
+    for weekIdx = wkStartIdx to MAX_WEEKLY_HISTORY - 1
         int weekStart = array.get(weeklyAnchorStartsArray, weekIdx)
-
-        if not na(weekStart)
-            // Detect when we cross into this week's start
-            bool atWeekStart = time >= weekStart and time[1] < weekStart
-
-            if atWeekStart
-                // Reset accumulators for this week
-                array.set(weeklyAnchorSumSrc, weekIdx, 0.0)
-                array.set(weeklyAnchorSumVol, weekIdx, 0.0)
-
-                // Check if this is the most recent week and matches the most recent daily session
-                if weekIdx == MAX_WEEKLY_HISTORY - 1
-                    currentSessionIsWeeklyAnchor := (weekStart == array.get(primaryMgr.starts, MAX_VWAP_HISTORY - 1))
-
-                bool shouldShowLabel = weekIdx >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount)
-                if showSessionLabels and shouldShowLabel
-                    int positionInWeeklyHistory = (MAX_WEEKLY_HISTORY - 1) - weekIdx
-                    createAnchorLabel(weeklyAnchorLabels, weekIdx, weekStart, "W", positionInWeeklyHistory, colorWeeklyAnchor, colorWeeklyAnchorEnd, weeklyAnchorCount - 1, anchorTZ, primarySessionName)
-
-            // Accumulate if we're at or after this week's start (apply RTH filter for stocks/indices)
-            bool shouldAccumulateWeekly = not shouldFilterRTH or isNYSession
-            if time >= weekStart and shouldAccumulateWeekly
-                float currentSumSrc = array.get(weeklyAnchorSumSrc, weekIdx)
-                float currentSumVol = array.get(weeklyAnchorSumVol, weekIdx)
-                array.set(weeklyAnchorSumSrc, weekIdx, currentSumSrc + (ohlc4 * volume))
-                array.set(weeklyAnchorSumVol, weekIdx, currentSumVol + volume)
-
-                float newSumSrc = array.get(weeklyAnchorSumSrc, weekIdx)
-                float newSumVol = array.get(weeklyAnchorSumVol, weekIdx)
-                float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
-                array.set(weeklyAnchorVWAPs, weekIdx, vwap)
+        if na(weekStart) or weekStart > time
+            continue
+        bool atWeekStart = prevTime < weekStart
+        if atWeekStart
+            array.set(weeklyAnchorSumSrc, weekIdx, 0.0)
+            array.set(weeklyAnchorSumVol, weekIdx, 0.0)
+            if weekIdx == MAX_WEEKLY_HISTORY - 1
+                currentSessionIsWeeklyAnchor := (weekStart == array.get(primaryMgr.starts, MAX_VWAP_HISTORY - 1))
+            if showSessionLabels
+                createAnchorLabel(weeklyAnchorLabels, weekIdx, weekStart, "W", (MAX_WEEKLY_HISTORY - 1) - weekIdx, colorWeeklyAnchor, colorWeeklyAnchorEnd, weeklyAnchorCount - 1, primarySessionTZ, primarySessionName)
+        if shouldAccumulateWeekly
+            float sumSrc = array.get(weeklyAnchorSumSrc, weekIdx) + barOhlc4Vol
+            float sumVol = array.get(weeklyAnchorSumVol, weekIdx) + volume
+            array.set(weeklyAnchorSumSrc, weekIdx, sumSrc)
+            array.set(weeklyAnchorSumVol, weekIdx, sumVol)
+            array.set(weeklyAnchorVWAPs, weekIdx, sumVol > 0 ? sumSrc / sumVol : na)
 
 bool wklyBase = showWeeklyAnchorVWAP and showSessionMarkers and meetsWeeklyAnchorMaxTimeframe
-plot(wklyBase and 0 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 0) : na, "Weekly Anchor 1", color=array.get(weeklyColors, 5), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(wklyBase and 1 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 1) : na, "Weekly Anchor 2", color=array.get(weeklyColors, 4), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(wklyBase and 2 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 2) : na, "Weekly Anchor 3", color=array.get(weeklyColors, 3), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(wklyBase and 3 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 3) : na, "Weekly Anchor 4", color=array.get(weeklyColors, 2), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(wklyBase and 4 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 4) : na, "Weekly Anchor 5", color=array.get(weeklyColors, 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(wklyBase and 5 >= (MAX_WEEKLY_HISTORY - weeklyAnchorCount) ? array.get(weeklyAnchorVWAPs, 5) : na, "Weekly Anchor 6", color=array.get(weeklyColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 0, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "Weekly Anchor 1", color=array.get(weeklyColors, 5), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 1, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "Weekly Anchor 2", color=array.get(weeklyColors, 4), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 2, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "Weekly Anchor 3", color=array.get(weeklyColors, 3), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 3, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "Weekly Anchor 4", color=array.get(weeklyColors, 2), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 4, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "Weekly Anchor 5", color=array.get(weeklyColors, 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 5, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "Weekly Anchor 6", color=array.get(weeklyColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// MONTHLY ANCHOR VWAP CALCULATION
-// ═══════════════════════════════════════════════════════════════════════════════
-
-if showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe
-    string anchorTZ = getSessionTimezone(primarySessionName)
-    for monthIdx = 0 to MAX_MONTHLY_HISTORY - 1
+if shouldComputeMonthly and not na(barOhlc4Vol) and not skipAnchorBar
+    bool shouldAccumulateMonthly = not shouldFilterRTH or isNYSession
+    int mnStartIdx = MAX_MONTHLY_HISTORY - monthlyAnchorCount
+    for monthIdx = mnStartIdx to MAX_MONTHLY_HISTORY - 1
         int monthStart = array.get(monthlyAnchorStartsArray, monthIdx)
-        if not na(monthStart)
-            bool atMonthStart = time >= monthStart and time[1] < monthStart
-            if atMonthStart
-                array.set(monthlyAnchorSumSrc, monthIdx, 0.0)
-                array.set(monthlyAnchorSumVol, monthIdx, 0.0)
-                if monthIdx == MAX_MONTHLY_HISTORY - 1
-                    currentSessionIsMonthlyAnchor := (monthStart == array.get(primaryMgr.starts, MAX_VWAP_HISTORY - 1))
-                bool shouldShowLabel = monthIdx >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount)
-                if showSessionLabels and shouldShowLabel
-                    int positionInMonthlyHistory = (MAX_MONTHLY_HISTORY - 1) - monthIdx
-                    createAnchorLabel(monthlyAnchorLabels, monthIdx, monthStart, "M", positionInMonthlyHistory, colorMonthlyAnchor, colorMonthlyAnchorEnd, monthlyAnchorCount - 1, anchorTZ, primarySessionName)
-            if time >= monthStart
-                bool shouldAccumulateMonthly = not shouldFilterRTH or isNYSession
-                if shouldAccumulateMonthly
-                    float currentSumSrc = array.get(monthlyAnchorSumSrc, monthIdx)
-                    float currentSumVol = array.get(monthlyAnchorSumVol, monthIdx)
-                    array.set(monthlyAnchorSumSrc, monthIdx, currentSumSrc + (ohlc4 * volume))
-                    array.set(monthlyAnchorSumVol, monthIdx, currentSumVol + volume)
-                float newSumSrc = array.get(monthlyAnchorSumSrc, monthIdx)
-                float newSumVol = array.get(monthlyAnchorSumVol, monthIdx)
-                float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
-                array.set(monthlyAnchorVWAPs, monthIdx, vwap)
+        if na(monthStart) or monthStart > time
+            continue
+        bool atMonthStart = prevTime < monthStart
+        if atMonthStart
+            array.set(monthlyAnchorSumSrc, monthIdx, 0.0)
+            array.set(monthlyAnchorSumVol, monthIdx, 0.0)
+            if monthIdx == MAX_MONTHLY_HISTORY - 1
+                currentSessionIsMonthlyAnchor := (monthStart == array.get(primaryMgr.starts, MAX_VWAP_HISTORY - 1))
+            if showSessionLabels
+                createAnchorLabel(monthlyAnchorLabels, monthIdx, monthStart, "M", (MAX_MONTHLY_HISTORY - 1) - monthIdx, colorMonthlyAnchor, colorMonthlyAnchorEnd, monthlyAnchorCount - 1, primarySessionTZ, primarySessionName)
+        if shouldAccumulateMonthly
+            float sumSrc = array.get(monthlyAnchorSumSrc, monthIdx) + barOhlc4Vol
+            float sumVol = array.get(monthlyAnchorSumVol, monthIdx) + volume
+            array.set(monthlyAnchorSumSrc, monthIdx, sumSrc)
+            array.set(monthlyAnchorSumVol, monthIdx, sumVol)
+            array.set(monthlyAnchorVWAPs, monthIdx, sumVol > 0 ? sumSrc / sumVol : na)
 
 bool mnthBase = showMonthlyAnchorVWAP and showSessionMarkers and meetsMonthlyAnchorTimeframe
-plot(mnthBase and 0 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 0) : na, "Monthly Anchor 1", color=array.get(monthlyColors, 5), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(mnthBase and 1 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 1) : na, "Monthly Anchor 2", color=array.get(monthlyColors, 4), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(mnthBase and 2 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 2) : na, "Monthly Anchor 3", color=array.get(monthlyColors, 3), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(mnthBase and 3 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 3) : na, "Monthly Anchor 4", color=array.get(monthlyColors, 2), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(mnthBase and 4 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 4) : na, "Monthly Anchor 5", color=array.get(monthlyColors, 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(mnthBase and 5 >= (MAX_MONTHLY_HISTORY - monthlyAnchorCount) ? array.get(monthlyAnchorVWAPs, 5) : na, "Monthly Anchor 6", color=array.get(monthlyColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 0, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "Monthly Anchor 1", color=array.get(monthlyColors, 5), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 1, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "Monthly Anchor 2", color=array.get(monthlyColors, 4), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 2, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "Monthly Anchor 3", color=array.get(monthlyColors, 3), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 3, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "Monthly Anchor 4", color=array.get(monthlyColors, 2), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 4, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "Monthly Anchor 5", color=array.get(monthlyColors, 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 5, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "Monthly Anchor 6", color=array.get(monthlyColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// YEARLY ANCHOR VWAP CALCULATION
-// ═══════════════════════════════════════════════════════════════════════════════
-
-if showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe
-    string anchorTZ = getSessionTimezone(primarySessionName)
-    for yearIdx = 0 to MAX_YEARLY_HISTORY - 1
+if shouldComputeYearly and not na(barOhlc4Vol) and not skipAnchorBar
+    bool shouldAccumulateYearly = not shouldFilterRTH or isNYSession
+    int yrStartIdx = MAX_YEARLY_HISTORY - yearlyAnchorCount
+    for yearIdx = yrStartIdx to MAX_YEARLY_HISTORY - 1
         int yearStart = array.get(yearlyAnchorStartsArray, yearIdx)
-        if not na(yearStart)
-            bool atYearStart = time >= yearStart and time[1] < yearStart
-            if atYearStart
-                array.set(yearlyAnchorSumSrc, yearIdx, 0.0)
-                array.set(yearlyAnchorSumVol, yearIdx, 0.0)
-                if yearIdx == MAX_YEARLY_HISTORY - 1
-                    currentSessionIsYearlyAnchor := (yearStart == array.get(primaryMgr.starts, MAX_VWAP_HISTORY - 1))
-                bool shouldShowLabel = yearIdx >= (MAX_YEARLY_HISTORY - yearlyAnchorCount)
-                if showSessionLabels and shouldShowLabel
-                    int positionInYearlyHistory = (MAX_YEARLY_HISTORY - 1) - yearIdx
-                    createAnchorLabel(yearlyAnchorLabels, yearIdx, yearStart, "Y", positionInYearlyHistory, colorYearlyAnchor, colorYearlyAnchorEnd, yearlyAnchorCount - 1, anchorTZ, primarySessionName)
-            if time >= yearStart
-                bool shouldAccumulateYearly = not shouldFilterRTH or isNYSession
-                if shouldAccumulateYearly
-                    float currentSumSrc = array.get(yearlyAnchorSumSrc, yearIdx)
-                    float currentSumVol = array.get(yearlyAnchorSumVol, yearIdx)
-                    array.set(yearlyAnchorSumSrc, yearIdx, currentSumSrc + (ohlc4 * volume))
-                    array.set(yearlyAnchorSumVol, yearIdx, currentSumVol + volume)
-                float newSumSrc = array.get(yearlyAnchorSumSrc, yearIdx)
-                float newSumVol = array.get(yearlyAnchorSumVol, yearIdx)
-                float vwap = newSumVol > 0 ? newSumSrc / newSumVol : na
-                array.set(yearlyAnchorVWAPs, yearIdx, vwap)
+        if na(yearStart) or yearStart > time
+            continue
+        bool atYearStart = prevTime < yearStart
+        if atYearStart
+            array.set(yearlyAnchorSumSrc, yearIdx, 0.0)
+            array.set(yearlyAnchorSumVol, yearIdx, 0.0)
+            if yearIdx == MAX_YEARLY_HISTORY - 1
+                currentSessionIsYearlyAnchor := (yearStart == array.get(primaryMgr.starts, MAX_VWAP_HISTORY - 1))
+            if showSessionLabels
+                createAnchorLabel(yearlyAnchorLabels, yearIdx, yearStart, "Y", (MAX_YEARLY_HISTORY - 1) - yearIdx, colorYearlyAnchor, colorYearlyAnchorEnd, yearlyAnchorCount - 1, primarySessionTZ, primarySessionName)
+        if shouldAccumulateYearly
+            float sumSrc = array.get(yearlyAnchorSumSrc, yearIdx) + barOhlc4Vol
+            float sumVol = array.get(yearlyAnchorSumVol, yearIdx) + volume
+            array.set(yearlyAnchorSumSrc, yearIdx, sumSrc)
+            array.set(yearlyAnchorSumVol, yearIdx, sumVol)
+            array.set(yearlyAnchorVWAPs, yearIdx, sumVol > 0 ? sumSrc / sumVol : na)
 
 bool yrlyBase = showYearlyAnchorVWAP and showSessionMarkers and meetsYearlyAnchorTimeframe
-plot(yrlyBase and 0 >= (MAX_YEARLY_HISTORY - yearlyAnchorCount) ? array.get(yearlyAnchorVWAPs, 0) : na, "Yearly Anchor 1", color=array.get(yearlyColors, 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(yrlyBase and 1 >= (MAX_YEARLY_HISTORY - yearlyAnchorCount) ? array.get(yearlyAnchorVWAPs, 1) : na, "Yearly Anchor 2", color=array.get(yearlyColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-
-
-// ═══════════════════════════════════════════════════════════════════════════════
-// SESSION LEVELS RENDERING (for active session only)
-// ═══════════════════════════════════════════════════════════════════════════════
+plot(anchorVal(yrlyBase, 0, MAX_YEARLY_HISTORY, yearlyAnchorCount, yearlyAnchorVWAPs), "Yearly Anchor 1", color=array.get(yearlyColors, 1), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(yrlyBase, 1, MAX_YEARLY_HISTORY, yearlyAnchorCount, yearlyAnchorVWAPs), "Yearly Anchor 2", color=array.get(yearlyColors, 0), linewidth=sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 var box boxOpenRange = na
 var box boxInitialBalanceUpper = na
 var box boxInitialBalanceLower = na
 
-// ═══════════════════════════════════════════════════════════════════════════════
-// KEY LEVELS RENDERING
-// ═══════════════════════════════════════════════════════════════════════════════
-
-// Cache bar_index to prevent redundant updates on same bar (improves scrolling performance)
+// KEY LEVELS RENDERING - only on last bar
 var int lastRenderBarIndex = na
 
 if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarIndex)
@@ -1466,57 +1156,22 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
 
     // Pivot points second (after session, before key levels)
     if showPivotsCondition
-        if showPivotP
-            addToMap(priceLabels, pivotP, "P")
-        if showPivotR1
-            addToMap(priceLabels, pivotR1, "R1")
-        if showPivotR2
-            addToMap(priceLabels, pivotR2, "R2")
-        if showPivotR3
-            addToMap(priceLabels, pivotR3, "R3")
-        if showPivotS1
-            addToMap(priceLabels, pivotS1, "S1")
-        if showPivotS2
-            addToMap(priceLabels, pivotS2, "S2")
-        if showPivotS3
-            addToMap(priceLabels, pivotS3, "S3")
+        addIf(priceLabels, showPivotP, pivotP, "P"), addIf(priceLabels, showPivotR1, pivotR1, "R1")
+        addIf(priceLabels, showPivotR2, pivotR2, "R2"), addIf(priceLabels, showPivotR3, pivotR3, "R3")
+        addIf(priceLabels, showPivotS1, pivotS1, "S1"), addIf(priceLabels, showPivotS2, pivotS2, "S2")
+        addIf(priceLabels, showPivotS3, pivotS3, "S3")
 
     // Key levels (lower priority)
     if showKeyLevelsCondition
-        if showATH
-            addToMap(priceLabels, ath, "ATH")
-        if showPYH
-            addToMap(priceLabels, pyh, "PYH")
-        if showPYL
-            addToMap(priceLabels, pyl, "PYL")
-        if showPMH
-            addToMap(priceLabels, pmh, "PMH")
-        if showPML
-            addToMap(priceLabels, pml, "PML")
-        if showPWH
-            addToMap(priceLabels, pwh, "PWH")
-        if showPWL
-            addToMap(priceLabels, pwl, "PWL")
-        if showPDH
-            addToMap(priceLabels, pdh, "PDH")
-        if showPDL
-            addToMap(priceLabels, pdl, "PDL")
-        if showCYH
-            addToMap(priceLabels, cyh, "CYH")
-        if showCYL
-            addToMap(priceLabels, cyl, "CYL")
-        if showCMH
-            addToMap(priceLabels, cmh, "CMH")
-        if showCML
-            addToMap(priceLabels, cml, "CML")
-        if showCWH
-            addToMap(priceLabels, cwh, "CWH")
-        if showCWL
-            addToMap(priceLabels, cwl, "CWL")
-        if showCDH
-            addToMap(priceLabels, cdh, "CDH")
-        if showCDL
-            addToMap(priceLabels, cdl, "CDL")
+        addIf(priceLabels, showATH, ath, "ATH")
+        addIf(priceLabels, showPYH, pyh, "PYH"), addIf(priceLabels, showPYL, pyl, "PYL")
+        addIf(priceLabels, showPMH, pmh, "PMH"), addIf(priceLabels, showPML, pml, "PML")
+        addIf(priceLabels, showPWH, pwh, "PWH"), addIf(priceLabels, showPWL, pwl, "PWL")
+        addIf(priceLabels, showPDH, pdh, "PDH"), addIf(priceLabels, showPDL, pdl, "PDL")
+        addIf(priceLabels, showCYH, cyh, "CYH"), addIf(priceLabels, showCYL, cyl, "CYL")
+        addIf(priceLabels, showCMH, cmh, "CMH"), addIf(priceLabels, showCML, cml, "CML")
+        addIf(priceLabels, showCWH, cwh, "CWH"), addIf(priceLabels, showCWL, cwl, "CWL")
+        addIf(priceLabels, showCDH, cdh, "CDH"), addIf(priceLabels, showCDL, cdl, "CDL")
 
     var array<int> renderedPrices = array.new<int>()
     array.clear(renderedPrices)
@@ -1588,16 +1243,9 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
         array.get(keyLevels, 15).update(showCDH, cdh, cdhTicks, startBar)
         array.get(keyLevels, 16).update(showCDL, cdl, cdlTicks, startBar)
 
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // SESSION LEVELS RENDERING (FIRST - highest priority for line style)
-    // ═══════════════════════════════════════════════════════════════════════════════
-
+    // SESSION LEVELS RENDERING
     string sessionLineStyleActual = getLineStyle(sessionLevelsLineStyle)
-    // Only show session levels if enabled and we meet the session levels timeframe filter
-    bool showSessionLevels = showSessionLevelsInput == "Always" or (showSessionLevelsInput == "Futures Only" and syminfo.type == "futures")
-    bool shouldShowSessionLevels = showSessionLevels and sessionBaseCondition and meetsSessionLevelsMaxTimeframe and not na(activeSessionIndex) and not na(sessionOpen)
-
-    // Render session levels using array-based approach (always ignore ATR filter for session levels)
+    bool shouldShowSessionLevels = sessionLevelsVisible and not na(activeSessionIndex) and not na(sessionOpen)
     for level in sessionLevels
         level.render(shouldShowSessionLevels, true, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter, true)
 
@@ -1633,18 +1281,10 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
         if not na(boxInitialBalanceLower)
             box.delete(boxInitialBalanceLower), boxInitialBalanceLower := na
 
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // PIVOT POINTS RENDERING (SECOND - after session levels, before key levels)
-    // ═══════════════════════════════════════════════════════════════════════════════
-
-    // Render pivot levels using array-based approach
+    // PIVOT POINTS RENDERING
     for level in pivotLevels
         level.render(showPivotsCondition, true, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter)
 
-    // ═══════════════════════════════════════════════════════════════════════════════
-    // KEY LEVELS RENDERING (THIRD - after session levels and pivots)
-    // ═══════════════════════════════════════════════════════════════════════════════
-
-    // Render key levels using array-based approach
+    // KEY LEVELS RENDERING
     for level in keyLevels
         level.render(showKeyLevelsCondition, true, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter)
