@@ -772,12 +772,13 @@ int ibMinutes = periodToMinutes(initialBalanceLength)
 
 // UNIFIED SESSION DETECTION (Calendar-based)
 // Skip entirely if neither session VWAPs nor session levels are visible
-// Optimized: only check most recent session slot per manager, break on first match
+// Find the most recently started active session (handles overlapping sessions like London/NY)
 if needSessionDetection and not na(time)
-    bool foundSession = false
+    int mostRecentStartTime = na
+    int mostRecentSessionIdx = na
+    int mostRecentSessionEnd = na
+    int mostRecentHolidayRank = na
     for i = 0 to 4
-        if foundSession
-            break
         SessionManager mgr = array.get(sessionManagers, i)
         if not mgr.enabled
             continue
@@ -786,24 +787,28 @@ if needSessionDetection and not na(time)
         if na(sessionStart) or na(sessionEnd) or time < sessionStart or time >= sessionEnd
             continue
         int holidayRank = array.get(mgr.holidayRanks, MAX_VWAP_HISTORY - 1)
-        if holidayRank > 0
-            bool sessionJustStarted = time[1] < sessionStart
-            if sessionJustStarted
-                activeSessionIndex := i
-                sessionOpen := open
-                openRangeHigh := high
-                openRangeLow := low
-                initialBalanceHigh := high
-                initialBalanceLow := low
-                sessionStartBar := bar_index
-                sessionStartTime := sessionStart
-                sessionEndTime := sessionEnd
-                openPriceBar := bar_index
-                orhBar := bar_index
-                orlBar := bar_index
-                ibhBar := bar_index
-                iblBar := bar_index
-            foundSession := true
+        if holidayRank > 0 and (na(mostRecentStartTime) or sessionStart > mostRecentStartTime)
+            mostRecentStartTime := sessionStart
+            mostRecentSessionIdx := i
+            mostRecentSessionEnd := sessionEnd
+            mostRecentHolidayRank := holidayRank
+    if not na(mostRecentSessionIdx)
+        bool sessionJustStarted = time[1] < mostRecentStartTime
+        if sessionJustStarted
+            activeSessionIndex := mostRecentSessionIdx
+            sessionOpen := open
+            openRangeHigh := high
+            openRangeLow := low
+            initialBalanceHigh := high
+            initialBalanceLow := low
+            sessionStartBar := bar_index
+            sessionStartTime := mostRecentStartTime
+            sessionEndTime := mostRecentSessionEnd
+            openPriceBar := bar_index
+            orhBar := bar_index
+            orlBar := bar_index
+            ibhBar := bar_index
+            iblBar := bar_index
 
 if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTime)
     SessionManager activeMgr = array.get(sessionManagers, activeSessionIndex)
@@ -830,7 +835,6 @@ if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTim
             if low < initialBalanceLow
                 initialBalanceLow := low
                 iblBar := bar_index
-
 // MULTI-SESSION VWAP CALCULATIONS
 // Optimized: skip bars before oldest tracked session, cache per-bar values
 // Cache showLabelsOnStart - doesn't change per bar
