@@ -27,22 +27,11 @@ indicator("Key Levels", overlay=true, max_lines_count=500, max_boxes_count=100)
 // INPUTS — PREMIUM PANEL (GROUPING/ORDER ONLY; RUNTIME LOGIC UNCHANGED)
 //══════════════════════════════════════════════════════════════════════════════════
 
-// ────────────────────────────────────────────────────────────────────────────────
-// 🏷️ Horizontal Levels
-// ────────────────────────────────────────────────────────────────────────────────
-globalShowPriceValues = input.bool(false, "Show Prices in Level Labels", group="🏷️ Horizontal Levels", tooltip="Include price values in labels")
-
-useATRFilter = input.bool(true, "Hide Distant Levels", group="🏷️ Horizontal Levels", tooltip="Show levels within ATR range only")
-atrMultiplier = input.float(1.5, "Distance (ATR)", minval=1.0, maxval=10.0, step=0.5, group="🏷️ Horizontal Levels", tooltip="Max ATR distance from price")
-atrPeriod = input.int(20, "ATR Period (Days)", minval=1, maxval=500, group="🏷️ Horizontal Levels", tooltip="Daily ATR lookback period")
-
-globalLabelSize = input.string("Normal", "Level Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="🏷️ Horizontal Levels", tooltip="Label size for all level lines")
-globalLineLengthBars = input.int(50, "Line Length (Bars)", minval=10, maxval=200, group="🏷️ Horizontal Levels", tooltip="Bars back for Fixed mode (max 200)")
-
 showSessionMarkers = input.bool(true, "Enable Session Features", group="🕒 Sessions • General", tooltip="Master switch for all session features")
 
 showSessionLabels = input.bool(true, "Enable Anchor Labels", group="🕒 Sessions • General", tooltip="Show VWAP anchor labels")
 compactLabels = input.bool(true, "Compact Anchor Labels", group="🕒 Sessions • General", tooltip="Abbreviated labels (D1/W1 vs full)")
+anchorLabelSize = input.string("Normal", "Anchor Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="🕒 Sessions • General", tooltip="Label size for session anchor labels")
 longTermAnchorSession = input.string("Auto", "Primary Anchor Session", options=["Auto", "Globex", "Sydney", "Tokyo", "London", "New York"], group="🕒 Sessions • General", tooltip="Session for weekly/monthly/yearly anchors")
 rthOnlyForStocks = input.bool(true, "RTH Only for NY Sessions (Stocks)", group="🕒 Sessions • General", tooltip="Stocks: filter NY to RTH 9:30-4:00 ET")
 rthOnlyForIndices = input.bool(false, "RTH Only for NY Sessions (Indices)", group="🕒 Sessions • General", tooltip="Index futures: filter NY to RTH 9:30-4:00 ET")
@@ -157,113 +146,125 @@ yearlyAnchorCount = input.int(2, "History", minval=1, maxval=2, group="🗓️ S
 
 
 // ────────────────────────────────────────────────────────────────────────────────
-// 📏 Sessions • Levels • Visibility
+// 📐 Levels • Global Settings
 // ────────────────────────────────────────────────────────────────────────────────
-showSessionLevelsInput = input.string("Futures Only", "Enable Session Levels", options=["Always", "Futures Only", "Off"], group="📏 Sessions • Levels • Visibility", tooltip="Open/ORB/IB levels visibility")
-sessionLevelsMaxTimeframe = input.string("5m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📏 Sessions • Levels • Visibility", tooltip="Hide above this TF")
-sessionLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📏 Sessions • Levels • Visibility")
-sessionLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📏 Sessions • Levels • Visibility", tooltip="Line width for session levels")
-sessionLineStartMode = input.string("Level Established", "Line Start", options=["Session Open", "Level Established", "Fixed Bars Back"], group="📏 Sessions • Levels • Visibility", tooltip="Line start point mode")
+globalShowPriceValues = input.bool(false, "Show Prices in Level Labels", group="📐 Levels • Global Settings", tooltip="Include price values in labels")
 
-// ────────────────────────────────────────────────────────────────────────────────
-// 📏 Sessions • Levels • Opening Price
-// ────────────────────────────────────────────────────────────────────────────────
-showOpenPrice = input.bool(true, "Enable Opening Price", group="📏 Sessions • Levels • Opening Price")
-colorOpenPrice = input.color(#fbbe30, "Color", group="📏 Sessions • Levels • Opening Price", tooltip="First bar open price")
+useATRFilter = input.bool(true, "Hide Distant Levels", group="📐 Levels • Global Settings", tooltip="Show levels within ATR range only")
+atrMultiplier = input.float(1.5, "Distance (ATR)", minval=1.0, maxval=10.0, step=0.5, group="📐 Levels • Global Settings", tooltip="Max ATR distance from price")
+atrPeriod = input.int(20, "ATR Period (Days)", minval=1, maxval=500, group="📐 Levels • Global Settings", tooltip="Daily ATR lookback period")
+
+globalLabelSize = input.string("Normal", "Level Label Size", options=["Tiny", "Small", "Normal", "Large", "Huge"], group="📐 Levels • Global Settings", tooltip="Label size for all level lines")
+globalLineLengthBars = input.int(50, "Line Length (Bars)", minval=10, maxval=200, group="📐 Levels • Global Settings", tooltip="Bars back for Fixed mode (max 200)")
 
 // ────────────────────────────────────────────────────────────────────────────────
-// 📏 Sessions • Levels • Opening Range (ORB)
+// 📐 Levels • Session • Visibility
 // ────────────────────────────────────────────────────────────────────────────────
-showOpenRange = input.bool(true, "Enable Opening Range (ORB)", group="📏 Sessions • Levels • Opening Range (ORB)", tooltip="First 15-30min high/low")
-openRangeLength = input.string("15m", "Length", options=["15m", "30m"], group="📏 Sessions • Levels • Opening Range (ORB)")
-colorORH = input.color(#4682b4, "High", inline="SL_ORC", group="📏 Sessions • Levels • Opening Range (ORB)")
-colorORL = input.color(#cd5c5c, "Low", inline="SL_ORC", group="📏 Sessions • Levels • Opening Range (ORB)")
-shadeOpenRange = input.bool(true, "Shade", inline="SL_ORC", group="📏 Sessions • Levels • Opening Range (ORB)")
-colorOpenRangeShade = input.color(color.new(color.black, 98), "", inline="SL_ORC", group="📏 Sessions • Levels • Opening Range (ORB)")
+showSessionLevelsInput = input.string("Futures Only", "Enable Session Levels", options=["Always", "Futures Only", "Off"], group="📐 Levels • Session • Visibility", tooltip="Open/ORB/IB levels visibility")
+sessionLevelsMaxTimeframe = input.string("5m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📐 Levels • Session • Visibility", tooltip="Hide above this TF")
+sessionLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📐 Levels • Session • Visibility")
+sessionLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📐 Levels • Session • Visibility", tooltip="Line width for session levels")
+sessionLineStartMode = input.string("Level Established", "Line Start", options=["Session Open", "Level Established", "Fixed Bars Back"], group="📐 Levels • Session • Visibility", tooltip="Line start point mode")
 
 // ────────────────────────────────────────────────────────────────────────────────
-// 📏 Sessions • Levels • Initial Balance (IB)
+// 📐 Levels • Session • Opening Price
 // ────────────────────────────────────────────────────────────────────────────────
-showInitialBalance = input.bool(false, "Enable Initial Balance (IB)", group="📏 Sessions • Levels • Initial Balance (IB)", tooltip="First 30-60min high/low")
-initialBalanceLength = input.string("1h", "Length", options=["30m", "1h"], group="📏 Sessions • Levels • Initial Balance (IB)")
-colorIBH = input.color(#81ce6f, "High", inline="SL_IBC", group="📏 Sessions • Levels • Initial Balance (IB)")
-colorIBL = input.color(#e43b38, "Low", inline="SL_IBC", group="📏 Sessions • Levels • Initial Balance (IB)")
-shadeInitialBalance = input.bool(true, "Shade", inline="SL_IBC", group="📏 Sessions • Levels • Initial Balance (IB)")
-colorInitialBalanceShade = input.color(color.new(color.green, 95), "", inline="SL_IBC", group="📏 Sessions • Levels • Initial Balance (IB)")
+showOpenPrice = input.bool(true, "Enable Opening Price", group="📐 Levels • Session • Opening Price")
+colorOpenPrice = input.color(#fbbe30, "Color", group="📐 Levels • Session • Opening Price", tooltip="First bar open price")
+
+// ────────────────────────────────────────────────────────────────────────────────
+// 📐 Levels • Session • Opening Range (ORB)
+// ────────────────────────────────────────────────────────────────────────────────
+showOpenRange = input.bool(true, "Enable Opening Range (ORB)", group="📐 Levels • Session • Opening Range (ORB)", tooltip="First 15-30min high/low")
+openRangeLength = input.string("15m", "Length", options=["15m", "30m"], group="📐 Levels • Session • Opening Range (ORB)")
+colorORH = input.color(#4682b4, "High", inline="SL_ORC", group="📐 Levels • Session • Opening Range (ORB)")
+colorORL = input.color(#cd5c5c, "Low", inline="SL_ORC", group="📐 Levels • Session • Opening Range (ORB)")
+shadeOpenRange = input.bool(true, "Shade", inline="SL_ORC", group="📐 Levels • Session • Opening Range (ORB)")
+colorOpenRangeShade = input.color(color.new(color.black, 98), "", inline="SL_ORC", group="📐 Levels • Session • Opening Range (ORB)")
+
+// ────────────────────────────────────────────────────────────────────────────────
+// 📐 Levels • Session • Initial Balance (IB)
+// ────────────────────────────────────────────────────────────────────────────────
+showInitialBalance = input.bool(false, "Enable Initial Balance (IB)", group="📐 Levels • Session • Initial Balance (IB)", tooltip="First 30-60min high/low")
+initialBalanceLength = input.string("1h", "Length", options=["30m", "1h"], group="📐 Levels • Session • Initial Balance (IB)")
+colorIBH = input.color(#81ce6f, "High", inline="SL_IBC", group="📐 Levels • Session • Initial Balance (IB)")
+colorIBL = input.color(#e43b38, "Low", inline="SL_IBC", group="📐 Levels • Session • Initial Balance (IB)")
+shadeInitialBalance = input.bool(true, "Shade", inline="SL_IBC", group="📐 Levels • Session • Initial Balance (IB)")
+colorInitialBalanceShade = input.color(color.new(color.green, 95), "", inline="SL_IBC", group="📐 Levels • Session • Initial Balance (IB)")
 
 
 
-showPivots = input.bool(true, "Enable Pivot Points", group="🔁 Pivot Points", tooltip="Traditional pivots from prev day HLC")
-pivotMaxTimeframe = input.string("4h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="🔁 Pivot Points", tooltip="Hide above this TF")
-pivotLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="🔁 Pivot Points")
-pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="🔁 Pivot Points")
+showPivots = input.bool(true, "Enable Pivot Points", group="📐 Levels • Pivot Points", tooltip="Traditional pivots from prev day HLC")
+pivotMaxTimeframe = input.string("4h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📐 Levels • Pivot Points", tooltip="Hide above this TF")
+pivotLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📐 Levels • Pivot Points")
+pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📐 Levels • Pivot Points")
 
-showPivotR3 = input.bool(true, "R3", inline="PV_R3", group="🔁 Pivot Points")
-pivotColorR3 = input.color(#449955, "", inline="PV_R3", group="🔁 Pivot Points")
-showPivotR2 = input.bool(true, "R2", inline="PV_R2", group="🔁 Pivot Points")
-pivotColorR2 = input.color(#449955, "", inline="PV_R2", group="🔁 Pivot Points")
-showPivotR1 = input.bool(false, "R1", inline="PV_R1", group="🔁 Pivot Points")
-pivotColorR1 = input.color(#449955, "", inline="PV_R1", group="🔁 Pivot Points")
+showPivotR3 = input.bool(true, "R3", inline="PV_R3", group="📐 Levels • Pivot Points")
+pivotColorR3 = input.color(#449955, "", inline="PV_R3", group="📐 Levels • Pivot Points")
+showPivotR2 = input.bool(true, "R2", inline="PV_R2", group="📐 Levels • Pivot Points")
+pivotColorR2 = input.color(#449955, "", inline="PV_R2", group="📐 Levels • Pivot Points")
+showPivotR1 = input.bool(false, "R1", inline="PV_R1", group="📐 Levels • Pivot Points")
+pivotColorR1 = input.color(#449955, "", inline="PV_R1", group="📐 Levels • Pivot Points")
 
-showPivotP = input.bool(false, "Pivot (P)", inline="PV_P", group="🔁 Pivot Points")
-pivotColorP = input.color(#808080, "", inline="PV_P", group="🔁 Pivot Points")
+showPivotP = input.bool(false, "Pivot (P)", inline="PV_P", group="📐 Levels • Pivot Points")
+pivotColorP = input.color(#808080, "", inline="PV_P", group="📐 Levels • Pivot Points")
 
-showPivotS1 = input.bool(false, "S1", inline="PV_S1", group="🔁 Pivot Points")
-pivotColorS1 = input.color(#b51b00, "", inline="PV_S1", group="🔁 Pivot Points")
-showPivotS2 = input.bool(true, "S2", inline="PV_S2", group="🔁 Pivot Points")
-pivotColorS2 = input.color(#b51b00, "", inline="PV_S2", group="🔁 Pivot Points")
-showPivotS3 = input.bool(true, "S3", inline="PV_S3", group="🔁 Pivot Points")
-pivotColorS3 = input.color(#b51b00, "", inline="PV_S3", group="🔁 Pivot Points")
+showPivotS1 = input.bool(false, "S1", inline="PV_S1", group="📐 Levels • Pivot Points")
+pivotColorS1 = input.color(#b51b00, "", inline="PV_S1", group="📐 Levels • Pivot Points")
+showPivotS2 = input.bool(true, "S2", inline="PV_S2", group="📐 Levels • Pivot Points")
+pivotColorS2 = input.color(#b51b00, "", inline="PV_S2", group="📐 Levels • Pivot Points")
+showPivotS3 = input.bool(true, "S3", inline="PV_S3", group="📐 Levels • Pivot Points")
+pivotColorS3 = input.color(#b51b00, "", inline="PV_S3", group="📐 Levels • Pivot Points")
 
 
 
-showKeyLevels = input.bool(true, "Enable Key Levels", group="📈 Key Levels", tooltip="ATH/Year/Month/Week/Day high/low")
-keyLevelsMaxTimeframe = input.string("15m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📈 Key Levels", tooltip="Hide above this TF")
-keyLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📈 Key Levels")
-keyLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📈 Key Levels")
+showKeyLevels = input.bool(true, "Enable Key Levels", group="📐 Levels • Key Levels", tooltip="ATH/Year/Month/Week/Day high/low")
+keyLevelsMaxTimeframe = input.string("15m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📐 Levels • Key Levels", tooltip="Hide above this TF")
+keyLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📐 Levels • Key Levels")
+keyLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📐 Levels • Key Levels")
 
-showATH = input.bool(true, "All-Time High", inline="KL_ATH", group="📈 Key Levels • All-Time High")
-colorATH = input.color(#00fcff, "Color", inline="KL_ATH", group="📈 Key Levels • All-Time High")
+showATH = input.bool(true, "All-Time High", inline="KL_ATH", group="📐 Levels • Key Levels • All-Time High")
+colorATH = input.color(#00fcff, "Color", inline="KL_ATH", group="📐 Levels • Key Levels • All-Time High")
 
-showCYH = input.bool(true, "Current", inline="KL_CY", group="📈 Key Levels • Year")
-colorCYH = input.color(#449955, "High", inline="KL_CY", group="📈 Key Levels • Year")
-showCYL = input.bool(true, "", inline="KL_CY", group="📈 Key Levels • Year")
-colorCYL = input.color(#b51b00, "Low", inline="KL_CY", group="📈 Key Levels • Year")
+showCYH = input.bool(true, "Current", inline="KL_CY", group="📐 Levels • Key Levels • Year")
+colorCYH = input.color(#449955, "High", inline="KL_CY", group="📐 Levels • Key Levels • Year")
+showCYL = input.bool(true, "", inline="KL_CY", group="📐 Levels • Key Levels • Year")
+colorCYL = input.color(#b51b00, "Low", inline="KL_CY", group="📐 Levels • Key Levels • Year")
 
-showPYH = input.bool(true, "Previous", inline="KL_PY", group="📈 Key Levels • Year")
-colorPYH = input.color(#449955, "High", inline="KL_PY", group="📈 Key Levels • Year")
-showPYL = input.bool(true, "", inline="KL_PY", group="📈 Key Levels • Year")
-colorPYL = input.color(#b51b00, "Low", inline="KL_PY", group="📈 Key Levels • Year")
+showPYH = input.bool(true, "Previous", inline="KL_PY", group="📐 Levels • Key Levels • Year")
+colorPYH = input.color(#449955, "High", inline="KL_PY", group="📐 Levels • Key Levels • Year")
+showPYL = input.bool(true, "", inline="KL_PY", group="📐 Levels • Key Levels • Year")
+colorPYL = input.color(#b51b00, "Low", inline="KL_PY", group="📐 Levels • Key Levels • Year")
 
-showCMH = input.bool(true, "Current", inline="KL_CM", group="📈 Key Levels • Month")
-colorCMH = input.color(#449955, "High", inline="KL_CM", group="📈 Key Levels • Month")
-showCML = input.bool(true, "", inline="KL_CM", group="📈 Key Levels • Month")
-colorCML = input.color(#b51b00, "Low", inline="KL_CM", group="📈 Key Levels • Month")
+showCMH = input.bool(true, "Current", inline="KL_CM", group="📐 Levels • Key Levels • Month")
+colorCMH = input.color(#449955, "High", inline="KL_CM", group="📐 Levels • Key Levels • Month")
+showCML = input.bool(true, "", inline="KL_CM", group="📐 Levels • Key Levels • Month")
+colorCML = input.color(#b51b00, "Low", inline="KL_CM", group="📐 Levels • Key Levels • Month")
 
-showPMH = input.bool(true, "Previous", inline="KL_PM", group="📈 Key Levels • Month")
-colorPMH = input.color(#449955, "High", inline="KL_PM", group="📈 Key Levels • Month")
-showPML = input.bool(true, "", inline="KL_PM", group="📈 Key Levels • Month")
-colorPML = input.color(#b51b00, "Low", inline="KL_PM", group="📈 Key Levels • Month")
+showPMH = input.bool(true, "Previous", inline="KL_PM", group="📐 Levels • Key Levels • Month")
+colorPMH = input.color(#449955, "High", inline="KL_PM", group="📐 Levels • Key Levels • Month")
+showPML = input.bool(true, "", inline="KL_PM", group="📐 Levels • Key Levels • Month")
+colorPML = input.color(#b51b00, "Low", inline="KL_PM", group="📐 Levels • Key Levels • Month")
 
-showCWH = input.bool(true, "Current", inline="KL_CW", group="📈 Key Levels • Week")
-colorCWH = input.color(#449955, "High", inline="KL_CW", group="📈 Key Levels • Week")
-showCWL = input.bool(true, "", inline="KL_CW", group="📈 Key Levels • Week")
-colorCWL = input.color(#b51b00, "Low", inline="KL_CW", group="📈 Key Levels • Week")
+showCWH = input.bool(true, "Current", inline="KL_CW", group="📐 Levels • Key Levels • Week")
+colorCWH = input.color(#449955, "High", inline="KL_CW", group="📐 Levels • Key Levels • Week")
+showCWL = input.bool(true, "", inline="KL_CW", group="📐 Levels • Key Levels • Week")
+colorCWL = input.color(#b51b00, "Low", inline="KL_CW", group="📐 Levels • Key Levels • Week")
 
-showPWH = input.bool(true, "Previous", inline="KL_PW", group="📈 Key Levels • Week")
-colorPWH = input.color(#449955, "High", inline="KL_PW", group="📈 Key Levels • Week")
-showPWL = input.bool(true, "", inline="KL_PW", group="📈 Key Levels • Week")
-colorPWL = input.color(#b51b00, "Low", inline="KL_PW", group="📈 Key Levels • Week")
+showPWH = input.bool(true, "Previous", inline="KL_PW", group="📐 Levels • Key Levels • Week")
+colorPWH = input.color(#449955, "High", inline="KL_PW", group="📐 Levels • Key Levels • Week")
+showPWL = input.bool(true, "", inline="KL_PW", group="📐 Levels • Key Levels • Week")
+colorPWL = input.color(#b51b00, "Low", inline="KL_PW", group="📐 Levels • Key Levels • Week")
 
-showCDH = input.bool(true, "Current", inline="KL_CD", group="📈 Key Levels • Day")
-colorCDH = input.color(#449955, "High", inline="KL_CD", group="📈 Key Levels • Day")
-showCDL = input.bool(true, "", inline="KL_CD", group="📈 Key Levels • Day")
-colorCDL = input.color(#b51b00, "Low", inline="KL_CD", group="📈 Key Levels • Day")
+showCDH = input.bool(true, "Current", inline="KL_CD", group="📐 Levels • Key Levels • Day")
+colorCDH = input.color(#449955, "High", inline="KL_CD", group="📐 Levels • Key Levels • Day")
+showCDL = input.bool(true, "", inline="KL_CD", group="📐 Levels • Key Levels • Day")
+colorCDL = input.color(#b51b00, "Low", inline="KL_CD", group="📐 Levels • Key Levels • Day")
 
-showPDH = input.bool(true, "Previous", inline="KL_PD", group="📈 Key Levels • Day")
-colorPDH = input.color(#449955, "High", inline="KL_PD", group="📈 Key Levels • Day")
-showPDL = input.bool(true, "", inline="KL_PD", group="📈 Key Levels • Day")
-colorPDL = input.color(#b51b00, "Low", inline="KL_PD", group="📈 Key Levels • Day")
+showPDH = input.bool(true, "Previous", inline="KL_PD", group="📐 Levels • Key Levels • Day")
+colorPDH = input.color(#449955, "High", inline="KL_PD", group="📐 Levels • Key Levels • Day")
+showPDL = input.bool(true, "", inline="KL_PD", group="📐 Levels • Key Levels • Day")
+colorPDL = input.color(#b51b00, "Low", inline="KL_PD", group="📐 Levels • Key Levels • Day")
 
 
 
@@ -391,8 +392,8 @@ addLevel(array<LevelRenderer> arr, string name, bool show, float price, int pric
     array.push(arr, LevelRenderer.new(name, show, price, priceTicks, startBar, col, width, style, na, na))
 
 // Render method for a single level with deduplication support
-method render(LevelRenderer this, bool groupCondition, bool checkDuplicate, map<int, string> priceLabels, array<int> renderedPrices, bool globalShowPriceValues, string labelSizeActual, float atrThreshold, bool useATRFilter) =>
-    if groupCondition and this.enabled and not na(this.price) and isWithinATR(this.price, close, atrThreshold, useATRFilter) and (not checkDuplicate or not array.includes(renderedPrices, this.priceTicks))
+method render(LevelRenderer this, bool groupCondition, bool checkDuplicate, map<int, string> priceLabels, array<int> renderedPrices, bool globalShowPriceValues, string labelSizeActual, float atrThreshold, bool useATRFilter, bool ignoreATRFilter = false) =>
+    if groupCondition and this.enabled and not na(this.price) and (ignoreATRFilter or isWithinATR(this.price, close, atrThreshold, useATRFilter)) and (not checkDuplicate or not array.includes(renderedPrices, this.priceTicks))
         string combinedLabel = map.contains(priceLabels, this.priceTicks) ? map.get(priceLabels, this.priceTicks) : this.name
         string labelText = globalShowPriceValues ? combinedLabel + " (" + str.tostring(this.price, format.mintick) + ")" : combinedLabel
         if na(this.lineRef)
@@ -719,7 +720,7 @@ createAnchorLabel(array<label> labelArray, int idx, int anchorStart, string peri
             labelText := compactLabels ? "M" + str.tostring(positionInHistory + 1) : str.format("{0,date,MMM yyyy}", anchorStart) + " (" + sessionName + ")"
         else if period == "Y"
             labelText := compactLabels ? "Y" + str.tostring(positionInHistory + 1) : str.tostring(year(anchorStart, anchorTZ)) + " (" + sessionName + ")"
-        label newLabel = label.new(bar_index, high, labelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+        label newLabel = label.new(bar_index, high, labelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down)
         array.set(labelArray, idx, newLabel)
 
 // Convert period string to minutes
@@ -1134,7 +1135,7 @@ for i = 0 to 4
                     bool isPrimarySession = mgr.name == primarySessionName
                     int labelTimestamp = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
                     string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(mgr.name) + str.tostring(positionInHistory + 1)) : mgr.name + " " + str.format_time(labelTimestamp, "d MMM", getSessionTimezone(mgr.name))
-                    label newLabel = label.new(bar_index, high, sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                    label newLabel = label.new(bar_index, high, sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down)
                     array.set(mgr.labels, arrayIdx, newLabel)
                     if arrayIdx == MAX_VWAP_HISTORY - 1
                         array.set(sessionLabels, i, newLabel)
@@ -1157,6 +1158,11 @@ if barstate.isconfirmed and not barstate.isfirst
                 mgr.starts := currentStarts
                 mgr.ends := currentEnds
                 shiftSessionArrays(mgr.starts, currentStarts, mgr.startBars, mgr.sumSrc, mgr.sumVol, mgr.vwaps)
+
+                // Recalculate colors after shift to keep alignment
+                for pos = 0 to MAX_VWAP_HISTORY - 1
+                    color preCalc = getVWAPColor(mgr.col, mgr.colEnd, pos, mgr.historyCount - 1)
+                    array.set(mgr.preCalcColors, pos, preCalc)
 
                 for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
                     int sessionStart = array.get(mgr.starts, arrayIdx)
@@ -1190,7 +1196,7 @@ if barstate.isconfirmed and not barstate.isfirst
                         bool isPrimarySession = mgr.name == primarySessionName
                         int labelTimestamp = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
                         string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(mgr.name) + str.tostring(positionInHistory + 1)) : mgr.name + " " + str.format_time(labelTimestamp, "d MMM", getSessionTimezone(mgr.name))
-                        label newLabel = label.new(mgrSessionStartBar, high[bar_index - mgrSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(globalLabelSize), style=label.style_label_down)
+                        label newLabel = label.new(mgrSessionStartBar, high[bar_index - mgrSessionStartBar], sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down)
                         array.set(mgr.labels, arrayIdx, newLabel)
 
                 mgr.prevMostRecentStart := array.get(currentStarts, MAX_VWAP_HISTORY - 1)
@@ -1577,9 +1583,9 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
     bool showSessionLevels = showSessionLevelsInput == "Always" or (showSessionLevelsInput == "Futures Only" and syminfo.type == "futures")
     bool shouldShowSessionLevels = showSessionLevels and sessionBaseCondition and meetsSessionLevelsMaxTimeframe and not na(activeSessionIndex) and not na(sessionOpen)
 
-    // Render session levels using array-based approach
+    // Render session levels using array-based approach (always ignore ATR filter for session levels)
     for level in sessionLevels
-        level.render(shouldShowSessionLevels, true, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter)
+        level.render(shouldShowSessionLevels, true, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter, true)
 
     // Open Range Background Shading
     if shouldShowSessionLevels and showOpenRange and shadeOpenRange and not na(openRangeHigh) and not na(openRangeLow)
