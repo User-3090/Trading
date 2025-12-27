@@ -21,7 +21,15 @@
 // SOFTWARE.
 
 //@version=6
-indicator("Key Levels", overlay=true, max_lines_count=500, max_boxes_count=100)
+indicator("Key Levels", overlay=true, max_lines_count=500, max_boxes_count=100, max_labels_count=200)
+
+//══════════════════════════════════════════════════════════════════════════════════
+// TIME CONSTANTS
+//══════════════════════════════════════════════════════════════════════════════════
+
+const int MS_PER_MINUTE = 60000
+const int MS_PER_HOUR = 3600000
+const int MS_PER_DAY = 86400000
 
 //══════════════════════════════════════════════════════════════════════════════════
 // INPUTS — PREMIUM PANEL (GROUPING/ORDER ONLY; RUNTIME LOGIC UNCHANGED)
@@ -515,7 +523,7 @@ getSessionEndForDate(string session, int y, int m, int d) =>
     if session == "Globex"
         // Add 24 hours in milliseconds to base timestamp instead of incrementing day
         int baseTimestamp = timestamp(tz, y, m, d, sessionHour, sessionMinute)
-        baseTimestamp + 86400000  // Add 1 day in milliseconds
+        baseTimestamp + MS_PER_DAY
     else
         timestamp(tz, y, m, d, sessionHour, sessionMinute)
 
@@ -538,7 +546,7 @@ getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
 
     // Adjust weekend to Friday; Globex trades Sunday so don't adjust Sunday for Globex
     if currentDayOfWeek == dayofweek.saturday
-        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+        int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - MS_PER_DAY
         currentY := year(fridayMidnight, tz)
         currentM := month(fridayMidnight, tz)
         currentD := dayofmonth(fridayMidnight, tz)
@@ -552,7 +560,7 @@ getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
     // So we need to check yesterday's session start time
     int todaySessionStart = na
     if session == "Globex" and currentDayOfWeek >= dayofweek.monday and currentDayOfWeek <= dayofweek.friday
-        int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+        int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - MS_PER_DAY
         int prevY = year(yesterdayMidnight, tz)
         int prevM = month(yesterdayMidnight, tz)
         int prevD = dayofmonth(yesterdayMidnight, tz)
@@ -570,7 +578,7 @@ getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
     int lastTimestamp = na
 
     while sessionsCollected < sessionsBack and daysBackOffset < 730
-        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBackOffset * 86400000)
+        int targetMidnight = timestamp(tz, mostRecentY, mostRecentM, mostRecentD, 0, 0) - (daysBackOffset * MS_PER_DAY)
         int y = year(targetMidnight, tz)
         int m = month(targetMidnight, tz)
         int d = dayofmonth(targetMidnight, tz)
@@ -585,7 +593,7 @@ getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
                 if dow == dayofweek.sunday
                     ts := isStart ? getSessionStartForDate(session, y, m, d) : getSessionEndForDate(session, y, m, d)
                 else
-                    int prevDayMidnight = timestamp(tz, y, m, d, 0, 0) - 86400000
+                    int prevDayMidnight = timestamp(tz, y, m, d, 0, 0) - MS_PER_DAY
                     int prevY = year(prevDayMidnight, tz)
                     int prevM = month(prevDayMidnight, tz)
                     int prevD = dayofmonth(prevDayMidnight, tz)
@@ -641,7 +649,7 @@ getAnchorStarts(string period, string session, int count) =>
     if period == "W"
         int currentDayOfWeek = dayofweek(timenow, tz)
         if currentDayOfWeek == dayofweek.saturday
-            int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+            int fridayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - MS_PER_DAY
             currentY := year(fridayMidnight, tz)
             currentM := month(fridayMidnight, tz)
             currentD := dayofmonth(fridayMidnight, tz)
@@ -655,7 +663,7 @@ getAnchorStarts(string period, string session, int count) =>
         int mostRecentM = currentM
         int mostRecentD = currentD
         if timenow < todaySessionStart
-            int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - 86400000
+            int yesterdayMidnight = timestamp(tz, currentY, currentM, currentD, 0, 0) - MS_PER_DAY
             mostRecentY := year(yesterdayMidnight, tz)
             mostRecentM := month(yesterdayMidnight, tz)
             mostRecentD := dayofmonth(yesterdayMidnight, tz)
@@ -784,7 +792,9 @@ bool showPivotsCondition = showPivots and meetsPivotMaxTimeframe
 // NY session filter for stocks and equity indices (RTH = 9:30 AM - 4:00 PM ET, bars before 4:00 PM)
 int nyHour = hour(time, "America/New_York")
 int nyMinute = minute(time, "America/New_York")
-bool isNYSession = (nyHour == 9 and nyMinute >= 30) or (nyHour > 9 and nyHour < 16)
+int nyDayOfWeek = dayofweek(time, "America/New_York")
+bool isWeekday = nyDayOfWeek >= dayofweek.monday and nyDayOfWeek <= dayofweek.friday
+bool isNYSession = isWeekday and ((nyHour == 9 and nyMinute >= 30) or (nyHour > 9 and nyHour < 16))
 bool isEquityIndex = syminfo.type == "futures" and (str.contains(syminfo.ticker, "ES") or str.contains(syminfo.ticker, "MES") or str.contains(syminfo.ticker, "NQ") or str.contains(syminfo.ticker, "MNQ") or str.contains(syminfo.ticker, "RTY") or str.contains(syminfo.ticker, "M2K") or str.contains(syminfo.ticker, "YM") or str.contains(syminfo.ticker, "MYM"))
 bool shouldFilterRTH = (rthOnlyForStocks and syminfo.type == "stock") or (rthOnlyForIndices and isEquityIndex)
 bool isRTHBar = not shouldFilterRTH or isNYSession
@@ -928,14 +938,6 @@ if barstate.isfirst
             color preCalc = getVWAPColor(mgr.col, mgr.colEnd, pos, mgr.historyCount - 1)
             array.set(mgr.preCalcColors, pos, preCalc)
 
-var array<bool> sessionEnabled = array.from(enableLondonActive, enableNewYorkActive, enableGlobexActive, enableSydneyActive, enableTokyoActive)
-var array<string> sessionNames = array.from("London", "New York", "Globex", "Sydney", "Tokyo")
-var array<color> sessionColors = array.from(colorLondonActive, colorNewYorkActive, colorGlobexActive, colorSydneyActive, colorTokyoActive)
-
-var array<int> sessionStartBars = array.new<int>(5, na)
-var array<int> sessionStartTimes = array.new<int>(5, na)
-var array<label> sessionLabels = array.new<label>(5, na)
-
 var array<int> weeklyAnchorStartsArray = array.new<int>(MAX_WEEKLY_HISTORY, na)
 var array<float> weeklyAnchorSumSrc = array.new<float>(MAX_WEEKLY_HISTORY, 0.0)
 var array<float> weeklyAnchorSumVol = array.new<float>(MAX_WEEKLY_HISTORY, 0.0)
@@ -974,7 +976,6 @@ if barstate.isfirst
             array.set(yearlyColors, pos, getVWAPColor(colorYearlyAnchor, colorYearlyAnchorEnd, pos, yearlyAnchorCount - 1))
 
 var int activeSessionIndex = na
-var string activeSessionName = na
 
 var float sessionOpen = na
 var float openRangeHigh = na
@@ -997,10 +998,9 @@ int ibMinutes = periodToMinutes(initialBalanceLength)
 // UNIFIED SESSION DETECTION (Calendar-based)
 
 for i = 0 to 4
-    if array.get(sessionEnabled, i)
-        string sessionName = array.get(sessionNames, i)
-
-        SessionManager mgr = array.get(sessionManagers, i)
+    SessionManager mgr = array.get(sessionManagers, i)
+    if mgr.enabled
+        string sessionName = mgr.name
         array<int> sessionStartsArray = mgr.starts
         array<int> sessionEndsArray = mgr.ends
 
@@ -1013,18 +1013,22 @@ for i = 0 to 4
                 // Skip sessions that fall on holidays
                 string sessionTZ = getSessionTimezone(sessionName)
                 // For Globex, check the next day (active trading day), not the session start day
-                int holidayCheckTimestamp = sessionName == "Globex" ? sessionStart + 86400000 : sessionStart
+                int holidayCheckTimestamp = na
+                if sessionName == "Globex"
+                    holidayCheckTimestamp := timestamp(sessionTZ,
+                                                       year(sessionStart, sessionTZ),
+                                                       month(sessionStart, sessionTZ),
+                                                       dayofmonth(sessionStart, sessionTZ) + 1,
+                                                       0, 0)
+                else
+                    holidayCheckTimestamp := sessionStart
                 bool sessionIsHoliday = isFullHoliday(holidayCheckTimestamp, sessionTZ, isStock)
 
                 bool isInThisSession = time >= sessionStart and time < sessionEnd and not sessionIsHoliday
                 bool sessionJustStarted = time >= sessionStart and time[1] < sessionStart and not sessionIsHoliday
 
                 if sessionJustStarted
-                    array.set(sessionStartBars, i, bar_index)
-                    array.set(sessionStartTimes, i, sessionStart)
-
                     activeSessionIndex := i
-                    activeSessionName := sessionName
 
                     sessionOpen := open
                     openRangeHigh := high
@@ -1052,7 +1056,7 @@ if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTim
     bool stillInSession = not na(sessionEndTime) and time >= sessionStartTime and time < sessionEndTime
 
     if stillInSession
-        int elapsedMinutes = math.round((time - sessionStartTime) / 60000)
+        int elapsedMinutes = math.round((time - sessionStartTime) / MS_PER_MINUTE)
         if elapsedMinutes <= openRangeMinutes
             if high > openRangeHigh
                 openRangeHigh := high
@@ -1075,7 +1079,10 @@ for i = 0 to 4
     SessionManager mgr = array.get(sessionManagers, i)
     if mgr.enabled
         int historyCountUser = mgr.historyCount
-        int historyCountCalc = MAX_VWAP_HISTORY
+        // Only calculate VWAPs that will be displayed (historyCount)
+        // When user changes historyCount, entire script reloads from beginning
+        // After array shift, the newest historyCount sessions continue calculating correctly
+        int historyCountCalc = historyCountUser
 
         // Loop through all tracked sessions (MAX_VWAP_HISTORY)
         for arrayIdx = 0 to MAX_VWAP_HISTORY - 1
@@ -1133,12 +1140,19 @@ for i = 0 to 4
                     int positionInHistory = nonHolidayRank - 1
                     color labelColor = getVWAPColor(mgr.col, mgr.colEnd, positionInHistory, historyCountUser - 1)
                     bool isPrimarySession = mgr.name == primarySessionName
-                    int labelTimestamp = mgr.name == "Globex" ? sessionStart + 86400000 : sessionStart
+                    int labelTimestamp = na
+                    if mgr.name == "Globex"
+                        string labelTZ = getSessionTimezone(mgr.name)
+                        labelTimestamp := timestamp(labelTZ,
+                                                    year(sessionStart, labelTZ),
+                                                    month(sessionStart, labelTZ),
+                                                    dayofmonth(sessionStart, labelTZ) + 1,
+                                                    0, 0)
+                    else
+                        labelTimestamp := sessionStart
                     string sessionLabelText = compactLabels ? (isPrimarySession ? "D" + str.tostring(positionInHistory + 1) : getSessionAbbr(mgr.name) + str.tostring(positionInHistory + 1)) : mgr.name + " " + str.format_time(labelTimestamp, "d MMM", getSessionTimezone(mgr.name))
                     label newLabel = label.new(bar_index, high, sessionLabelText, xloc=xloc.bar_index, yloc=yloc.abovebar, color=labelColor, textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down)
                     array.set(mgr.labels, arrayIdx, newLabel)
-                    if arrayIdx == MAX_VWAP_HISTORY - 1
-                        array.set(sessionLabels, i, newLabel)
 
             if not isInConfiguredRange
                 deleteLabel(mgr.labels, arrayIdx)
