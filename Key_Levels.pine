@@ -21,7 +21,7 @@
 // SOFTWARE.
 
 //@version=6
-indicator("VT Pro", overlay=true, max_lines_count=500, max_boxes_count=100, max_labels_count=200)
+indicator("VWAP Trader Pro", overlay=true, max_lines_count=500, max_boxes_count=100, max_labels_count=200)
 
 //══════════════════════════════════════════════════════════════════════════════════
 // TIME CONSTANTS
@@ -293,9 +293,20 @@ getLineStyle(string s) => s == "Solid" ? line.style_solid : s == "Dashed" ? line
 vwapVal(bool base, bool meetsTF, bool enabled, int histCount, int minHist, array<float> vwaps, int idx, bool skipMostRecent) =>
     base and meetsTF and enabled and histCount >= minHist and (minHist > 1 or not skipMostRecent) ? array.get(vwaps, MAX_VWAP_HISTORY - minHist) : na
 
-// Helper for anchor VWAP plot value (weekly/monthly/yearly)
-anchorVal(bool base, int idx, int maxHist, int count, array<float> vwaps) =>
-    base and idx >= (maxHist - count) ? array.get(vwaps, idx) : na
+// Helper for anchor VWAP plot value (weekly/monthly/yearly) with collision detection
+anchorVal(bool base, int idx, int maxHist, int count, array<float> vwaps, array<int> starts, array<int> higherStarts, int higherMaxHist, int higherCount, bool checkCollision) =>
+    if not base or idx < (maxHist - count)
+        na
+    else if checkCollision and not na(array.get(starts, idx))
+        int thisStart = array.get(starts, idx)
+        bool collision = false
+        for i = (higherMaxHist - higherCount) to higherMaxHist - 1
+            if not na(array.get(higherStarts, i)) and thisStart == array.get(higherStarts, i)
+                collision := true
+                break
+        collision ? na : array.get(vwaps, idx)
+    else
+        array.get(vwaps, idx)
 labelBgColor(color c) => color.new(c, 100)
 priceToTicks(float p) => syminfo.mintick > 0 ? int(math.round(p / syminfo.mintick)) : int(p)
 
@@ -515,14 +526,21 @@ getAnchorStarts(string period, string session, int maxSize) =>
             array.unshift(starts, not na(fd) ? getSessionStartForDate(session, tY, 1, fd) : na)
     starts
 
-createAnchorLabel(array<label> arr, int idx, int start, string p, int pos, color c1, color c2, int maxC, string tz, string sess) =>
+createAnchorLabel(array<label> arr, int idx, int start, string p, int pos, color c1, color c2, int maxC, string tz, string sess, array<int> higherStarts, int higherMaxHist, int higherCount, bool checkCollision) =>
     if not na(start)
-        label old = array.get(arr, idx)
-        if not na(old)
-            label.delete(old)
-        string txt = p == "W" ? (compactLabels ? "W" : "Week " + str.tostring(weekofyear(start, tz)) + " (" + sess + ")") : p == "M" ? (compactLabels ? "M" : str.format("{0,date,MMM yyyy}", start) + " (" + sess + ")") : (compactLabels ? "Y" : str.tostring(year(start, tz)) + " (" + sess + ")")
-        txt := compactLabels ? txt + str.tostring(pos + 1) : txt
-        array.set(arr, idx, label.new(bar_index, high, txt, xloc=xloc.bar_index, yloc=yloc.abovebar, color=getVWAPColor(c1, c2, pos, maxC - 1), textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down))
+        bool hasCollision = false
+        if checkCollision
+            for i = (higherMaxHist - higherCount) to higherMaxHist - 1
+                if not na(array.get(higherStarts, i)) and start == array.get(higherStarts, i)
+                    hasCollision := true
+                    break
+        if not hasCollision
+            label old = array.get(arr, idx)
+            if not na(old)
+                label.delete(old)
+            string txt = p == "W" ? (compactLabels ? "W" : "Week " + str.tostring(weekofyear(start, tz)) + " (" + sess + ")") : p == "M" ? (compactLabels ? "M" : str.format("{0,date,MMM yyyy}", start) + " (" + sess + ")") : (compactLabels ? "Y" : str.tostring(year(start, tz)) + " (" + sess + ")")
+            txt := compactLabels ? txt + str.tostring(pos + 1) : txt
+            array.set(arr, idx, label.new(bar_index, high, txt, xloc=xloc.bar_index, yloc=yloc.abovebar, color=getVWAPColor(c1, c2, pos, maxC - 1), textcolor=color.white, size=getLabelSize(anchorLabelSize), style=label.style_label_down))
 
 periodToMinutes(string p) => p == "1m" ? 1 : p == "2m" ? 2 : p == "3m" ? 3 : p == "5m" ? 5 : p == "15m" ? 15 : p == "30m" ? 30 : p == "1h" ? 60 : p == "65m" ? 65 : p == "2h" ? 120 : p == "4h" ? 240 : p == "1D" ? 1440 : 99999
 getTimeframeMinutes() => timeframe.in_seconds() >= 86400 ? (timeframe.in_seconds() / 86400) * 1440 : timeframe.in_seconds() / 60
@@ -1018,7 +1036,7 @@ SessionManager primaryMgr = switch primarySessionName
     "Sydney" => sydneyMgr
     => tokyoMgr
 
-processAnchorPeriod(bool shouldCompute, int anchorCount, int maxHistory, array<int> startsArray, array<float> sumSrcArray, array<float> sumVolArray, array<float> vwapsArray, array<label> labelsArray, string labelPrefix, color colorAnchor, color colorAnchorEnd, bool shouldAccumulate, bool isNewestSlot) =>
+processAnchorPeriod(bool shouldCompute, int anchorCount, int maxHistory, array<int> startsArray, array<float> sumSrcArray, array<float> sumVolArray, array<float> vwapsArray, array<label> labelsArray, string labelPrefix, color colorAnchor, color colorAnchorEnd, bool shouldAccumulate, bool isNewestSlot, array<int> higherStarts, int higherMaxHist, int higherCount, bool checkCollision) =>
     bool sessionFlag = false
     if shouldCompute and not na(barOhlc4Vol) and not skipAnchorBar and bar_index > 0
         int startIdx = maxHistory - anchorCount
@@ -1033,7 +1051,7 @@ processAnchorPeriod(bool shouldCompute, int anchorCount, int maxHistory, array<i
                 if idx == maxHistory - 1 and isNewestSlot
                     sessionFlag := (anchorStart == array.get(primaryMgr.starts, MAX_VWAP_HISTORY - 1))
                 if showAnchorLabels
-                    createAnchorLabel(labelsArray, idx, anchorStart, labelPrefix, (maxHistory - 1) - idx, colorAnchor, colorAnchorEnd, anchorCount - 1, primarySessionTZ, primarySessionName)
+                    createAnchorLabel(labelsArray, idx, anchorStart, labelPrefix, (maxHistory - 1) - idx, colorAnchor, colorAnchorEnd, anchorCount - 1, primarySessionTZ, primarySessionName, higherStarts, higherMaxHist, higherCount, checkCollision)
             if shouldAccumulate
                 float sumSrc = array.get(sumSrcArray, idx) + barOhlc4Vol
                 float sumVol = array.get(sumVolArray, idx) + volume
@@ -1050,31 +1068,37 @@ int effectiveWeeklyCount = dailySessionsActive ? weeklyAnchorCountWhenDaily : we
 int effectiveMonthlyCount = (showWeeklyAnchorVWAP and enableSessionFeatures and meetsWeeklyAnchorTimeframe) ? monthlyAnchorCountWhenWeekly : monthlyAnchorCount
 int effectiveYearlyCount = (showMonthlyAnchorVWAP and enableSessionFeatures and meetsMonthlyAnchorTimeframe) ? yearlyAnchorCountWhenMonthly : yearlyAnchorCount
 
-currentSessionIsWeeklyAnchor := processAnchorPeriod(shouldComputeWeekly, effectiveWeeklyCount, MAX_WEEKLY_HISTORY, weeklyAnchorStartsArray, weeklyAnchorSumSrc, weeklyAnchorSumVol, weeklyAnchorVWAPs, weeklyAnchorLabels, "W", colorWeeklyAnchor, colorWeeklyAnchorEnd, not shouldFilterRTH or isNYSession, true)
+// Deduplication flags (used for both labels and plots)
+bool checkWeeklyCollision = showMonthlyAnchorVWAP and enableSessionFeatures and meetsMonthlyAnchorTimeframe
+bool checkMonthlyCollision = showYearlyAnchorVWAP and enableSessionFeatures and meetsYearlyAnchorTimeframe
 
+// Process all anchor periods with collision detection
+currentSessionIsWeeklyAnchor := processAnchorPeriod(shouldComputeWeekly, effectiveWeeklyCount, MAX_WEEKLY_HISTORY, weeklyAnchorStartsArray, weeklyAnchorSumSrc, weeklyAnchorSumVol, weeklyAnchorVWAPs, weeklyAnchorLabels, "W", colorWeeklyAnchor, colorWeeklyAnchorEnd, not shouldFilterRTH or isNYSession, true, monthlyAnchorStartsArray, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, checkWeeklyCollision)
+currentSessionIsMonthlyAnchor := processAnchorPeriod(shouldComputeMonthly, effectiveMonthlyCount, MAX_MONTHLY_HISTORY, monthlyAnchorStartsArray, monthlyAnchorSumSrc, monthlyAnchorSumVol, monthlyAnchorVWAPs, monthlyAnchorLabels, "M", colorMonthlyAnchor, colorMonthlyAnchorEnd, not shouldFilterRTH or isNYSession, true, yearlyAnchorStartsArray, MAX_YEARLY_HISTORY, effectiveYearlyCount, checkMonthlyCollision)
+currentSessionIsYearlyAnchor := processAnchorPeriod(shouldComputeYearly, effectiveYearlyCount, MAX_YEARLY_HISTORY, yearlyAnchorStartsArray, yearlyAnchorSumSrc, yearlyAnchorSumVol, yearlyAnchorVWAPs, yearlyAnchorLabels, "Y", colorYearlyAnchor, colorYearlyAnchorEnd, not shouldFilterRTH or isNYSession, true, yearlyAnchorStartsArray, MAX_YEARLY_HISTORY, effectiveYearlyCount, false)
+
+// Plot weekly anchors (check collision with monthly)
 bool wklyBase = showWeeklyAnchorVWAP and enableSessionFeatures and meetsWeeklyAnchorTimeframe
-plot(anchorVal(wklyBase, 5, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W1", array.get(weeklyColors, 5), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(wklyBase, 4, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W2", array.get(weeklyColors, 4), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(wklyBase, 3, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W3", array.get(weeklyColors, 3), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(wklyBase, 2, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W4", array.get(weeklyColors, 2), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(wklyBase, 1, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W5", array.get(weeklyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(wklyBase, 0, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W6", array.get(weeklyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 5, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs, weeklyAnchorStartsArray, monthlyAnchorStartsArray, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, checkWeeklyCollision), "W1", array.get(weeklyColors, 5), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 4, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs, weeklyAnchorStartsArray, monthlyAnchorStartsArray, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, checkWeeklyCollision), "W2", array.get(weeklyColors, 4), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 3, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs, weeklyAnchorStartsArray, monthlyAnchorStartsArray, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, checkWeeklyCollision), "W3", array.get(weeklyColors, 3), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 2, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs, weeklyAnchorStartsArray, monthlyAnchorStartsArray, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, checkWeeklyCollision), "W4", array.get(weeklyColors, 2), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 1, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs, weeklyAnchorStartsArray, monthlyAnchorStartsArray, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, checkWeeklyCollision), "W5", array.get(weeklyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 0, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs, weeklyAnchorStartsArray, monthlyAnchorStartsArray, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, checkWeeklyCollision), "W6", array.get(weeklyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
+// Plot monthly anchors (check collision with yearly)
 bool mnthBase = showMonthlyAnchorVWAP and enableSessionFeatures and meetsMonthlyAnchorTimeframe
-currentSessionIsMonthlyAnchor := processAnchorPeriod(shouldComputeMonthly, effectiveMonthlyCount, MAX_MONTHLY_HISTORY, monthlyAnchorStartsArray, monthlyAnchorSumSrc, monthlyAnchorSumVol, monthlyAnchorVWAPs, monthlyAnchorLabels, "M", colorMonthlyAnchor, colorMonthlyAnchorEnd, not shouldFilterRTH or isNYSession, true)
+plot(anchorVal(mnthBase, 5, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs, monthlyAnchorStartsArray, yearlyAnchorStartsArray, MAX_YEARLY_HISTORY, effectiveYearlyCount, checkMonthlyCollision), "M1", array.get(monthlyColors, 5), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 4, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs, monthlyAnchorStartsArray, yearlyAnchorStartsArray, MAX_YEARLY_HISTORY, effectiveYearlyCount, checkMonthlyCollision), "M2", array.get(monthlyColors, 4), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 3, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs, monthlyAnchorStartsArray, yearlyAnchorStartsArray, MAX_YEARLY_HISTORY, effectiveYearlyCount, checkMonthlyCollision), "M3", array.get(monthlyColors, 3), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 2, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs, monthlyAnchorStartsArray, yearlyAnchorStartsArray, MAX_YEARLY_HISTORY, effectiveYearlyCount, checkMonthlyCollision), "M4", array.get(monthlyColors, 2), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 1, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs, monthlyAnchorStartsArray, yearlyAnchorStartsArray, MAX_YEARLY_HISTORY, effectiveYearlyCount, checkMonthlyCollision), "M5", array.get(monthlyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 0, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs, monthlyAnchorStartsArray, yearlyAnchorStartsArray, MAX_YEARLY_HISTORY, effectiveYearlyCount, checkMonthlyCollision), "M6", array.get(monthlyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
-plot(anchorVal(mnthBase, 5, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M1", array.get(monthlyColors, 5), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(mnthBase, 4, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M2", array.get(monthlyColors, 4), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(mnthBase, 3, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M3", array.get(monthlyColors, 3), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(mnthBase, 2, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M4", array.get(monthlyColors, 2), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(mnthBase, 1, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M5", array.get(monthlyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(mnthBase, 0, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M6", array.get(monthlyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-
-currentSessionIsYearlyAnchor := processAnchorPeriod(shouldComputeYearly, effectiveYearlyCount, MAX_YEARLY_HISTORY, yearlyAnchorStartsArray, yearlyAnchorSumSrc, yearlyAnchorSumVol, yearlyAnchorVWAPs, yearlyAnchorLabels, "Y", colorYearlyAnchor, colorYearlyAnchorEnd, not shouldFilterRTH or isNYSession, true)
-
+// Plot yearly anchors (no collision check - highest timeframe)
 bool yrlyBase = showYearlyAnchorVWAP and enableSessionFeatures and meetsYearlyAnchorTimeframe
-plot(anchorVal(yrlyBase, 1, MAX_YEARLY_HISTORY, effectiveYearlyCount, yearlyAnchorVWAPs), "Y1", array.get(yearlyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(yrlyBase, 0, MAX_YEARLY_HISTORY, effectiveYearlyCount, yearlyAnchorVWAPs), "Y2", array.get(yearlyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(yrlyBase, 1, MAX_YEARLY_HISTORY, effectiveYearlyCount, yearlyAnchorVWAPs, yearlyAnchorStartsArray, yearlyAnchorStartsArray, MAX_YEARLY_HISTORY, effectiveYearlyCount, false), "Y1", array.get(yearlyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(yrlyBase, 0, MAX_YEARLY_HISTORY, effectiveYearlyCount, yearlyAnchorVWAPs, yearlyAnchorStartsArray, yearlyAnchorStartsArray, MAX_YEARLY_HISTORY, effectiveYearlyCount, false), "Y2", array.get(yearlyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 var box boxOpenRange = na
 var box boxInitialBalanceUpper = na
