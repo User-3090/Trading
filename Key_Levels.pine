@@ -132,19 +132,23 @@ int nyVWAPCountActive = isStock ? nyVWAPCountStock : nyVWAPCount
 
 showWeeklyAnchorVWAP = input.bool(true, "Enable Weekly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Weekly")
 weeklyAnchorCount = input.int(6, "History", inline="WK_SET", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Weekly")
+weeklyAnchorCountWhenDaily = input.int(6, "History (When Daily Active)", inline="WK_SET2", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Weekly", tooltip="Reduced history count when daily session anchors are visible")
 colorWeeklyAnchor = input.color(#b51b00, "", inline="WK_SET", group="🗓️ Sessions • VWAP Anchors • Weekly")
 colorWeeklyAnchorEnd = input.color(#9c27b0, "", inline="WK_SET", group="🗓️ Sessions • VWAP Anchors • Weekly")
+weeklyAnchorMinTimeframe = input.string("None", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Weekly")
 weeklyAnchorMaxTimeframe = input.string("2h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D"], group="🗓️ Sessions • VWAP Anchors • Weekly")
 
 showMonthlyAnchorVWAP = input.bool(true, "Enable Monthly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Monthly")
 monthlyAnchorCount = input.int(6, "History", inline="MN_SET", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Monthly")
+monthlyAnchorCountWhenWeekly = input.int(1, "History (When Weekly Active)", inline="MN_SET2", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Reduced history count when weekly anchors are visible")
 colorMonthlyAnchor = input.color(#2962ff, "", inline="MN_SET", group="🗓️ Sessions • VWAP Anchors • Monthly")
 colorMonthlyAnchorEnd = input.color(#1cc1ff, "", inline="MN_SET", group="🗓️ Sessions • VWAP Anchors • Monthly")
-monthlyAnchorMinTimeframe = input.string("4h", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Monthly")
+monthlyAnchorMinTimeframe = input.string("None", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Monthly")
 monthlyAnchorMaxTimeframe = input.string("1D", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Monthly")
 
 showYearlyAnchorVWAP = input.bool(true, "Enable Yearly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Yearly")
 yearlyAnchorCount = input.int(2, "History", inline="YR_SET", minval=1, maxval=2, group="🗓️ Sessions • VWAP Anchors • Yearly")
+yearlyAnchorCountWhenMonthly = input.int(2, "History (When Monthly Active)", inline="YR_SET2", minval=1, maxval=2, group="🗓️ Sessions • VWAP Anchors • Yearly", tooltip="Reduced history count when monthly anchors are visible")
 colorYearlyAnchor = input.color(#000000, "", inline="YR_SET", group="🗓️ Sessions • VWAP Anchors • Yearly")
 colorYearlyAnchorEnd = input.color(#808080, "", inline="YR_SET", group="🗓️ Sessions • VWAP Anchors • Yearly")
 yearlyAnchorMinTimeframe = input.string("15m", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W", "1M"], group="🗓️ Sessions • VWAP Anchors • Yearly")
@@ -602,7 +606,9 @@ int nyDow = shouldFilterRTH ? dayofweek(time, "America/New_York") : 0
 bool isNYSession = not shouldFilterRTH ? true : (nyDow >= dayofweek.monday and nyDow <= dayofweek.friday and ((nyHour == 9 and nyMin >= 30) or (nyHour > 9 and nyHour < 16)))
 
 // Check timeframe condition for weekly anchors
+bool meetsWeeklyAnchorMinTimeframe = weeklyAnchorMinTimeframe == "None" or currentTfMinutes >= periodToMinutes(weeklyAnchorMinTimeframe)
 bool meetsWeeklyAnchorMaxTimeframe = weeklyAnchorMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(weeklyAnchorMaxTimeframe)
+bool meetsWeeklyAnchorTimeframe = meetsWeeklyAnchorMinTimeframe and meetsWeeklyAnchorMaxTimeframe
 bool meetsMonthlyAnchorMinTimeframe = monthlyAnchorMinTimeframe == "None" or currentTfMinutes >= periodToMinutes(monthlyAnchorMinTimeframe)
 bool meetsMonthlyAnchorMaxTimeframe = monthlyAnchorMaxTimeframe == "None" or currentTfMinutes <= periodToMinutes(monthlyAnchorMaxTimeframe)
 bool meetsMonthlyAnchorTimeframe = meetsMonthlyAnchorMinTimeframe and meetsMonthlyAnchorMaxTimeframe
@@ -754,7 +760,7 @@ var array<int> yearlyAnchorStartsArray = array.new<int>(MAX_YEARLY_HISTORY, na),
 var array<float> yearlyAnchorVWAPs = array.new<float>(MAX_YEARLY_HISTORY, na), var array<label> yearlyAnchorLabels = array.new<label>(MAX_YEARLY_HISTORY, na), var array<color> yearlyColors = array.new<color>(MAX_YEARLY_HISTORY)
 
 // Combined visibility checks for anchor VWAPs (enabled AND meets timeframe)
-bool shouldComputeWeekly = showWeeklyAnchorVWAP and enableSessionFeatures and meetsWeeklyAnchorMaxTimeframe
+bool shouldComputeWeekly = showWeeklyAnchorVWAP and enableSessionFeatures and meetsWeeklyAnchorTimeframe
 bool shouldComputeMonthly = showMonthlyAnchorVWAP and enableSessionFeatures and meetsMonthlyAnchorTimeframe
 bool shouldComputeYearly = showYearlyAnchorVWAP and enableSessionFeatures and meetsYearlyAnchorTimeframe
 bool anyAnchorEnabled = shouldComputeWeekly or shouldComputeMonthly or shouldComputeYearly
@@ -1036,31 +1042,39 @@ processAnchorPeriod(bool shouldCompute, int anchorCount, int maxHistory, array<i
                 array.set(vwapsArray, idx, sumVol > 0 ? sumSrc / sumVol : na)
     sessionFlag
 
-currentSessionIsWeeklyAnchor := processAnchorPeriod(shouldComputeWeekly, weeklyAnchorCount, MAX_WEEKLY_HISTORY, weeklyAnchorStartsArray, weeklyAnchorSumSrc, weeklyAnchorSumVol, weeklyAnchorVWAPs, weeklyAnchorLabels, "W", colorWeeklyAnchor, colorWeeklyAnchorEnd, not shouldFilterRTH or isNYSession, true)
+// Determine if daily sessions are actively displayed
+bool dailySessionsActive = showDailySessionVWAPs and enableSessionFeatures and (meetsPrimarySessionTimeframe or meetsOtherSessionsTimeframe)
 
-bool wklyBase = showWeeklyAnchorVWAP and enableSessionFeatures and meetsWeeklyAnchorMaxTimeframe
-plot(anchorVal(wklyBase, 5, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "W1", array.get(weeklyColors, 5), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(wklyBase, 4, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "W2", array.get(weeklyColors, 4), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(wklyBase, 3, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "W3", array.get(weeklyColors, 3), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(wklyBase, 2, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "W4", array.get(weeklyColors, 2), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(wklyBase, 1, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "W5", array.get(weeklyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(wklyBase, 0, MAX_WEEKLY_HISTORY, weeklyAnchorCount, weeklyAnchorVWAPs), "W6", array.get(weeklyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+// Determine effective history counts based on lower timeframe visibility
+int effectiveWeeklyCount = dailySessionsActive ? weeklyAnchorCountWhenDaily : weeklyAnchorCount
+int effectiveMonthlyCount = (showWeeklyAnchorVWAP and enableSessionFeatures and meetsWeeklyAnchorTimeframe) ? monthlyAnchorCountWhenWeekly : monthlyAnchorCount
+int effectiveYearlyCount = (showMonthlyAnchorVWAP and enableSessionFeatures and meetsMonthlyAnchorTimeframe) ? yearlyAnchorCountWhenMonthly : yearlyAnchorCount
+
+currentSessionIsWeeklyAnchor := processAnchorPeriod(shouldComputeWeekly, effectiveWeeklyCount, MAX_WEEKLY_HISTORY, weeklyAnchorStartsArray, weeklyAnchorSumSrc, weeklyAnchorSumVol, weeklyAnchorVWAPs, weeklyAnchorLabels, "W", colorWeeklyAnchor, colorWeeklyAnchorEnd, not shouldFilterRTH or isNYSession, true)
+
+bool wklyBase = showWeeklyAnchorVWAP and enableSessionFeatures and meetsWeeklyAnchorTimeframe
+plot(anchorVal(wklyBase, 5, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W1", array.get(weeklyColors, 5), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 4, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W2", array.get(weeklyColors, 4), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 3, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W3", array.get(weeklyColors, 3), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 2, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W4", array.get(weeklyColors, 2), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 1, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W5", array.get(weeklyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(wklyBase, 0, MAX_WEEKLY_HISTORY, effectiveWeeklyCount, weeklyAnchorVWAPs), "W6", array.get(weeklyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 bool mnthBase = showMonthlyAnchorVWAP and enableSessionFeatures and meetsMonthlyAnchorTimeframe
-currentSessionIsMonthlyAnchor := processAnchorPeriod(shouldComputeMonthly, monthlyAnchorCount, MAX_MONTHLY_HISTORY, monthlyAnchorStartsArray, monthlyAnchorSumSrc, monthlyAnchorSumVol, monthlyAnchorVWAPs, monthlyAnchorLabels, "M", colorMonthlyAnchor, colorMonthlyAnchorEnd, not shouldFilterRTH or isNYSession, true)
+currentSessionIsMonthlyAnchor := processAnchorPeriod(shouldComputeMonthly, effectiveMonthlyCount, MAX_MONTHLY_HISTORY, monthlyAnchorStartsArray, monthlyAnchorSumSrc, monthlyAnchorSumVol, monthlyAnchorVWAPs, monthlyAnchorLabels, "M", colorMonthlyAnchor, colorMonthlyAnchorEnd, not shouldFilterRTH or isNYSession, true)
 
-plot(anchorVal(mnthBase, 5, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "M1", array.get(monthlyColors, 5), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(mnthBase, 4, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "M2", array.get(monthlyColors, 4), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(mnthBase, 3, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "M3", array.get(monthlyColors, 3), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(mnthBase, 2, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "M4", array.get(monthlyColors, 2), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(mnthBase, 1, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "M5", array.get(monthlyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(mnthBase, 0, MAX_MONTHLY_HISTORY, monthlyAnchorCount, monthlyAnchorVWAPs), "M6", array.get(monthlyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 5, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M1", array.get(monthlyColors, 5), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 4, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M2", array.get(monthlyColors, 4), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 3, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M3", array.get(monthlyColors, 3), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 2, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M4", array.get(monthlyColors, 2), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 1, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M5", array.get(monthlyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(mnthBase, 0, MAX_MONTHLY_HISTORY, effectiveMonthlyCount, monthlyAnchorVWAPs), "M6", array.get(monthlyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
-currentSessionIsYearlyAnchor := processAnchorPeriod(shouldComputeYearly, yearlyAnchorCount, MAX_YEARLY_HISTORY, yearlyAnchorStartsArray, yearlyAnchorSumSrc, yearlyAnchorSumVol, yearlyAnchorVWAPs, yearlyAnchorLabels, "Y", colorYearlyAnchor, colorYearlyAnchorEnd, not shouldFilterRTH or isNYSession, true)
+currentSessionIsYearlyAnchor := processAnchorPeriod(shouldComputeYearly, effectiveYearlyCount, MAX_YEARLY_HISTORY, yearlyAnchorStartsArray, yearlyAnchorSumSrc, yearlyAnchorSumVol, yearlyAnchorVWAPs, yearlyAnchorLabels, "Y", colorYearlyAnchor, colorYearlyAnchorEnd, not shouldFilterRTH or isNYSession, true)
 
 bool yrlyBase = showYearlyAnchorVWAP and enableSessionFeatures and meetsYearlyAnchorTimeframe
-plot(anchorVal(yrlyBase, 1, MAX_YEARLY_HISTORY, yearlyAnchorCount, yearlyAnchorVWAPs), "Y1", array.get(yearlyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
-plot(anchorVal(yrlyBase, 0, MAX_YEARLY_HISTORY, yearlyAnchorCount, yearlyAnchorVWAPs), "Y2", array.get(yearlyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(yrlyBase, 1, MAX_YEARLY_HISTORY, effectiveYearlyCount, yearlyAnchorVWAPs), "Y1", array.get(yearlyColors, 1), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
+plot(anchorVal(yrlyBase, 0, MAX_YEARLY_HISTORY, effectiveYearlyCount, yearlyAnchorVWAPs), "Y2", array.get(yearlyColors, 0), sessionVWAPLineWidth, linestyle=sessionVWAPLineStyle)
 
 var box boxOpenRange = na
 var box boxInitialBalanceUpper = na
