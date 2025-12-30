@@ -463,7 +463,9 @@ getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
                 t := isStart ? getSessionStartForDate(session, year(prev, tz), month(prev, tz), dayofmonth(prev, tz)) : getSessionEndForDate(session, year(prev, tz), month(prev, tz), dayofmonth(prev, tz))
             else
                 t := isStart ? getSessionStartForDate(session, y, m, d) : getSessionEndForDate(session, y, m, d)
-            if na(lastTs) or t != lastTs
+            // Only include sessions that have already started (exclude future sessions)
+            bool hasStarted = not na(t) and t <= timenow
+            if hasStarted and (na(lastTs) or t != lastTs)
                 array.unshift(ts, t), lastTs := t, collected += 1
         offset += 1
     ts
