@@ -140,7 +140,7 @@ weeklyAnchorMaxTimeframe = input.string("2h", "Max Timeframe", options=["None", 
 
 showMonthlyAnchorVWAP = input.bool(true, "Enable Monthly VWAP Anchor", group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="VWAP anchored to first session of each calendar month")
 monthlyAnchorCount = input.int(6, "History", inline="MN_SET", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Number of monthly anchors to show (1-6, 1=current only)")
-monthlyAnchorCountWhenWeekly = input.int(1, "History (When Weekly Active)", inline="MN_SET2", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Reduced count when weekly anchors visible. Example: 6→1 shows only current month with weekly context")
+monthlyAnchorCountWhenWeekly = input.int(2, "History (When Weekly Active)", inline="MN_SET2", minval=1, maxval=6, group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Reduced count when weekly anchors visible. Example: 6→1 shows only current month with weekly context")
 colorMonthlyAnchor = input.color(#2962ff, "", inline="MN_SET", group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Color for newest monthly anchor (gradient start)")
 colorMonthlyAnchorEnd = input.color(#1cc1ff, "", inline="MN_SET", group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Gradient end color (older months)")
 monthlyAnchorMinTimeframe = input.string("None", "Min Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h", "1D", "1W"], group="🗓️ Sessions • VWAP Anchors • Monthly", tooltip="Only show monthly anchors at or above this timeframe")
@@ -172,6 +172,7 @@ globalLineLengthBars = input.int(50, "Line Length (Bars)", minval=10, maxval=200
 // ────────────────────────────────────────────────────────────────────────────────
 showSessionLevelsInput = input.string("Futures Only", "Enable Session Levels", options=["Always", "Futures Only", "Off"], group="📐 Levels • Session • Visibility", tooltip="Show Open/ORB/IB levels")
 sessionLevelsSessionSelect = input.string("New York", "Session", options=["All", "Globex", "Sydney", "Tokyo", "London", "New York"], group="📐 Levels • Session • Visibility", tooltip="Which session to show Open/ORB/IB levels for")
+hideSessionLevelsWhenClosed = input.bool(true, "Hide When Session Closed", group="📐 Levels • Session • Visibility", tooltip="Hide session levels after the selected session closes (only applies when specific session selected, not 'All')")
 sessionLevelsMaxTimeframe = input.string("5m", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📐 Levels • Session • Visibility", tooltip="Hide session levels above this timeframe")
 sessionLevelsLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📐 Levels • Session • Visibility", tooltip="Visual style for session level lines")
 sessionLevelsLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📐 Levels • Session • Visibility", tooltip="Line thickness for session levels (1-5)")
@@ -206,6 +207,7 @@ colorInitialBalanceShade = input.color(color.new(color.green, 95), "", inline="S
 
 
 showPivots = input.bool(true, "Enable Pivot Points", group="📐 Levels • Pivot Points", tooltip="Traditional pivot levels calculated from previous day's high, low, close")
+pivotIgnoreDistanceFilter = input.bool(true, "Ignore Distance Filter", group="📐 Levels • Pivot Points", tooltip="Show all pivot levels regardless of ATR distance filter")
 pivotMaxTimeframe = input.string("4h", "Max Timeframe", options=["None", "1m", "2m", "3m", "5m", "15m", "30m", "1h", "65m", "2h", "4h"], group="📐 Levels • Pivot Points", tooltip="Hide pivot points above this timeframe")
 pivotLineStyle = input.string("Solid", "Line Style", options=["Solid", "Dashed", "Dotted"], group="📐 Levels • Pivot Points", tooltip="Visual style for pivot lines")
 pivotLineWidth = input.int(2, "Line Width", minval=1, maxval=5, group="📐 Levels • Pivot Points", tooltip="Line thickness for pivot levels (1-5)")
@@ -809,11 +811,11 @@ int ibMinutes = periodToMinutes(initialBalanceLength)
 // UNIFIED SESSION DETECTION (Calendar-based)
 // Skip entirely if neither session VWAPs nor session levels are visible
 // Find the most recently started active session (handles overlapping sessions like London/NY)
+int mostRecentStartTime = na
+int mostRecentSessionIdx = na
+int mostRecentSessionEnd = na
+int mostRecentHolidayRank = na
 if needSessionDetection and not na(time)
-    int mostRecentStartTime = na
-    int mostRecentSessionIdx = na
-    int mostRecentSessionEnd = na
-    int mostRecentHolidayRank = na
     for i = 0 to 4
         SessionManager mgr = array.get(sessionManagers, i)
         if not mgr.enabled
@@ -848,6 +850,13 @@ if needSessionDetection and not na(time)
             orlBar := bar_index
             ibhBar := bar_index
             iblBar := bar_index
+
+// Check if selected session is currently active (for hiding levels when session closes)
+bool selectedSessionActive = true
+if hideSessionLevelsWhenClosed and sessionLevelsSessionSelect != "All" and not na(mostRecentSessionIdx)
+    SessionManager detectedMgr = array.get(sessionManagers, mostRecentSessionIdx)
+    bool isSelectedSession = detectedMgr.name == sessionLevelsSessionSelect
+    selectedSessionActive := isSelectedSession
 
 if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTime)
     SessionManager activeMgr = array.get(sessionManagers, activeSessionIndex)
@@ -1270,7 +1279,16 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
 
     // SESSION LEVELS RENDERING
     string sessionLineStyleActual = getLineStyle(sessionLevelsLineStyle)
-    bool shouldShowSessionLevels = sessionLevelsVisible and not na(activeSessionIndex) and not na(sessionOpen)
+
+    // Check if selected session is still active (for hide when closed feature)
+    bool selectedSessionStillActive = true
+    if hideSessionLevelsWhenClosed and sessionLevelsSessionSelect != "All" and not na(activeSessionIndex)
+        SessionManager activeMgr = array.get(sessionManagers, activeSessionIndex)
+        bool isSelectedSession = activeMgr.name == sessionLevelsSessionSelect
+        bool inSession = not na(sessionEndTime) and time >= sessionStartTime and time < sessionEndTime
+        selectedSessionStillActive := isSelectedSession and inSession
+
+    bool shouldShowSessionLevels = sessionLevelsVisible and not na(activeSessionIndex) and not na(sessionOpen) and selectedSessionStillActive
     for level in sessionLevels
         level.render(shouldShowSessionLevels, true, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter, true)
 
@@ -1308,7 +1326,7 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
 
     // PIVOT POINTS RENDERING
     for level in pivotLevels
-        level.render(showPivotsCondition, true, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter)
+        level.render(showPivotsCondition, true, priceLabels, renderedPrices, globalShowPriceValues, labelSizeActual, atrThreshold, useATRFilter, pivotIgnoreDistanceFilter)
 
     // KEY LEVELS RENDERING
     for level in keyLevels
