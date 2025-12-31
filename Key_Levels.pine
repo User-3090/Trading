@@ -465,9 +465,10 @@ getSessionTimestampsArray(string session, int sessionsBack, bool isStart) =>
                 t := isStart ? getSessionStartForDate(session, year(prev, tz), month(prev, tz), dayofmonth(prev, tz)) : getSessionEndForDate(session, year(prev, tz), month(prev, tz), dayofmonth(prev, tz))
             else
                 t := isStart ? getSessionStartForDate(session, y, m, d) : getSessionEndForDate(session, y, m, d)
-            // Only include sessions that have already started (exclude future sessions)
-            bool hasStarted = not na(t) and t <= timenow
-            if hasStarted and (na(lastTs) or t != lastTs)
+            // Include sessions that have started OR will start within next 24 hours (FIX BUG #5)
+            // This prevents detection gaps when new sessions start in real-time
+            bool isRelevant = not na(t) and t <= timenow + MS_PER_DAY
+            if isRelevant and (na(lastTs) or t != lastTs)
                 array.unshift(ts, t), lastTs := t, collected += 1
         offset += 1
     ts
@@ -808,7 +809,57 @@ var int openPriceBar = na, var int orhBar = na, var int orlBar = na, var int ibh
 int openRangeMinutes = periodToMinutes(openRangeLength)
 int ibMinutes = periodToMinutes(initialBalanceLength)
 
+// ══════════════════════════════════════════════════════════════════════════════════
+// ARRAY REFRESH FOR REAL-TIME BARS (FIX BUG #1 - STALE ARRAYS)
+// ══════════════════════════════════════════════════════════════════════════════════
+// Must refresh arrays when new sessions start in real-time to prevent detection lag
+// This runs BEFORE session detection to ensure fresh data
+if needSessionDetection and barstate.isrealtime and not na(time)
+    for i = 0 to 4
+        SessionManager mgr = array.get(sessionManagers, i)
+        if not mgr.enabled
+            continue
+
+        // Validate array size before access
+        if array.size(mgr.starts) < MAX_VWAP_HISTORY or array.size(mgr.ends) < MAX_VWAP_HISTORY
+            continue
+
+        // Get what the current newest session SHOULD be based on current bar time
+        array<int> freshStarts = getSessionStartsArray(mgr.name, MAX_VWAP_HISTORY)
+
+        // Validate fresh array before access
+        if array.size(freshStarts) < MAX_VWAP_HISTORY
+            continue
+
+        int freshNewestStart = array.get(freshStarts, MAX_VWAP_HISTORY - 1)
+        int cachedNewestStart = array.get(mgr.starts, MAX_VWAP_HISTORY - 1)
+
+        // If fresh start is different, arrays need refresh
+        bool arraysNeedUpdate = not na(freshNewestStart) and (na(cachedNewestStart) or freshNewestStart != cachedNewestStart)
+
+        if arraysNeedUpdate
+            // Get fresh ends array
+            array<int> freshEnds = getSessionEndsArray(mgr.name, MAX_VWAP_HISTORY)
+
+            // Validate ends array
+            if array.size(freshEnds) < MAX_VWAP_HISTORY
+                continue
+
+            // Update all session arrays
+            mgr.starts := freshStarts
+            mgr.ends := freshEnds
+            mgr.holidayRanks := calcHolidayRanks(freshStarts, mgr.name, isStock)
+            mgr.prevMostRecentStart := freshNewestStart
+
+            // Recalculate pre-computed colors if history count changed
+            if mgr.historyCount != mgr.cachedHistoryCount
+                mgr.cachedHistoryCount := mgr.historyCount
+                for pos = 0 to MAX_VWAP_HISTORY - 1
+                    array.set(mgr.preCalcColors, pos, getVWAPColor(mgr.col, mgr.colEnd, pos, mgr.historyCount - 1))
+
+// ══════════════════════════════════════════════════════════════════════════════════
 // UNIFIED SESSION DETECTION (Calendar-based)
+// ══════════════════════════════════════════════════════════════════════════════════
 // Skip entirely if neither session VWAPs nor session levels are visible
 // Find the most recently started active session (handles overlapping sessions like London/NY)
 int mostRecentStartTime = na
@@ -820,6 +871,11 @@ if needSessionDetection and not na(time)
         SessionManager mgr = array.get(sessionManagers, i)
         if not mgr.enabled
             continue
+
+        // Validate array bounds before access (FIX BUG #4 - UNSAFE ARRAY ACCESS)
+        if array.size(mgr.starts) < MAX_VWAP_HISTORY or array.size(mgr.ends) < MAX_VWAP_HISTORY or array.size(mgr.holidayRanks) < MAX_VWAP_HISTORY
+            continue
+
         int sessionStart = array.get(mgr.starts, MAX_VWAP_HISTORY - 1)
         int sessionEnd = array.get(mgr.ends, MAX_VWAP_HISTORY - 1)
         if na(sessionStart) or na(sessionEnd) or time < sessionStart or time >= sessionEnd
@@ -831,61 +887,77 @@ if needSessionDetection and not na(time)
             mostRecentSessionEnd := sessionEnd
             mostRecentHolidayRank := holidayRank
     if not na(mostRecentSessionIdx)
-        SessionManager detectedMgr = array.get(sessionManagers, mostRecentSessionIdx)
-        // Check if this session matches the selected session filter
-        bool sessionMatches = sessionLevelsSessionSelect == "All" or detectedMgr.name == sessionLevelsSessionSelect
-        bool sessionJustStarted = time[1] < mostRecentStartTime
-        if sessionJustStarted and sessionMatches
-            activeSessionIndex := mostRecentSessionIdx
-            sessionOpen := open
-            openRangeHigh := high
-            openRangeLow := low
-            initialBalanceHigh := high
-            initialBalanceLow := low
-            sessionStartBar := bar_index
-            sessionStartTime := mostRecentStartTime
-            sessionEndTime := mostRecentSessionEnd
-            openPriceBar := bar_index
-            orhBar := bar_index
-            orlBar := bar_index
-            ibhBar := bar_index
-            iblBar := bar_index
-
-// Check if selected session is currently active (for hiding levels when session closes)
-bool selectedSessionActive = true
-if hideSessionLevelsWhenClosed and sessionLevelsSessionSelect != "All" and not na(mostRecentSessionIdx)
-    SessionManager detectedMgr = array.get(sessionManagers, mostRecentSessionIdx)
-    bool isSelectedSession = detectedMgr.name == sessionLevelsSessionSelect
-    selectedSessionActive := isSelectedSession
-
-if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTime)
-    SessionManager activeMgr = array.get(sessionManagers, activeSessionIndex)
-    array<int> activeSessionEnds = activeMgr.ends
-
-    // Verify active session still matches filter (in case user changes it mid-session)
-    bool activeSessionMatches = sessionLevelsSessionSelect == "All" or activeMgr.name == sessionLevelsSessionSelect
-
-    // Use stored session end time (set at session start) to handle edge case where
-    // active session gets dropped from array after MAX_VWAP_HISTORY shifts
-    bool stillInSession = not na(sessionEndTime) and time >= sessionStartTime and time < sessionEndTime and activeSessionMatches
-
-    if stillInSession
-        int elapsedMinutes = math.round((time - sessionStartTime) / MS_PER_MINUTE)
-        if elapsedMinutes <= openRangeMinutes
-            if high > openRangeHigh
+        // Validate index before array access (FIX BUG #4)
+        if mostRecentSessionIdx >= 0 and mostRecentSessionIdx < array.size(sessionManagers)
+            SessionManager detectedMgr = array.get(sessionManagers, mostRecentSessionIdx)
+            // Check if this session matches the selected session filter
+            bool sessionMatches = sessionLevelsSessionSelect == "All" or detectedMgr.name == sessionLevelsSessionSelect
+            bool sessionJustStarted = time[1] < mostRecentStartTime
+            if sessionJustStarted and sessionMatches
+                activeSessionIndex := mostRecentSessionIdx
+                sessionOpen := open
                 openRangeHigh := high
-                orhBar := bar_index
-            if low < openRangeLow
                 openRangeLow := low
-                orlBar := bar_index
-
-        if elapsedMinutes <= ibMinutes
-            if high > initialBalanceHigh
                 initialBalanceHigh := high
-                ibhBar := bar_index
-            if low < initialBalanceLow
                 initialBalanceLow := low
+                sessionStartBar := bar_index
+                sessionStartTime := mostRecentStartTime
+                sessionEndTime := mostRecentSessionEnd
+                openPriceBar := bar_index
+                orhBar := bar_index
+                orlBar := bar_index
+                ibhBar := bar_index
                 iblBar := bar_index
+
+// ══════════════════════════════════════════════════════════════════════════════════
+// SESSION LEVEL UPDATES (with FIX BUG #2 - RESET WHEN SESSION ENDS)
+// ══════════════════════════════════════════════════════════════════════════════════
+if not na(activeSessionIndex) and not na(sessionOpen) and not na(sessionStartTime)
+    // Validate activeSessionIndex before array access (FIX BUG #4)
+    if activeSessionIndex >= 0 and activeSessionIndex < array.size(sessionManagers)
+        SessionManager activeMgr = array.get(sessionManagers, activeSessionIndex)
+        array<int> activeSessionEnds = activeMgr.ends
+
+        // Verify active session still matches filter (in case user changes it mid-session)
+        bool activeSessionMatches = sessionLevelsSessionSelect == "All" or activeMgr.name == sessionLevelsSessionSelect
+
+        // Use stored session end time (set at session start) to handle edge case where
+        // active session gets dropped from array after MAX_VWAP_HISTORY shifts
+        bool stillInSession = not na(sessionEndTime) and time >= sessionStartTime and time < sessionEndTime and activeSessionMatches
+
+        if stillInSession
+            int elapsedMinutes = math.round((time - sessionStartTime) / MS_PER_MINUTE)
+            if elapsedMinutes <= openRangeMinutes
+                if high > openRangeHigh
+                    openRangeHigh := high
+                    orhBar := bar_index
+                if low < openRangeLow
+                    openRangeLow := low
+                    orlBar := bar_index
+
+            if elapsedMinutes <= ibMinutes
+                if high > initialBalanceHigh
+                    initialBalanceHigh := high
+                    ibhBar := bar_index
+                if low < initialBalanceLow
+                    initialBalanceLow := low
+                    iblBar := bar_index
+        else
+            // Session has ended - reset all tracking variables (FIX BUG #2)
+            activeSessionIndex := na
+            sessionOpen := na
+            openRangeHigh := na
+            openRangeLow := na
+            initialBalanceHigh := na
+            initialBalanceLow := na
+            sessionStartBar := na
+            sessionStartTime := na
+            sessionEndTime := na
+            openPriceBar := na
+            orhBar := na
+            orlBar := na
+            ibhBar := na
+            iblBar := na
 // MULTI-SESSION VWAP CALCULATIONS
 // Optimized: skip bars before oldest tracked session, cache per-bar values
 // Cache showLabelsOnStart - doesn't change per bar
@@ -1281,12 +1353,15 @@ if barstate.islast and (na(lastRenderBarIndex) or bar_index != lastRenderBarInde
     string sessionLineStyleActual = getLineStyle(sessionLevelsLineStyle)
 
     // Check if selected session is still active (for hide when closed feature)
+    // FIX BUG #3 & #6 - Unified correct session-active check
     bool selectedSessionStillActive = true
     if hideSessionLevelsWhenClosed and sessionLevelsSessionSelect != "All" and not na(activeSessionIndex)
-        SessionManager activeMgr = array.get(sessionManagers, activeSessionIndex)
-        bool isSelectedSession = activeMgr.name == sessionLevelsSessionSelect
-        bool inSession = not na(sessionEndTime) and time >= sessionStartTime and time < sessionEndTime
-        selectedSessionStillActive := isSelectedSession and inSession
+        // Validate index before access (FIX BUG #4)
+        if activeSessionIndex >= 0 and activeSessionIndex < array.size(sessionManagers)
+            SessionManager activeMgr = array.get(sessionManagers, activeSessionIndex)
+            bool isSelectedSession = activeMgr.name == sessionLevelsSessionSelect
+            bool inSession = not na(sessionEndTime) and time >= sessionStartTime and time < sessionEndTime
+            selectedSessionStillActive := isSelectedSession and inSession
 
     bool shouldShowSessionLevels = sessionLevelsVisible and not na(activeSessionIndex) and not na(sessionOpen) and selectedSessionStillActive
     for level in sessionLevels
